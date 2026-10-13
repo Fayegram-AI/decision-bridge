@@ -62,5 +62,11 @@ if (lock.version !== pkg.version || lock.packages?.['']?.version !== pkg.version
     lock.name !== pkg.name || lock.packages?.['']?.name !== pkg.name) {
     console.error('Lockfile package identity mismatch.'); failed = true;
 }
+const bins = mapping => Object.entries(mapping ?? {}).map(([name, path]) => [name, path.replace(/^\.\//, '')])
+    .sort(([left], [right]) => left.localeCompare(right));
+if (JSON.stringify(bins(pkg.bin)) !== JSON.stringify(bins(lock.packages?.['']?.bin)) ||
+    Object.values(pkg.bin ?? {}).some(path => !existsSync(join(root, path)))) {
+    console.error('CLI executable mapping mismatch.'); failed = true;
+}
 if (!failed) console.log('Source layout, JavaScript syntax, JSON, formatting, local documentation links, and version checks passed.');
 process.exitCode = failed ? 1 : 0;

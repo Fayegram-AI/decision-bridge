@@ -1,6 +1,7 @@
-import { createAdapter, choice, decideChoice } from '../src/index.mjs';
+import { createBridge, choice, decideChoice } from '../src/index.mjs';
 
-const adapter = createAdapter({
+const bridge = createBridge({
+  jev: {},
   extensions: [{
     name: 'project-context',
     prepareState(state) {
@@ -22,7 +23,7 @@ const adapter = createAdapter({
   }],
 });
 
-const result = await adapter.evaluate({
+const result = await bridge.evaluate({
   state: "ModuleNotFoundError: No module named 'pytest'",
   questions: {
     category: choice('Classify the error.', {

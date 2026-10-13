@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { open, link, unlink, rename, lstat, stat, realpath } from 'node:fs/promises';
 import { resolve, dirname, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { AdapterError, requireCondition as check } from '../errors.mjs';
+import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { withSignal, abortError } from '../async.mjs';
 
 export const INPUT_LIMIT = 8 * 1024 * 1024;
@@ -21,8 +21,8 @@ export async function assertDistinctFiles(input, output, cwd) {
     // A nonexistent output cannot alias an existing input. Missing inputs are
     // reported by the normal input reader, before any inference is dispatched.
     if (error?.code === 'ENOENT') return;
-    if (error instanceof AdapterError) throw error;
-    throw new AdapterError('Cannot verify input/output file identity.', { code: 'IO_ERROR' });
+    if (error instanceof DecisionError) throw error;
+    throw new DecisionError('Cannot verify input/output file identity.', { code: 'IO_ERROR' });
   }
 }
 
@@ -37,8 +37,8 @@ async function* chunks(path, { stdin, cwd, signal }, limit) {
       check(info.isFile(), 'Input must be a regular file.', 'IO_ERROR');
       input = createReadStream(file);
     } catch (error) {
-      if (error instanceof AdapterError) throw error;
-      throw new AdapterError('Cannot open input file.', { code: 'IO_ERROR' });
+      if (error instanceof DecisionError) throw error;
+      throw new DecisionError('Cannot open input file.', { code: 'IO_ERROR' });
     }
   }
   check(input && !input.isTTY, 'No piped input was supplied on stdin.', 'USAGE_ERROR');
@@ -56,8 +56,8 @@ async function* chunks(path, { stdin, cwd, signal }, limit) {
     }
   } catch (error) {
     if (signal?.aborted) throw abortError();
-    if (error instanceof AdapterError) throw error;
-    throw new AdapterError('Cannot read input.', { code: 'IO_ERROR' });
+    if (error instanceof DecisionError) throw error;
+    throw new DecisionError('Cannot read input.', { code: 'IO_ERROR' });
   } finally {
     if (path !== '-' || signal?.aborted) input.destroy?.();
     // Closing a file/pipe breaks pending reads without waiting on custom streams.
@@ -67,14 +67,15 @@ async function* chunks(path, { stdin, cwd, signal }, limit) {
 
 export async function readJson(path, context) {
   const buffers = [];
-  for await (const chunk of chunks(path, context, INPUT_LIMIT)) buffers.push(chunk);
+  for await (const chunk of chunks(path, context, context.maxInputBytes ?? INPUT_LIMIT)) buffers.push(chunk);
   try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers))); }
-  catch { throw new AdapterError('Input is not valid UTF-8 JSON.', { code: 'VALIDATION_ERROR' }); }
+  catch { throw new DecisionError('Input is not valid UTF-8 JSON.', { code: 'VALIDATION_ERROR' }); }
 }
 
-/** Streaming JSONL: per-line 8 MiB, total 64 MiB; blank lines ignored. */
+/** Streaming JSONL: provider-specific per-line limit, total 64 MiB; blanks ignored. */
 export async function* readJsonLines(path, context) {
   const decoder = new TextDecoder('utf-8', { fatal: true });
+  const lineLimit = context.maxInputBytes ?? INPUT_LIMIT;
   let pending = '';
   let line = 0;
   function parse(text) {
@@ -89,16 +90,21 @@ export async function* readJsonLines(path, context) {
         const text = pending.slice(0, end).replace(/\r$/, '');
         pending = pending.slice(end + 1);
         line++;
-        check(Buffer.byteLength(text) <= INPUT_LIMIT, 'A JSONL line exceeds 8 MiB.', 'INPUT_TOO_LARGE');
+        check(Buffer.byteLength(text) <= lineLimit, 'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
         if (text.trim()) yield parse(text);
       }
-      check(Buffer.byteLength(pending) <= INPUT_LIMIT, 'A JSONL line exceeds 8 MiB.', 'INPUT_TOO_LARGE');
+      // A trailing CR may be half of a split CRLF delimiter, not record content.
+      const delimiterBytes = pending.endsWith('\r') ? 1 : 0;
+      check(Buffer.byteLength(pending) - delimiterBytes <= lineLimit,
+        'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
     }
     pending += decoder.decode();
+    // At EOF an unpaired CR is content; it cannot enlarge the record ceiling.
+    check(Buffer.byteLength(pending) <= lineLimit, 'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
     if (pending.trim()) { line++; yield parse(pending); }
   } catch (error) {
-    if (error instanceof AdapterError) throw error;
-    throw new AdapterError('JSONL input contains invalid UTF-8.', { code: 'VALIDATION_ERROR' });
+    if (error instanceof DecisionError) throw error;
+    throw new DecisionError('JSONL input contains invalid UTF-8.', { code: 'VALIDATION_ERROR' });
   }
 }
 
@@ -123,26 +129,26 @@ export async function createWriter({ output, force = false, stdout, cwd, signal 
   if (!force) {
     try {
       await lstat(target);
-      throw new AdapterError('Output already exists; use --force to replace it.', { code: 'IO_ERROR' });
+      throw new DecisionError('Output already exists; use --force to replace it.', { code: 'IO_ERROR' });
     } catch (error) {
       if (error?.code !== 'ENOENT') {
-        if (error instanceof AdapterError) throw error;
-        throw new AdapterError('Cannot inspect output path.', { code: 'IO_ERROR' });
+        if (error instanceof DecisionError) throw error;
+        throw new DecisionError('Cannot inspect output path.', { code: 'IO_ERROR' });
       }
     }
   }
   const temporary = resolve(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
   let handle;
   try { handle = await open(temporary, 'wx', 0o600); }
-  catch { throw new AdapterError('Cannot create output file.', { code: 'IO_ERROR' }); }
+  catch { throw new DecisionError('Cannot create output file.', { code: 'IO_ERROR' }); }
   let closed = false;
   async function close() { if (!closed) { closed = true; await handle.close(); } }
   return {
     async write(text) {
       try { checkCancelled(); await handle.writeFile(text); checkCancelled(); }
       catch (error) {
-        if (error instanceof AdapterError) throw error;
-        throw new AdapterError('Cannot write output file.', { code: 'IO_ERROR' });
+        if (error instanceof DecisionError) throw error;
+        throw new DecisionError('Cannot write output file.', { code: 'IO_ERROR' });
       }
     },
     async finish() {
@@ -156,8 +162,8 @@ export async function createWriter({ output, force = false, stdout, cwd, signal 
         if (force) await rename(temporary, target);
         else { await link(temporary, target); await unlink(temporary); }
       } catch (error) {
-        if (error instanceof AdapterError) throw error;
-        throw new AdapterError('Cannot finalize output file; existing output was not overwritten without --force.', { code: 'IO_ERROR' });
+        if (error instanceof DecisionError) throw error;
+        throw new DecisionError('Cannot finalize output file; existing output was not overwritten without --force.', { code: 'IO_ERROR' });
       }
     },
     async abort() { await close().catch(() => {}); await unlink(temporary).catch(() => {}); },

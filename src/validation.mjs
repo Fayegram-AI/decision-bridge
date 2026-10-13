@@ -1,5 +1,6 @@
-import { isDeepStrictEqual } from 'node:util';
 import { requireCondition as check } from './errors.mjs';
+import { isTextWithinLimit, validateOrderedInput } from './input.mjs';
+import { validateProbabilitySum, validateResultOptions } from './probabilities.mjs';
 
 const own = (value, key) => Object.hasOwn(value, key);
 export const isRecord = value => value !== null && typeof value === 'object' &&
@@ -7,6 +8,15 @@ export const isRecord = value => value !== null && typeof value === 'object' &&
 const isEntry = value => value === null || typeof value === 'string' ||
   Array.isArray(value) || isRecord(value);
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
+
+function equalJson(left, right) {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object' ||
+    Object.getPrototypeOf(left) !== Object.getPrototypeOf(right) || Array.isArray(left) !== Array.isArray(right)) return false;
+  if (Array.isArray(left)) return left.length === right.length && left.every((item, i) => equalJson(item, right[i]));
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every(key => own(right, key) && equalJson(left[key], right[key]));
+}
 
 /** Reject lossy JSON conversion: cycles, NaN, undefined, Date, getters, etc. */
 export function cloneJson(value, label = 'value', code = 'VALIDATION_ERROR') {
@@ -68,26 +78,53 @@ function allowedKeys(value, expected, label, code = 'VALIDATION_ERROR') {
     `${label}: unknown field.`, code);
 }
 
-export function validateRequest(input, defaultModel = 'jev-latest') {
+export function validateRequest(input, defaultModel) {
   const request = cloneJson(input, 'request');
   check(isRecord(request), 'request must be an object.');
-  allowedKeys(request, ['state', 'questions', 'model'], 'request');
-  check(own(request, 'state') && request.state !== null && isEntry(request.state),
+  allowedKeys(request, ['state', 'input', 'questions', 'model', 'safetyIdentifier'], 'request');
+  check(own(request, 'state') !== own(request, 'input'), 'Provide exactly one of state or input.');
+  if (own(request, 'state')) check(request.state !== null && isEntry(request.state),
     'state must be text, a JSON object, or an array.');
+  else validateOrderedInput(request.input);
+  if (own(request, 'safetyIdentifier')) check(request.safetyIdentifier === null ||
+    isTextWithinLimit(request.safetyIdentifier, 128),
+  'safetyIdentifier must be a string up to 128 characters or null.');
   if (own(request, 'model')) check(nonempty(request.model), 'model must be a nonempty string when provided.');
-  const model = request.model ?? defaultModel;
+    const model = own(request, 'model') ? request.model : defaultModel;
   check(nonempty(model), 'model must be a nonempty string.');
   check(isRecord(request.questions) && Object.keys(request.questions).length > 0,
     'questions must be a nonempty object.');
   for (const [id, q] of Object.entries(request.questions)) {
     check(nonempty(id), 'Question IDs must be nonempty.');
     check(isRecord(q), 'Every question must be an object.');
-    allowedKeys(q, ['type', 'instructions', 'criteria'], 'question');
+    allowedKeys(q, q.type === 'choice' ? ['type', 'instructions', 'criteria', 'options'] :
+      q.type === 'score' ? ['type', 'instructions', 'criteria', 'levels'] : ['type', 'instructions', 'criteria'], 'question');
     check(['choice', 'noul', 'score'].includes(q.type), 'Question type must be choice, noul, or score.');
     check(own(q, 'instructions') && q.instructions !== null && isEntry(q.instructions),
       'instructions are required and must be text, a JSON object, or an array.');
     if (typeof q.instructions === 'string') check(nonempty(q.instructions), 'instructions must not be empty.');
-    if (q.type === 'choice') {
+    if (q.type === 'choice' && own(q, 'options')) {
+      check(!own(q, 'criteria') && Array.isArray(q.options) && q.options.length > 0,
+        'Typed choice requires options and no criteria map.');
+      const values = new Set();
+      for (const option of q.options) {
+        check(isRecord(option), 'Choice options must be objects.');
+        allowedKeys(option, ['value', 'description'], 'choice option');
+        check(typeof option.value === 'string' || typeof option.value === 'boolean', 'Choice values must be strings or booleans.');
+        check(!values.has(option.value), 'Choice values must be distinct.');
+        values.add(option.value);
+        if (own(option, 'description')) check(isEntry(option.description), 'Invalid choice description.');
+      }
+    } else if (q.type === 'score' && own(q, 'levels')) {
+      check(!own(q, 'criteria') && Array.isArray(q.levels) && q.levels.length >= 2,
+        'Labelled score requires at least two levels and no criteria array.');
+      for (const level of q.levels) {
+        check(isRecord(level), 'Score levels must be objects.');
+        allowedKeys(level, ['label', 'description'], 'score level');
+        check(typeof level.label === 'string', 'Score level requires a label.');
+        if (own(level, 'description')) check(level.description !== null && isEntry(level.description), 'Invalid level description.');
+      }
+    } else if (q.type === 'choice') {
       check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0 && Object.keys(q.criteria).length <= 255,
         'choice requires a criteria map with 1 to 255 options.');
       for (const [label, description] of Object.entries(q.criteria)) {
@@ -113,34 +150,32 @@ function probability(value, label) {
     `${label}: expected a probability in [0, 1].`, 'INVALID_RESPONSE');
 }
 
-function distribution(value, labels) {
+function distribution(value, labels, decimalPlaces) {
   exactKeys(value, labels, 'probabilities', 'INVALID_RESPONSE');
   Object.values(value).forEach(item => probability(item, 'probabilities'));
-  const total = Object.values(value).reduce((sum, item) => sum + item, 0);
-  // Tolerate serialization rounding, but do not renormalize provider values.
-  check(Math.abs(total - 1) <= 1e-3, 'probabilities must sum to 1 (tolerance 0.001).', 'INVALID_RESPONSE');
+  validateProbabilitySum(Object.values(value), decimalPlaces);
 }
 
 /** Validate, but do not invent, round, or normalize model results. */
 export function validateResult(input, questions, options = {}) {
-  check(isRecord(options), 'Result-validation options must be an object.', 'CONFIGURATION_ERROR');
-  check(Object.getOwnPropertySymbols(options).length === 0 &&
-    Object.entries(Object.getOwnPropertyDescriptors(options)).every(([key, d]) =>
-      key === 'native' && d.enumerable && 'value' in d),
-  'Result-validation options contain an unknown field or accessor.', 'CONFIGURATION_ERROR');
-  const { native = false } = options;
-  check(typeof native === 'boolean', 'native must be boolean.', 'CONFIGURATION_ERROR');
+  const { native, probabilityDecimalPlaces } = validateResultOptions(options);
   const result = cloneJson(input, 'response', 'INVALID_RESPONSE');
+  // Snapshot both sides so rubric comparison uses JSON values without executing accessors.
+  const questionSnapshot = cloneJson(questions, 'questions');
   check(isRecord(result), 'Response must be an object.', 'INVALID_RESPONSE');
   allowedKeys(result, ['model', 'answers', 'usage', 'meta'], 'response', 'INVALID_RESPONSE');
-  check(isRecord(questions) && Object.keys(questions).length > 0, 'questions must be a nonempty object.');
+  check(isRecord(questionSnapshot) && Object.keys(questionSnapshot).length > 0, 'questions must be a nonempty object.');
   check(nonempty(result.model), 'Response must include model.', 'INVALID_RESPONSE');
-  exactKeys(result.answers, Object.keys(questions), 'answers', 'INVALID_RESPONSE');
-  for (const [id, q] of Object.entries(questions)) {
+  exactKeys(result.answers, Object.keys(questionSnapshot), 'answers', 'INVALID_RESPONSE');
+  for (const [id, q] of Object.entries(questionSnapshot)) {
     check(isRecord(q) && ['noul', 'choice', 'score'].includes(q.type), 'A valid question type is required.');
-    if (q.type === 'choice') check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0 &&
+    if (q.type === 'choice' && own(q, 'options')) check(Array.isArray(q.options) && q.options.length > 0 &&
+      q.options.every(option => isRecord(option)), 'Typed choice requires nonempty option objects.');
+    if (q.type === 'score' && own(q, 'levels')) check(Array.isArray(q.levels) && q.levels.length >= 2 &&
+      q.levels.every(level => isRecord(level) && typeof level.label === 'string'), 'Labelled score requires valid levels.');
+    if (q.type === 'choice' && !own(q, 'options')) check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0 &&
       Object.keys(q.criteria).length <= 255, 'choice requires 1 to 255 criteria.');
-    if (q.type === 'score') check(Array.isArray(q.criteria) && q.criteria.length >= 2 && q.criteria.length <= 10, 'score requires 2–10 levels.');
+    if (q.type === 'score' && !own(q, 'levels')) check(Array.isArray(q.criteria) && q.criteria.length >= 2 && q.criteria.length <= 10, 'score requires 2–10 levels.');
     const answer = result.answers[id];
     check(isRecord(answer) && answer.type === q.type, 'Answer type must match its question.', 'INVALID_RESPONSE');
     allowedKeys(answer, q.type === 'noul' ? ['type', 'noul'] : q.type === 'choice'
@@ -150,8 +185,13 @@ export function validateResult(input, questions, options = {}) {
       continue;
     }
     if (native || own(answer, 'confidence')) probability(answer.confidence, 'confidence');
-    const labels = q.type === 'choice' ? Object.keys(q.criteria) : q.criteria.map((_, i) => String(i));
-    distribution(answer.probabilities, labels);
+    if (q.type === 'choice' && q.options) {
+      validateTypedChoice(answer, q.options, probabilityDecimalPlaces);
+      continue;
+    }
+    const rubric = q.levels ?? q.criteria;
+    const labels = q.type === 'choice' ? Object.keys(q.criteria) : rubric.map((_, i) => String(i));
+    distribution(answer.probabilities, labels, probabilityDecimalPlaces);
     if (q.type === 'choice') {
       check(typeof answer.choice === 'string' && labels.includes(answer.choice), 'choice must be a supplied option.', 'INVALID_RESPONSE');
       const selected = answer.probabilities[answer.choice];
@@ -159,13 +199,13 @@ export function validateResult(input, questions, options = {}) {
         'choice must select a highest-probability option.', 'INVALID_RESPONSE');
     } else {
       exactKeys(answer.legend, labels, 'legend', 'INVALID_RESPONSE');
-      check(labels.every((label, i) => isDeepStrictEqual(answer.legend[label], q.criteria[i])),
+      check(labels.every((label, i) => equalJson(answer.legend[label], rubric[i])),
         'Score legend does not match the supplied rubric.', 'INVALID_RESPONSE');
       check(typeof answer.score === 'number' && Number.isFinite(answer.score) &&
-        answer.score >= 0 && answer.score <= q.criteria.length - 1,
+        answer.score >= 0 && answer.score <= rubric.length - 1,
         'score is outside the rubric range.', 'INVALID_RESPONSE');
       const mean = labels.reduce((sum, key) => sum + Number(key) * answer.probabilities[key], 0);
-      check(Math.abs(mean - answer.score) <= 0.02 * q.criteria.length,
+      check(Math.abs(mean - answer.score) <= 0.02 * rubric.length,
         'score is inconsistent with its probability-weighted mean.', 'INVALID_RESPONSE');
     }
   }
@@ -183,3 +223,23 @@ export function validateResult(input, questions, options = {}) {
   return result;
 }
 
+/** Values retain primitive identity: true and "true" never share a map key. */
+function validateTypedChoice(answer, options, decimalPlaces) {
+    const values = options.map(option => option.value);
+    const supplied = new Set(values);
+    check(values.every(value => typeof value === 'string' || typeof value === 'boolean') &&
+        supplied.size === values.length && values.length > 0, 'Invalid typed choice options.');
+    check(Array.isArray(answer.probabilities) && answer.probabilities.length === values.length,
+        'Typed probabilities must match the options.', 'INVALID_RESPONSE');
+    const probabilities = new Map();
+    for (const item of answer.probabilities) {
+        exactKeys(item, ['value', 'probability'], 'typed probability', 'INVALID_RESPONSE');
+        check(supplied.has(item.value) && !probabilities.has(item.value), 'Invalid typed probability value.', 'INVALID_RESPONSE');
+        probability(item.probability, 'probability');
+        probabilities.set(item.value, item.probability);
+    }
+    const numbers = [...probabilities.values()];
+    validateProbabilitySum(numbers, decimalPlaces);
+    check(probabilities.has(answer.choice) && probabilities.get(answer.choice) + 1e-6 >= numbers.reduce((max, p) => Math.max(max, p), 0),
+        'choice must select a highest-probability supplied value.', 'INVALID_RESPONSE');
+}

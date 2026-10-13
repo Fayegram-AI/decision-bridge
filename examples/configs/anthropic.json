@@ -1,7 +1,9 @@
 {
-  "schemaVersion": 1,
-  "provider": "anthropic",
-  "model": "YOUR_ANTHROPIC_MODEL",
-  "apiKeyEnv": "ANTHROPIC_API_KEY",
-  "timeoutMs": 30000
+    "$schema": "../../schemas/decision.config.schema.json",
+    "schemaVersion": 1,
+    "provider": "custom-generative",
+    "model": "YOUR_ANTHROPIC_MODEL",
+    "apiKeyEnv": "ANTHROPIC_API_KEY",
+    "timeoutMs": 30000,
+    "preset": "anthropic"
 }

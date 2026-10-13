@@ -1,0 +1,19 @@
+{
+    "model": "gpt-6-luna",
+    "input": "Export fails in Safari but works in Chrome.",
+    "questions": [
+        { "type": "predicate", "name": "browser_specific", "instructions": "Is the failure browser-specific?" },
+        {
+            "type": "choice",
+            "name": "route",
+            "instructions": "Select a queue.",
+            "choices": [{ "value": "engineering" }, { "value": "review" }]
+        },
+        {
+            "type": "score",
+            "name": "severity",
+            "instructions": "Rate the impact.",
+            "levels": [{ "label": "Minor" }, { "label": "Workaround available" }, { "label": "Blocked" }]
+        }
+    ]
+}

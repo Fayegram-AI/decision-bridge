@@ -1,0 +1,28 @@
+{
+    "model": "clef",
+    "state": {
+        "ticket": "The production checkout is unavailable."
+    },
+    "questions": {
+        "urgent": {
+            "type": "noul",
+            "instructions": "Does this need immediate attention?"
+        },
+        "route": {
+            "type": "choice",
+            "instructions": "Choose a route.",
+            "criteria": {
+                "incident": "Immediate incident response.",
+                "review": "Normal review."
+            }
+        },
+        "severity": {
+            "type": "score",
+            "instructions": "Rate severity.",
+            "criteria": [
+                "No production impact.",
+                "Production functionality is unavailable."
+            ]
+        }
+    }
+}

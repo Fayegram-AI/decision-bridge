@@ -1,8 +1,9 @@
+import { createGenerativeProvider } from '../src/custom/generative/index.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAdapter, createProvider, JevProvider, OpenAICompatibleProvider, OpenRouterProvider,
-  AnthropicProvider, buildResponseSchema, validateResult } from '../src/index.mjs';
-import { normalizeGenerated, parseGeneratedJson } from '../src/schema.mjs';
+import { createBridge, createProvider, JevProvider, validateResult } from '../src/index.mjs';
+import { OpenAICompatibleProvider, OpenRouterProvider, AnthropicProvider, buildResponseSchema } from '../src/custom/generative/index.mjs';
+import { normalizeGenerated, parseGeneratedJson } from '../src/custom/generative/schema.mjs';
 import { request, response, jsonResponse, copy } from './fixtures.mjs';
 
 const generated = { answers: { route: { probabilities: { a: 0.8, b: 0.2 } },
@@ -29,7 +30,7 @@ test('OpenAI wire body, schema, model override and native normalization', async 
       captured = JSON.parse(init.body);
       return jsonResponse(chat());
     } });
-  const result = await createAdapter({ provider }).evaluate({ ...request, model: 'override' });
+  const result = await createBridge({ provider }).evaluate({ ...request, model: 'override' });
   assert.equal(captured.model, 'override');
   assert.equal(captured.stream, false);
   assert.equal(captured.max_completion_tokens, 4096);
@@ -169,6 +170,21 @@ for (const config of [{ responseFormat: 'auto' }, { tokenParameter: 'tokens' }, 
   });
 }
 
+test('generative presets reject legacy function controls before dispatch', () => {
+    let calls = 0;
+    for (const Provider of [OpenAICompatibleProvider, OpenRouterProvider, AnthropicProvider]) {
+        for (const parameters of [
+            { functions: [{ name: 'other_output', parameters: { type: 'object' } }] },
+            { function_call: { name: 'other_output' } },
+        ]) {
+            assert.throws(() => new Provider({ apiKey: 'fixture', model: 'fixture', parameters,
+                fetchImpl: async () => { calls++; return jsonResponse(chat()); } }),
+            { code: 'CONFIGURATION_ERROR' });
+        }
+    }
+    assert.equal(calls, 0);
+});
+
 test('Anthropic forced output protocol and cache accounting', async () => {
   const provider = new AnthropicProvider({ apiKey: 'anthropic-fixture', model: 'chosen', fetchImpl: async (url, init) => {
     assert.equal(url, 'https://api.anthropic.com/v1/messages');
@@ -216,7 +232,7 @@ for (const Provider of [OpenAICompatibleProvider, AnthropicProvider]) {
       assert.equal(init.method, 'GET');
       return jsonResponse({ data: [{ id: 'test-model' }], has_more: true, last_id: 'test-model' });
     } });
-    const result = await createAdapter({ provider }).listModels();
+    const result = await createBridge({ provider }).listModels();
     assert.equal(result.models[0].name, 'test-model');
     assert.equal(result.has_more, true);
     assert.equal(result.last_id, 'test-model');
@@ -231,7 +247,11 @@ test('native confidence and usage are still required by Jev provider', async () 
 });
 
 test('provider factory supports every built-in type and rejects unknown types', () => {
-  for (const type of ['jev', 'openai-compatible', 'openrouter', 'anthropic']) assert.equal(typeof createProvider({ type, apiKey: 'test' }).evaluate, 'function');
+  assert.equal(createProvider({ type: 'jev', apiKey: 'test' }).kind, 'decision');
+  for (const type of ['openai-compatible', 'openrouter', 'anthropic']) {
+    assert.throws(() => createProvider({ type, apiKey: 'test' }), { code: 'CONFIGURATION_ERROR' });
+    assert.equal(createGenerativeProvider({ type, apiKey: 'test' }).kind, 'generative');
+  }
   assert.throws(() => createProvider({ type: 'mystery' }), { code: 'CONFIGURATION_ERROR' });
   assert.throws(() => parseGeneratedJson(null), { code: 'INVALID_RESPONSE' });
 });

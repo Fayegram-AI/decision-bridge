@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "provider": "cloudflare-decisions",
+    "model": "clef",
+    "apiKeyEnv": "CLOUDFLARE_API_TOKEN",
+    "timeoutMs": 30000,
+    "maxRetries": 0
+}

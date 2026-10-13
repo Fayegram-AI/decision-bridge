@@ -1,13 +1,23 @@
-import { AdapterError, requireCondition as check } from './errors.mjs';
-import { isRecord, validateRequest, validateResult, cloneJson } from './validation.mjs';
+import { DecisionError, requireCondition as check } from '../../errors.mjs';
+import { isRecord, validateRequest, validateResult, cloneJson } from '../../validation.mjs';
+import { assertCapabilities, LEGACY_CAPABILITIES } from '../../capabilities.mjs';
 
 const objectSchema = properties => ({ type: 'object', properties,
   required: Object.keys(properties), additionalProperties: false });
 const numberSchema = () => ({ type: 'number' });
 
+/** Public helpers share the preset profile, including when called outside a provider. */
+function legacyRequest(input, defaultModel) {
+  const request = validateRequest(input, defaultModel);
+  assertCapabilities(request, LEGACY_CAPABILITIES);
+  return request;
+}
+
 /** Compact schema for generative backends; derived fields are computed in code. */
 export function buildResponseSchema(questions) {
-  const validated = validateRequest({ state: '', questions }).questions;
+  // Schema construction validates the rubric without selecting an inference model.
+  const request = legacyRequest({ state: '', questions }, 'validation-only');
+  const validated = request.questions;
   const properties = Object.fromEntries(Object.entries(validated).map(([id, q]) => {
     const labels = q.type === 'choice' ? Object.keys(q.criteria)
       : q.type === 'score' ? q.criteria.map((_, i) => String(i)) : [];
@@ -19,7 +29,8 @@ export function buildResponseSchema(questions) {
   return objectSchema({ answers: objectSchema(properties) });
 }
 
-export function buildPrompt(request) {
+export function buildPrompt(input) {
+  const request = legacyRequest(input);
   return {
     system: [
       'Evaluate the supplied state against each question independently.',
@@ -40,7 +51,7 @@ export function parseGeneratedJson(text) {
   check(typeof text === 'string' && text.trim().length > 0,
     'Provider returned no JSON content.', 'INVALID_RESPONSE');
   try { return JSON.parse(text); }
-  catch { throw new AdapterError('Model output is not a single valid JSON object.', { code: 'INVALID_RESPONSE' }); }
+  catch { throw new DecisionError('Model output is not a single valid JSON object.', { code: 'INVALID_RESPONSE' }); }
 }
 
 function exact(value, keys) {
@@ -49,7 +60,8 @@ function exact(value, keys) {
 }
 
 /** Convert elicited distributions to the stable decision result, without confidence. */
-export function normalizeGenerated(payload, request, { model, usage, meta = {} } = {}) {
+export function normalizeGenerated(payload, input, { model, usage, meta = {} } = {}) {
+  const request = legacyRequest(input);
   const data = cloneJson(payload, 'generated response', 'INVALID_RESPONSE');
   exact(data, ['answers']);
   exact(data.answers, Object.keys(request.questions));

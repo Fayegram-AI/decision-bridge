@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile, readdir, stat, symlink, link } from 'node:fs/promises';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { runCli } from '../src/cli/main.mjs';
-import { createWriter } from '../src/cli/io.mjs';
+import { createWriter, readJsonLines } from '../src/cli/io.mjs';
 import { workspace, temporaryWorkspace, streams, one } from './support.mjs';
 import { request } from './fixtures.mjs';
 
@@ -13,9 +14,29 @@ async function invoke(args, cwd) {
   return { code, stdout: io.output(), stderr: io.error() };
 }
 
+test('JSONL record byte limits are independent of split CRLF delimiters', async () => {
+    const input = { ...one, state: '界' };
+    const text = JSON.stringify(input);
+    const limit = Buffer.byteLength(text);
+    const read = parts => Array.fromAsync(readJsonLines('-', {
+        stdin: Readable.from(parts.map(part => Buffer.from(part))),
+        cwd: process.cwd(), maxInputBytes: limit,
+    }));
+    for (const parts of [[text + '\n'], [text + '\r\n'], [text + '\r', '\n'],
+        [text, '\r', '\n'], [text]]) {
+        assert.deepEqual(await read(parts), [{ line: 1, input }]);
+    }
+    assert.deepEqual(await read([text + '\r', '\n' + text + '\r', '\n']),
+        [{ line: 1, input }, { line: 2, input }]);
+    // A CR only earns delimiter allowance when it is followed by LF.
+    for (const parts of [[text + '\r'], [text + '\r', ' '], [text + ' ', '\r\n']]) {
+        await assert.rejects(read(parts), { code: 'INPUT_TOO_LARGE' });
+    }
+});
+
 test('atomic output is private, exclusive and leaves no temporary files', async t => {
   const cwd = await workspace(t);
-  const args = ['evaluate', 'request.json', '--provider-module', 'provider.mjs', '--output', 'out.json'];
+  const args = ['evaluate', 'request.json', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--output', 'out.json'];
   const result = await invoke(args, cwd);
   assert.equal(result.code, 0, result.stderr);
   assert.equal(result.stdout, '');

@@ -1,12 +1,16 @@
 /** Public errors never retain raw upstream bodies, headers or original exceptions. */
-export class AdapterError extends Error {
-  constructor(message, { code = 'ADAPTER_ERROR', status, requestId, attempts } = {}) {
+export class DecisionError extends Error {
+  constructor(message, { code = 'DECISION_ERROR', status, requestId, gatewayLogId, attempts, refusedQuestions, usage, upstreamCode } = {}) {
     super(message);
-    this.name = 'AdapterError';
+    this.name = 'DecisionError';
     this.code = code;
     if (status !== undefined) this.status = status;
     if (requestId !== undefined) this.requestId = requestId;
+    if (gatewayLogId !== undefined) this.gatewayLogId = gatewayLogId;
     if (attempts !== undefined) this.attempts = attempts;
+    if (refusedQuestions !== undefined) this.refusedQuestions = refusedQuestions;
+    if (usage !== undefined) this.usage = usage;
+    if (upstreamCode !== undefined) this.upstreamCode = upstreamCode;
   }
 
   toJSON() {
@@ -15,19 +19,23 @@ export class AdapterError extends Error {
       message: this.message,
       ...(this.status === undefined ? {} : { status: this.status }),
       ...(this.requestId === undefined ? {} : { requestId: this.requestId }),
+      ...(this.gatewayLogId === undefined ? {} : { gatewayLogId: this.gatewayLogId }),
       ...(this.attempts === undefined ? {} : { attempts: this.attempts }),
+      ...(this.refusedQuestions === undefined ? {} : { refusedQuestions: this.refusedQuestions }),
+      ...(this.usage === undefined ? {} : { usage: this.usage }),
+      ...(this.upstreamCode === undefined ? {} : { upstreamCode: this.upstreamCode }),
     };
   }
 }
 
 export function requireCondition(condition, message, code = 'VALIDATION_ERROR') {
-  if (!condition) throw new AdapterError(message, { code });
+  if (!condition) throw new DecisionError(message, { code });
 }
 
 /** Unknown exceptions can contain credentials or prompts; never serialize them. */
 export function publicError(error) {
-  return error instanceof AdapterError ? error.toJSON() : {
-    code: 'UNEXPECTED_ERROR', message: 'Unexpected adapter failure.',
+  return error instanceof DecisionError ? error.toJSON() : {
+    code: 'UNEXPECTED_ERROR', message: 'Unexpected bridge failure.',
   };
 }
 
@@ -35,7 +43,7 @@ export function publicError(error) {
 export function withResponseMeta(meta, decode) {
   try { return decode(); }
   catch (error) {
-    if (!(error instanceof AdapterError)) throw error;
-    throw new AdapterError(error.message, { ...meta, ...error.toJSON() });
+    if (!(error instanceof DecisionError)) throw error;
+    throw new DecisionError(error.message, { ...meta, ...error.toJSON() });
   }
 }

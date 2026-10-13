@@ -1,7 +1,7 @@
-import { createAdapter, choice, noul } from '../src/index.mjs';
+import { createBridge, choice, noul } from '../src/index.mjs';
 
-const jev = createAdapter(); // TYPESAFE_API_KEY; direct TypeSafe; jev-latest by default.
-const result = await jev.evaluate({
+const bridge = createBridge({ jev: {} }); // TYPESAFE_API_KEY; direct TypeSafe; jev-latest by default.
+const result = await bridge.evaluate({
   state: { error: "ModuleNotFoundError: No module named 'pytest'" },
   questions: {
     category: choice('Classify this failure from the supplied evidence.', {

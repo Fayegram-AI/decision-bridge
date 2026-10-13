@@ -8,13 +8,14 @@ import { npmCommand } from './toolchain.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const outputDirectory = join(root, 'release');
-const temporary = mkdtempSync(join(tmpdir(), 'jev-package-build-'));
+const temporary = mkdtempSync(join(tmpdir(), 'decision-bridge-build-'));
 
-function run(command, args) {
+function run(command, args, timeoutMs = 120000, inheritOutput = false) {
     const result = spawnSync(command, args, {
         cwd: root,
         encoding: 'utf8',
-        timeout: 120000,
+        timeout: timeoutMs,
+        stdio: inheritOutput ? 'inherit' : 'pipe',
     });
     if (result.status !== 0) {
         throw Error(`Package command failed: ${result.stderr || result.error || result.status}`);
@@ -37,10 +38,11 @@ try {
     assert.equal(dirname(tarball), temporary, 'Package filename must stay in the build directory.');
     assert(statSync(tarball).size > 0, 'Package artifact is empty.');
 
-    // Keep the artifact only after its exact bytes pass the install check.
-    process.stdout.write(run(process.execPath, [
+    // Allow aggregate CLI startup overhead while retaining each command's bound.
+    // Stream progress and retain the artifact only after its exact bytes pass.
+    run(process.execPath, [
         join(root, 'scripts/package-smoke.mjs'), '--tarball', tarball,
-    ]));
+    ], 600000, true);
     mkdirSync(outputDirectory, { recursive: true });
     const output = join(outputDirectory, packed[0].filename);
     copyFileSync(tarball, output);

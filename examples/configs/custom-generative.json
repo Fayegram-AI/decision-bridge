@@ -1,0 +1,14 @@
+{
+    "$schema": "../../schemas/decision.config.schema.json",
+    "schemaVersion": 1,
+    "provider": "custom-generative",
+    "module": "../custom/generative-provider.mjs",
+    "model": "YOUR_SERVED_MODEL",
+    "apiKeyEnv": "PROJECT_MODEL_KEY",
+    "options": {
+        "baseURL": "https://your-model-service.example/v1",
+        "responseFormat": "json_schema",
+        "tokenParameter": "max_tokens"
+    },
+    "timeoutMs": 30000
+}

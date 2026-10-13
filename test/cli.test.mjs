@@ -10,7 +10,7 @@ import { PassThrough } from 'node:stream';
 import { runCli } from '../src/cli/main.mjs';
 import { child, cleanEnv, workspace, temporaryWorkspace, streams, one } from './support.mjs';
 
-const bin = fileURLToPath(new URL('../bin/jev.mjs', import.meta.url));
+const bin = fileURLToPath(new URL('../bin/decision.mjs', import.meta.url));
 async function localServer(t, handler) {
   const server = createServer(handler); server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
@@ -43,7 +43,7 @@ test('stdin JSON validation and schema inspection', async () => {
 for (const args of [['badcommand'], ['--unknown'], ['validate', '--pretty', '--compact'],
   ['models', 'file'], ['validate', '--concurrency', '2'], ['validate', '--model', 'a', '--model', 'b'],
   ['validate', '--timeout-ms', 'abc'], ['validate', '--force'], ['validate', '--input', 'a', 'b'],
-  ['models', '--input', 'a'], ['init', '--output', 'a'], ['evaluate', '--provider-module', 'x', '--provider', 'jev']]) {
+  ['models', '--input', 'a'], ['init', '--output', 'a'], ['evaluate', '--provider', 'custom-decision', '--provider-module', 'x', '--provider', 'jev']]) {
   test(`invalid CLI usage ${args.join(' ')}`, async () => {
     const result = await invoke(args);
     assert.equal(result.code, 2, result.stderr);
@@ -67,20 +67,20 @@ test('missing credential errors never print a key or raw stack', async () => {
 
 test('explicit custom module evaluates, selects models and lists them', async t => {
   const cwd = await workspace(t);
-  const args = ['evaluate', 'request.json', '--provider-module', 'provider.mjs', '--model', 'selected'];
+  const args = ['evaluate', 'request.json', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--model', 'selected'];
   const result = await child(args, { cwd });
   assert.equal(result.code, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).model, 'selected');
   assert.equal(JSON.parse(result.stdout).answers.yes.noul, 0.42);
   assert.equal(JSON.parse(result.stdout).meta.probabilitySource, 'synthetic');
-  const models = await child(['models', '--provider-module', 'provider.mjs'], { cwd });
+  const models = await child(['models', '--provider', 'custom-decision', '--provider-module', 'provider.mjs'], { cwd });
   assert.equal(JSON.parse(models.stdout).models[0].name, 'local-test-fixture');
 });
 
 test('config module path is relative to its explicit configuration file', async t => {
   const cwd = await workspace(t);
   await mkdir(join(cwd, 'nested'));
-  await writeFile(join(cwd, 'nested/config.json'), JSON.stringify({ provider: 'custom', module: '../provider.mjs' }));
+  await writeFile(join(cwd, 'nested/config.json'), JSON.stringify({ provider: 'custom-decision', module: '../provider.mjs' }));
   const result = await child(['evaluate', 'request.json', '--config', 'nested/config.json'], { cwd });
   assert.equal(result.code, 0, result.stderr);
 });
@@ -88,7 +88,7 @@ test('config module path is relative to its explicit configuration file', async 
 test('no executable config is auto-discovered', async t => {
   const cwd = await workspace(t);
   await writeFile(join(cwd, 'decision.config.js'), `throw Error('should never execute');`);
-  await writeFile(join(cwd, 'decision.config.json'), JSON.stringify({ provider: 'custom', module: 'provider.mjs' }));
+  await writeFile(join(cwd, 'decision.config.json'), JSON.stringify({ provider: 'custom-decision', module: 'provider.mjs' }));
   const result = await child(['evaluate', 'request.json'], { cwd });
   assert.equal(result.code, 2);
   assert.equal(JSON.parse(result.stderr).error.code, 'CONFIGURATION_ERROR');
@@ -98,7 +98,7 @@ test('batch preserves line order, blank lines and per-record failures', async t 
   const cwd = await workspace(t);
   const data = JSON.stringify({ ...one, state: 'slow' }) + '\r\n\r\nnot-json\n' + JSON.stringify(one);
   await writeFile(join(cwd, 'input.jsonl'), data);
-  const result = await child(['batch', 'input.jsonl', '--provider-module', 'provider.mjs', '--concurrency', '2'], { cwd });
+  const result = await child(['batch', 'input.jsonl', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--concurrency', '2'], { cwd });
   assert.equal(result.code, 1, result.stderr);
   assert.equal(result.stderr, '');
   const rows = result.stdout.trim().split('\n').map(line => JSON.parse(line));
@@ -108,7 +108,7 @@ test('batch preserves line order, blank lines and per-record failures', async t 
 
 test('batch accepts streamed stdin', async t => {
   const cwd = await workspace(t);
-  const result = await child(['batch', '-', '--provider-module', 'provider.mjs'], { cwd, input: JSON.stringify(one) + '\n' });
+  const result = await child(['batch', '-', '--provider', 'custom-decision', '--provider-module', 'provider.mjs'], { cwd, input: JSON.stringify(one) + '\n' });
   assert.equal(result.code, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).ok, true);
 });
@@ -150,7 +150,7 @@ test('OpenAI-compatible CLI uses explicit no-auth for local models', async t => 
     assert.equal(JSON.parse(raw).model, 'local-model');
     res.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{"answers":{"yes":{"noul":0.6}}}' } }] }));
   });
-  const result = await child(['evaluate', 'request.json', '--provider', 'openai-compatible', '--base-url', base + '/v1', '--no-auth', '--model', 'local-model'], { cwd });
+  const result = await child(['evaluate', 'request.json', '--provider', 'custom-generative', '--preset', 'openai-compatible', '--base-url', base + '/v1', '--no-auth', '--model', 'local-model'], { cwd });
   assert.equal(result.code, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).meta.modelSource, 'requested');
 });
@@ -174,7 +174,7 @@ test('error redaction preserves JSON keys and covers explicit nonstandard creden
   await writeFile(join(cwd, 'provider.mjs'), `export function createProvider({ apiKey }) {
     throw Error(apiKey);
   }`);
-  const result = await child(['evaluate', 'request.json', '--provider-module', 'provider.mjs', '--api-key-env', 'PASSWORD'],
+  const result = await child(['evaluate', 'request.json', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--api-key-env', 'PASSWORD'],
     { cwd, env: { PASSWORD: 'error' } });
   assert.equal(result.code, 2);
   const data = JSON.parse(result.stderr);
@@ -183,7 +183,7 @@ test('error redaction preserves JSON keys and covers explicit nonstandard creden
 });
 
 test('validate does not invent a Jev model for an unspecified generative model', async () => {
-  const result = await child(['validate', '-', '--provider', 'openrouter'], { input: JSON.stringify(one) });
+  const result = await child(['validate', '-', '--provider', 'custom-generative', '--preset', 'openrouter'], { input: JSON.stringify(one) });
   assert.equal(result.code, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).model, null);
 });
@@ -211,14 +211,14 @@ test('SIGINT cancels a stalled HTTP inference without hanging', { skip: process.
 test('custom async factory initialization is bounded', async t => {
   const cwd = await workspace(t);
   await writeFile(join(cwd, 'provider.mjs'), 'export const createProvider = () => new Promise(() => {});\n');
-  const result = await child(['evaluate', 'request.json', '--provider-module', 'provider.mjs', '--timeout-ms', '20'], { cwd });
+  const result = await child(['evaluate', 'request.json', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--timeout-ms', '20'], { cwd });
   assert.equal(result.code, 1, result.stderr);
   assert.equal(JSON.parse(result.stderr).error.code, 'TIMEOUT');
 });
 
 test('custom top-level generation options fail rather than being ignored', async t => {
   const cwd = await workspace(t);
-  const result = await child(['evaluate', 'request.json', '--provider-module', 'provider.mjs', '--max-tokens', '500'], { cwd });
+  const result = await child(['evaluate', 'request.json', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--max-tokens', '500'], { cwd });
   assert.equal(result.code, 2, result.stderr);
   assert.equal(JSON.parse(result.stderr).error.code, 'CONFIGURATION_ERROR');
 });
@@ -236,7 +236,7 @@ for (const args of [['batch'], ['batch', '-', '--concurrency', '0'], ['batch', '
 test('streaming batch emits a completed record without waiting for more input or EOF', { timeout: 6000 }, async t => {
   const cwd = await workspace(t);
   await writeFile(join(cwd, 'provider.mjs'), `export function createProvider() { return {
-    name: 'synthetic-streaming-fixture', defaultModel: 'fixture', async evaluate(r) {
+    kind: 'decision', name: 'synthetic-streaming-fixture', defaultModel: 'fixture', async evaluate(r) {
       return { model: r.model, answers: { yes: { type: 'noul', noul: 0.5 } },
         usage: { input_tokens: null, output_tokens: null } };
     }
@@ -248,7 +248,7 @@ test('streaming batch emits a completed record without waiting for more input or
     allOutput += chunk;
     if (allOutput.includes('\n')) resolve(allOutput.split('\n')[0]);
   }));
-  const running = runCli(['batch', '-', '--provider-module', 'provider.mjs', '--concurrency', '4'],
+  const running = runCli(['batch', '-', '--provider', 'custom-decision', '--provider-module', 'provider.mjs', '--concurrency', '4'],
     { cwd, stdin, stdout, stderr, env: {}, signal: controller.signal });
   t.after(async () => { controller.abort(); stdin.end(); await running; });
   stdin.write(JSON.stringify(one) + '\n');

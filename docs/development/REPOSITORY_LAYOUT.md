@@ -10,9 +10,15 @@ CONTRIBUTING.md             Contributor entry point
 CHANGELOG.md                User-visible changes
 SECURITY.md                 Security boundaries and reporting guidance
 LICENSE                    MIT license
-src/                       SDK, providers, CLI implementation, declarations
+package.json               Package identity, exports, commands, and file allowlist
+package-lock.json          Pinned development dependency metadata
+.env.example               Provider credential placeholders
+src/                       Common SDK, native providers, CLI, declarations
+src/custom/                Explicit decision definitions and generative presets
 bin/                       Node.js CLI entry point
-examples/                  Runnable SDK examples and request profiles
+examples/                  Native SDK examples and request profiles
+examples/custom/           Opt-in generative and native delegation examples
+schemas/                   Packaged CLI configuration JSON Schema
 docs/guides/               User guides
 docs/reference/            SDK, CLI, configuration, and provider contracts
 docs/development/          Architecture, tests, and packaging guidance

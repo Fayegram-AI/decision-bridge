@@ -1,22 +1,67 @@
 # Provider contracts and compatibility
 
-## Built-in routes
+## Native routes
 
 | Provider type | Wire API | Credential | Default model | Output strategy |
 | --- | --- | --- | --- | --- |
 | `jev` | `POST /v1/systemone` at api.typesafe.ai | `TYPESAFE_API_KEY` | `jev-latest` | Native typed decisions |
-| `openai-compatible` | `POST /chat/completions` below configured base | Selected API key | None | JSON Schema, JSON object, or text |
-| `openrouter` | Chat Completions at openrouter.ai/api/v1 | `OPENROUTER_API_KEY` | None | Same, with required-parameter routing |
-| `anthropic` | `POST /v1/messages` at api.anthropic.com | `ANTHROPIC_API_KEY` | None | One forced schema-carrying tool result |
-| Custom | Your implementation | Your explicit configuration | Optional | Canonical DecisionProvider result |
+| `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `gpt-6-luna` | Native Decisions with common and dedicated access |
+| `cloudflare-decisions` | Workers AI REST model route or `AI.run` binding | `CLOUDFLARE_API_TOKEN` and account ID for REST | `clef` | Native Clef decisions with common and dedicated access |
+
+`createProvider()` and the root SDK export these three native providers only.
+Custom decision services use `defineDecisionProvider` from `custom/decision`.
+General-purpose adapters are opt-in presets in `custom/generative`; they are
+maintained, but are not native decision models. See [custom providers](../guides/CUSTOM_PROVIDERS.md).
+
+## Supported model selection
+
+See the root README's [model list](../../README.md#supported-models) for the
+built-in selectors and aliases. Jev accepts `jev-latest` and explicit Jev IDs from
+its account catalog. OpenAI Decisions supports only `gpt-6-luna` in this release.
+Cloudflare supports `clef`, `clef-flash`, and `clef-omni`, including each full
+`@cf/cloudflare/<model>` alias. Unsupported OpenAI/Cloudflare selectors fail
+local preflight with `UNSUPPORTED_CAPABILITY`.
+
+Custom generative presets require an explicit available model and have no default.
+Custom decision or generative modules define their own model/capability contract.
+Local model support is separate from account permission and hosted availability.
 
 The interface is model-neutral, not a guarantee that every model or endpoint
 supports every strategy. A compatible URL alone is insufficient: the chosen model
 must follow the decision instruction, fit the input/schema, and return valid data.
 Provider behavior is covered by local protocol tests and checked against official
 specifications. These checks do not establish compatibility with every account or
-model. Run the optional [live check](../development/TESTING.md) for the Jev account
-and model you intend to use; see the protocol [sources](SOURCES.md).
+model. Run the optional [live checks](../development/TESTING.md) for the provider,
+account, model, and transport you intend to use; see the protocol [sources](SOURCES.md).
+
+## Common request capabilities
+
+All native providers and custom generative presets accept the legacy shared-state and `choice` / `noul` / `score`
+contract. The following additional forms are checked before dispatch:
+
+| Provider | Ordered text / embedded images | Typed string/boolean choices | Labelled score levels | Safety identifier | Model listing |
+| --- | --- | --- | --- | --- | --- |
+| Jev | Unsupported | Unsupported | Unsupported | Unsupported | Supported |
+| OpenAI Decisions | Supported; up to 128 images, preserving order | Supported | Supported | Supported | Unsupported |
+| Cloudflare Clef / Clef-flash | Supported; up to four images before text | Supported | Supported; 2–10 levels | Unsupported | Unsupported |
+| Cloudflare Clef-omni | Supported; up to four images before audio/video/text | Supported | Supported; 2–10 levels | Unsupported | Unsupported |
+| OpenAI-compatible / OpenRouter / Anthropic | Unsupported | Unsupported | Unsupported | Unsupported | Supported; service-specific catalog |
+
+`bridge.getCapabilities(model)` reports the local profile, and
+`bridge.validate(request)` checks that profile and provider preflight without
+inference. These methods do not authenticate an account or query availability.
+Legacy choice maps and score rubrics have their own limits, described in the
+[SDK reference](SDK.md#question-builders). Custom providers declare additional
+capabilities explicitly.
+
+Omni additionally accepts up to four audio clips and two videos. The optional
+capability fields `audio`, `videos`, `maxAudioClips`, and `maxVideos` normalize to
+false/zero when omitted, preserving legacy custom profiles. Cloudflare's older
+models and all other shipped providers reject audio/video before inference.
+
+Dedicated `createDecision()` access is available on OpenAI Decisions and
+Cloudflare providers. It uses each service's native request/response shape and
+bypasses bridge preparation and observation hooks.
 
 ## Native Jev
 
@@ -30,73 +75,39 @@ Pin a version after evaluating it for your workload rather than assuming a movin
 alias yields reproducible quality. Store the returned `model` along with the
 requested model and your question-template revision.
 
-## OpenAI-compatible servers
+## Native OpenAI Decisions
 
-Default base URL: `https://api.openai.com/v1`. Base paths such as `/v1` are preserved;
-provide the API base, not the final `/chat/completions` path.
+For the native Decisions endpoint, use `openai-decisions`; its capabilities,
+refusal policy, image input, and dedicated API are documented in the
+[OpenAI Decisions guide](../guides/OPENAI_DECISIONS.md). Native decision providers
+report native probabilities, with provider-specific confidence semantics.
 
-`json_schema` sends `response_format.type = json_schema`, `strict: true`, and a
-schema whose required object fields disallow additional properties. Ranges and
-normalization are validated locally to accommodate different supported schema
-subsets. `json_object` requests JSON without schema enforcement. `text` omits the
-format field and relies on instructions plus strict local validation.
+## Native Cloudflare Clef
 
-There is **no auto mode**: an unsupported schema error is visible rather than
-triggering a second request with weaker enforcement. A refusal, truncated output,
-malformed JSON, probability violation, or unexpected tool call is an explicit
-error. No Markdown stripping or JSON repair occurs.
-
-The default token field is `max_completion_tokens`. Some compatible servers need
-`max_tokens`; set `tokenParameter` explicitly. No temperature or reasoning setting
-is forced. Additional generation parameters must be supported by the selected
-model. This provider does not implement OpenAI Responses API, realtime streaming,
-multimodal inputs, or a general function-calling agent loop.
-
-## OpenRouter
-
-`OpenRouterProvider` is a fixed-endpoint compatible preset, not a second native
-Jev transport. It reads its own key and defaults to `max_tokens`. It sets
-`parameters.provider.require_parameters = true` so required request features are
-not silently ignored by routing. Other explicit routing settings are preserved.
-The preset does not guarantee which upstream host serves a model; use OpenRouter's
-routing controls for stricter requirements.
-
-Select a **generative model** that supports the chosen output mode. This release
-makes no claim that Jev itself can be used through a Chat Completions route. Direct
-Jev is the implemented native path. Vercel's special evaluation API is not a built-in
-provider in this release; add it through the documented custom-provider contract
-rather than mislabeling it as Chat Completions-compatible.
-
-## Anthropic
-
-The provider sends Messages API headers `x-api-key` and
-`anthropic-version: 2023-06-01`. It defines a synthetic `submit_decisions` tool whose
-input schema is the expected answer object, then forces exactly that tool. The
-returned `tool_use.input` carries the data; **no tool is executed** and no follow-up
-agent cycle is started.
-
-Extended thinking is not enabled in this forced-tool strategy; a `thinking`
-parameter is rejected. Refusals, truncated output, unexpected stop reasons, and
-missing/extra named tools fail. `GET /v1/models` returns the first page with
-`has_more` / `last_id` preserved. Automatic pagination is not implemented.
+Use `cloudflare-decisions` for Clef, Clef-flash, and Clef-omni through REST or an injected
+Workers AI binding. Common and native access share validation and codecs. See the
+[Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) for image/audio/video limits, structured
+content, typed values, rounding, capacity rejection, Gateway, and CLI examples.
 
 ## Native versus elicited probabilities
 
-Jev reports its own native outputs and confidence. Generative models are prompted
+Jev, OpenAI Decisions, and Clef report native outputs and confidence. Generative models are prompted
 to produce probability distributions. Those estimates are not logprobs, repeated
 sampling frequencies, calibrated confidence, or proof of correctness.
 
-The adapter derives an argmax choice and a probability-weighted score from the
-elicited distributions. It does not synthesize Jev's confidence statistic. Both
+Generative providers derive an argmax choice and a probability-weighted score from the
+elicited distributions. They do not synthesize native confidence statistics. Both
 paths use the same application contract, but metadata records their provenance:
-`native` versus `elicited`. Evaluate performance and calibration on representative
+`native` versus `elicited`. `meta.providerKind` separately records `decision` or
+`generative` from the provider contract. Classification does not force Jev's
+confidence/usage requirements on a custom decision service. Evaluate performance and calibration on representative
 labeled data before adopting thresholds or comparing costs/latencies.
 
 ## Compatibility boundaries
 
 Remote context limits, JSON Schema limits, model availability, output budgets,
-pricing, and rate limits are provider/account specific. The adapter's local caps
+pricing, and rate limits are provider/account specific. The bridge's local caps
 do not override them. This release has no silent provider failover, model search,
 credential refresh, provider-side batch API, or universal quality guarantee.
-Unsupported protocols require a custom `DecisionProvider`; unsupported server
+Unsupported protocols require an explicit custom decision or generative provider; unsupported server
 features require an explicitly supported mode or a different model.

@@ -1,8 +1,10 @@
 {
-  "schemaVersion": 1,
-  "provider": "openai-compatible",
-  "model": "YOUR_OPENAI_MODEL",
-  "apiKeyEnv": "OPENAI_API_KEY",
-  "responseFormat": "json_schema",
-  "timeoutMs": 30000
+    "$schema": "../../schemas/decision.config.schema.json",
+    "schemaVersion": 1,
+    "provider": "custom-generative",
+    "model": "YOUR_OPENAI_MODEL",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "responseFormat": "json_schema",
+    "timeoutMs": 30000,
+    "preset": "openai-compatible"
 }

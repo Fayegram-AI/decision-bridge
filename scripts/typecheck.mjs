@@ -13,14 +13,17 @@ try {
     args = [require.resolve('typescript/bin/tsc'), '--project', 'tsconfig.json'];
     executable = process.execPath;
 } catch {
-    // The CI and release workflows provide TypeScript on PATH instead.
+    // PATH is a fallback for source users without the pinned development install.
 }
 
-const result = spawnSync(executable, args, {
-    cwd: new URL('..', import.meta.url),
-    stdio: 'inherit',
-});
-if (result.error) {
-    console.error('TypeScript is required for this development check. Install typescript@5.8.3 or provide tsc on PATH.');
+for (const project of ['tsconfig.json', 'tsconfig.workers.json']) {
+    const projectArgs = args.map(argument => argument.replace('tsconfig.json', project));
+    const result = spawnSync(executable, projectArgs, {
+        cwd: new URL('..', import.meta.url),
+        stdio: 'inherit',
+    });
+    if (result.error) {
+        console.error('TypeScript is required for this development check. Install typescript@5.8.3 or provide tsc on PATH.');
+    }
+    if (result.status !== 0) { process.exitCode = result.status ?? 1; break; }
 }
-process.exitCode = result.status ?? 1;

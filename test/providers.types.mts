@@ -1,14 +1,14 @@
-import { createAdapter, createProvider, OpenAICompatibleProvider, OpenRouterProvider, AnthropicProvider,
-  evaluateBatch, choice, noul, buildResponseSchema, validateRequest, validateResult,
-  type DecisionProvider, type JsonValue } from '../src/index.mjs';
+import { createGenerativeProvider } from '../src/custom/generative/index.mjs';
+import { createBridge, createProvider, evaluateBatch, choice, noul, validateRequest, validateResult, type DecisionProvider, type JsonValue } from '../src/index.mjs';
+import { OpenAICompatibleProvider, OpenRouterProvider, AnthropicProvider, buildResponseSchema } from '../src/custom/generative/index.mjs';
 
 const options = { type: 'openai-compatible', apiKey: null, model: 'local', baseURL: 'http://127.0.0.1:8000/v1' } as const;
-const provider = createProvider(options);
-const adapter = createAdapter({ provider, timeoutMs: 1000, observerTimeoutMs: 100 });
+const provider = createGenerativeProvider(options);
+const bridge = createBridge({ provider, timeoutMs: 1000, observerTimeoutMs: 100 });
 const template = { route: choice('Pick.', { go: null, stop: { rule: 'Stop safely.' } }), yes: noul('True?') } as const;
 const input = { state: { labels: ['x', 'y'] }, questions: template } as const;
 async function checks() {
-  const result = await adapter.evaluate(input, { timeoutMs: 100 });
+  const result = await bridge.evaluate(input, { timeoutMs: 100 });
   const label: 'go' | 'stop' = result.answers.route.choice;
   const confidence: number | undefined = result.answers.route.confidence;
   const usage: number | null = result.usage.input_tokens;
@@ -18,13 +18,13 @@ async function checks() {
   const assumedUsage: number = result.usage.output_tokens;
   // @ts-expect-error Read-only result.
   result.answers.route.choice = 'go';
-  const batch = await evaluateBatch(adapter, [input], { concurrency: 2 });
+  const batch = await evaluateBatch(bridge, [input], { concurrency: 2 });
   for (const row of batch) {
     if (row.ok) { const p: number = row.result.answers.yes.noul; void p; }
     else { const message: string = row.error.message; void message; }
   }
   const schema: Readonly<Record<string, JsonValue>> = buildResponseSchema(template);
-  const validated = validateRequest(input);
+  const validated = validateRequest(input, 'local');
   const normalized = validateResult({}, template);
   return { label, confidence, usage, schema, validated, normalized };
 }
@@ -42,13 +42,13 @@ createProvider({ type: 'jev', maxTokens: 100 });
 // @ts-expect-error Instructions are required, not null.
 noul(null);
 // @ts-expect-error Instructions cannot be omitted from a question.
-adapter.evaluate({ state: '', questions: { q: { type: 'noul' } } });
+bridge.evaluate({ state: '', questions: { q: { type: 'noul' } } });
 const dynamic: unknown = JSON.parse('{}');
-validateRequest(dynamic);
-const custom: DecisionProvider = { name: 'custom-with-request-model', async evaluate() {
+validateRequest(dynamic, 'explicit-model');
+const custom: DecisionProvider = { kind: 'decision', name: 'custom-with-request-model', async evaluate() {
   throw new Error('Compile-only contract test; never executed.');
 } };
-createAdapter({ provider: custom });
+createBridge({ provider: custom });
 
 // @ts-expect-error Noul criteria must be omitted or an object, not null.
 noul('True?', null);

@@ -1,10 +1,10 @@
-import { createAdapter, evaluateBatch, noul } from '../src/index.mjs';
+import { createBridge, evaluateBatch, noul } from '../src/index.mjs';
 
 try {
-  const adapter = createAdapter();
+  const bridge = createBridge({ jev: {} });
   const questions = { failure: noul('Does the evidence explicitly report a failed test?') };
   const requests = ['18 passed, 2 failed.', 'Tests were not run.'].map(state => ({ state, questions }));
-  const records = await evaluateBatch(adapter, requests, { concurrency: 2 });
+  const records = await evaluateBatch(bridge, requests, { concurrency: 2 });
   console.log(JSON.stringify(records, null, 2));
   if (records.some(record => !record.ok)) process.exitCode = 1;
 } catch (error) {

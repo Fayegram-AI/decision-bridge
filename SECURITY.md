@@ -8,6 +8,10 @@ or shared logs. The package contains no key, telemetry client, or background job
 By design it sends the supplied state and question definitions to the selected
 provider when evaluation is explicitly requested. Review data-sharing requirements
 before sending private repository content or documents.
+Optional Cloudflare Gateway routing can cache requests/responses or collect logs
+according to explicit options and the Gateway's configuration. Review that
+configuration as part of your data-handling policy; Gateway is disabled until
+selected. See the [Cloudflare guide](docs/guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
 
 Built-in constructors do not forward ambient credentials to unrelated custom
 origins. The CLI requires explicit credential selection for custom URLs. URL
@@ -22,7 +26,7 @@ HTTP failure bodies/headers and unknown exception stacks are not copied into pub
 errors. Known keys are removed from request IDs and CLI error string values.
 Model outputs, requested labels, state, and arbitrary application logs are not
 universally scrubbed. Do not deliberately include secrets in prompts. A custom
-provider constructing AdapterError is responsible for a safe message. Never add a
+provider constructing DecisionError is responsible for a safe message. Never add a
 verbose HTTP logger that prints Authorization or x-api-key headers.
 
 ## Input and output
@@ -43,15 +47,17 @@ transaction across model billing, stdout, and filesystem writes.
 Custom provider modules execute ordinary trusted JavaScript with process access.
 They are not sandboxed and are never auto-discovered. Extensions can perform I/O
 and log data by their own design. Honor supplied AbortSignals and close resources;
-the adapter can stop awaiting a non-cooperative promise, not terminate arbitrary
+the bridge can stop awaiting a non-cooperative promise, not terminate arbitrary
 code or undo side effects. A provider timeout or cancellation does not prove remote
 inference stopped before billing.
 
 ## Dependencies and CI
 
 There are zero runtime dependencies. This reduces dependency surface but is not a
-security certification. Maintain Node.js security updates. TypeScript is a separate
-development tool. The supplied CI uses read-only repository permissions, no model
+security certification. Maintain Node.js security updates. The pinned TypeScript
+compiler, official Workers declarations, and Ajv configuration-schema validator
+are development-only dependencies; none is required by the installed SDK or CLI.
+The supplied CI uses read-only repository permissions, no model
 keys, and no publishing. Review third-party action updates and pin audited action
 commits under your organization's policy before using CI in a privileged setting.
 

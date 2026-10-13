@@ -2,16 +2,17 @@
 
 ## Report an issue or propose a change
 
-Search [existing issues](https://github.com/Fayegram-AI/jev-adapter/issues) before
-opening a new one. For a bug, include the adapter version, Node.js version,
+Search [existing issues](https://github.com/Fayegram-AI/decision-bridge/issues) before
+opening a new one. For a bug, include the bridge version, Node.js version,
 operating system, a minimal reproducible request with synthetic data, expected
 behavior, and actual behavior. For a feature proposal, describe the use case and
 how it fits the provider-independent contract. Report vulnerabilities through the
 private route in [SECURITY.md](SECURITY.md), not in an issue.
 
 Use a source checkout with Node.js 22.16 or newer. No build step or runtime
-dependencies are required. `npm ci --ignore-scripts` checks the dependency-free
-lockfile. Type checks additionally need TypeScript; see the
+dependencies are required. `npm ci --ignore-scripts` installs the pinned
+development-only TypeScript compiler, official Workers declarations, and Ajv
+configuration-schema validator from the lockfile. See the
 [testing guide](docs/development/TESTING.md).
 
 ## Understand the design
@@ -19,8 +20,8 @@ lockfile. Type checks additionally need TypeScript; see the
 Start with the [architecture](docs/development/ARCHITECTURE.md),
 [design rationale](docs/development/DESIGN.md), and
 [repository layout](docs/development/REPOSITORY_LAYOUT.md).
-Preserve the provider-independent `state` / `questions` contract and explicit
-probability provenance. Add focused regression tests for bug fixes and wire-level
+Preserve the provider-independent contract of `state` or ordered `input` plus
+`questions`, and explicit probability provenance. Add focused regression tests for bug fixes and wire-level
 tests for protocol changes. Fixtures must not contain credentials or live-account
 data; label synthetic responses as synthetic.
 

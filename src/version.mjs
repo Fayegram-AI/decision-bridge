@@ -1,4 +1,2 @@
-import manifest from '../package.json' with { type: 'json' };
-
-/** CLI and SDK metadata always identify the installed package version. */
-export const VERSION = manifest.version;
+/** Keep in sync with package.json; scripts/check.mjs verifies the release version. */
+export const VERSION = '0.1.0';

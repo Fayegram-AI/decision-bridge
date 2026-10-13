@@ -6,13 +6,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PassThrough } from 'node:stream';
 
-const bin = fileURLToPath(new URL('../bin/jev.mjs', import.meta.url));
+const bin = fileURLToPath(new URL('../bin/decision.mjs', import.meta.url));
 const root = fileURLToPath(new URL('..', import.meta.url));
 
 export const one = { state: 'test', questions: { yes: { type: 'noul', instructions: 'Is this a test?' } } };
 
 const moduleText = `export function createProvider({ model = 'local-test-fixture' } = {}) {
-  return { name: 'fixture-only', defaultModel: model, probabilitySource: 'synthetic',
+  return { kind: 'decision', name: 'fixture-only', defaultModel: model, probabilitySource: 'synthetic',
     async evaluate(request) {
       if (request.state === 'slow') await new Promise(r => setTimeout(r, 30));
       return { model: request.model, answers: Object.fromEntries(Object.keys(request.questions).map(id => [id, { type: 'noul', noul: 0.42 }])),
@@ -23,7 +23,7 @@ const moduleText = `export function createProvider({ model = 'local-test-fixture
 
 export function cleanEnv(extra = {}) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('DECISION_') &&
-    !['TYPESAFE_API_KEY', 'JEV_MODEL', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY'].includes(key)));
+    !['TYPESAFE_API_KEY', 'JEV_MODEL', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'].includes(key)));
   return { ...env, ...extra };
 }
 
@@ -56,7 +56,7 @@ export function streams() {
 }
 
 export async function temporaryWorkspace(t) {
-  const cwd = await mkdtemp(join(tmpdir(), 'jev-test-'));
+  const cwd = await mkdtemp(join(tmpdir(), 'decision-bridge-test-'));
   t.after(() => rm(cwd, { recursive: true, force: true }));
   return cwd;
 }

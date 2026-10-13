@@ -1,4 +1,4 @@
-name: Verify adapter
+name: Verify bridge
 on:
   push:
   pull_request:
@@ -22,7 +22,6 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npm install --global typescript@5.8.3
       - run: npm run check
       - run: npm run test:coverage
       - run: npm run typecheck

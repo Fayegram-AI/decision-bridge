@@ -1,98 +1,81 @@
-# Custom providers
+# Custom provider contracts
 
-A custom provider adapts another model or execution engine to the stable decision
-contract. It is not required for native Jev or the included compatible presets.
-An endpoint implementing only another protocol needs this adapter rather than an
-unverified base-URL substitution.
+Decision Bridge has one bridge and two explicit extension paths:
 
-## SDK contract
+| Path | SDK helper | CLI provider | Purpose |
+| --- | --- | --- | --- |
+| [Custom decision](CUSTOM_DECISION.md) | `defineDecisionProvider` from `custom/decision` | `custom-decision` with `module` | A new decision model protocol |
+| [Custom generative](CUSTOM_GENERATIVE.md) | `defineGenerativeProvider` from `custom/generative` | `custom-generative` with `preset` or `module` | Elicit structured decisions from a general-purpose model |
 
-A `DecisionProvider` has:
+The root `createProvider()` factory supports native Jev, OpenAI Decisions, and
+Cloudflare only. `createGenerativeProvider()` selects maintained generative
+presets. Select the corresponding custom entry point explicitly for either
+extension path.
 
-```text
-name: nonempty string
-probabilitySource?: string
-defaultModel?: nonempty string
-evaluate(resolvedRequest, { signal }?): Promise<ProviderResult>
-listModels?({ signal }?): Promise<{ models: [{ name, ... }], ... }>
-```
+## Common SDK contract
 
-`resolvedRequest` already contains a model, immutable state, and validated questions.
-Return `model`, `answers`, `usage`, and optional JSON `meta`. Exact answer IDs/types
-must match the request. Unreported token counts must be `null`. Do not use fake
-confidence or token counts to satisfy a native Jev shape. Set honest probability
-provenance; the adapter supplies `unspecified` when nothing is known.
+`Provider` requires a nonempty `name`, explicit `kind: 'decision' | 'generative'`,
+and `evaluate(request, { signal? })`. Optional fields and hooks are:
 
-Pass your provider directly:
+- `defaultModel`: a nonempty model ID, otherwise the request must supply one.
+- `probabilitySource`: known provenance; generative providers use `elicited`.
+- `getCapabilities(model)`: a pure synchronous capability profile.
+- `validateRequest(request)`: pure synchronous provider preflight; no inference.
+- `getResultValidationOptions(model)`: pure synchronous probability precision
+  policy, never derived from a response or its metadata.
+- `listModels({ signal? })`: a model catalog when the service implements one.
 
-```javascript
-const adapter = createAdapter({ provider: myProvider });
-```
+Both definition helpers validate plain data definitions and freeze their wrappers.
+Callbacks keep their original receiver. The bridge also accepts provider classes
+that implement this contract directly. Missing or invalid kinds fail at construction.
+`bridge.providerKind` and `result.meta.providerKind` come from the contract and
+cannot be overridden by response metadata.
 
-A provider with no default model is valid; callers must then supply request.model.
-Implement `listModels` only when it is meaningful. Respect AbortSignal and bound
-network/body work. Built-in transport helpers are internal, not public stable
-exports; use a public built-in provider to delegate an already-supported protocol,
-or own your protocol's transport and tests.
+The request is already snapshotted, validated, resolved to a model, and frozen.
+Return canonical `{ model, answers, usage, meta? }`; the bridge validates and
+freezes the result. Custom providers own API encoding, transport, response mapping,
+credential destinations, bounded bodies, safe errors, and cancellation cleanup.
+Internal transport helpers are not stable public exports. Delegate a maintained
+preset for a protocol already supported, or implement and test your own transport.
 
-## Runnable delegation example
+Capability omissions retain the legacy shared-state and question profile. Audio
+and video additions default to false/zero. Declare richer forms only when their
+encoding and validation are implemented. The bridge runs preflight again after
+preparation hooks. Unknown usage is null; no provider should invent token counts,
+confidence, or calibration. Generative native-provenance claims are rejected.
+Supplied `probabilitySource` and `confidenceSource` metadata must be nonempty
+strings. Decision providers may use custom labels; omitted probability provenance
+uses the provider's declared value, or `unspecified` when none is declared.
 
-In your installed application, save this as `provider.mjs`. It exports a factory
-that delegates to `OpenAICompatibleProvider`:
+## Explicit CLI modules
 
-```javascript
-import { OpenAICompatibleProvider } from '@fayegram-ai/jev-adapter';
+Select a custom kind and `module` in JSON, or pass both `--provider custom-decision`
+(or `custom-generative`) and `--provider-module FILE`. A module flag does not infer
+a kind. A generative profile chooses exactly one `preset` or `module`; module
+profiles require JSON `options` for implementation-specific transport/tuning.
+Inline `apiKey`/`api_key` options are rejected; use top-level `apiKeyEnv`.
 
-export function createProvider(options = {}) {
-    const backend = new OpenAICompatibleProvider(options);
-    return {
-        name: 'project-compatible-endpoint',
-        defaultModel: backend.defaultModel,
-        probabilitySource: backend.probabilitySource,
-        evaluate: (request, callOptions) => backend.evaluate(request, callOptions),
-        listModels: callOptions => backend.listModels(callOptions),
-    };
-}
-```
+The module exports `createProvider(options)`, synchronously or asynchronously.
+Import/factory waiting is bounded by `timeoutMs` (30 seconds by default) and CLI
+cancellation, separately from evaluation. The loader passes JSON `options`, then
+the selected `apiKey` and `model` when present. Its returned kind must match the
+selected path. The CLI also applies its configured model to common requests that
+omit a model, independently of the factory's own default; an explicit request
+model takes precedence, and `--model` overrides both. Module paths in JSON resolve
+relative to that file; flag paths
+resolve relative to the working directory. Explicit modules execute trusted code;
+this extension point is not a sandbox. No module is discovered automatically.
 
-Configure its real endpoint/key/model before use. The source checkout includes
-[examples/custom-provider.mjs](../../examples/custom-provider.mjs) with the
-corresponding source-relative import.
+`init` creates an honest service implementation placeholder when no implementation
+is selected. When given an existing module, it references that module without
+loading or overwriting it. Offline `validate` never imports custom modules or
+requires credentials; it reports structure-only validation for unknown protocols.
+`bridge.validate()` on an instantiated provider includes capabilities and preflight.
 
-## Explicit CLI module
+## Tests for a new protocol
 
-```json
-{
-  "schemaVersion": 1,
-  "provider": "custom",
-  "module": "./provider.mjs",
-  "model": "YOUR_SERVED_MODEL",
-  "apiKeyEnv": "PROJECT_MODEL_KEY",
-  "timeoutMs": 30000,
-  "options": {
-    "baseURL": "https://your-model-service.example/v1",
-    "responseFormat": "json_schema",
-    "tokenParameter": "max_tokens"
-  }
-}
-```
-
-Here the `.example` URL and model ID are placeholders, not hosted services.
-The module must export `createProvider(options)`, synchronously or asynchronously.
-Async import/factory waiting is bounded by `timeoutMs` (30 seconds by default) and
-CLI cancellation; this is a separate initialization budget before evaluation.
-The loader passes configured JSON `options`, then selected `apiKey` and `model`
-when present. Do not store secrets in `options`; use `apiKeyEnv`.
-
-A module path inside a JSON config is resolved relative to that config. The
-`--provider-module` flag resolves relative to the current directory and implies
-`--provider custom`. Imported modules can execute arbitrary code: this is a trusted
-extension mechanism, not a sandbox. No executable module is auto-discovered.
-
-## Required tests for a new backend
-
-Test the serialized request, credentials/headers, endpoint path, response mapping,
-unknown usage, provenance, refusals/truncation, malformed distributions, timeouts,
-abort behavior, and safe errors. Use local HTTP fixtures for deterministic protocol
-tests. Live tests should be explicit, credential-dependent, and clearly separated
-from unit tests. Do not call synthetic fixture results accuracy measurements.
+Test serialized bodies, credentials/headers, endpoint paths, all supported question
+mappings, usage/provenance, refusals/truncation, malformed distributions, timeouts,
+cancellation, and safe errors. Use local HTTP fixtures for deterministic protocol
+checks. Live tests must be explicit and credential-dependent; fixture tests do
+not establish model quality. See [testing](../development/TESTING.md).

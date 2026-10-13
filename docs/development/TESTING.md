@@ -5,13 +5,10 @@ runtime code and documentation, but does not contain tests or development script
 
 ## Automated code and package checks
 
-Use Node.js 22.16 or newer. Runtime and ordinary functional tests require no npm
-dependencies. Type checking uses a local TypeScript compiler or `tsc` on PATH;
-CI installs TypeScript 5.8.3. To use the same version:
-
-```text
-npm install --global typescript@5.8.3
-```
+Use Node.js 22.16 or newer. Runtime code has zero npm dependencies. Run
+`npm ci --ignore-scripts` to install the pinned development tools: TypeScript
+5.8.3, the official Workers declarations, and the configuration-schema validator.
+Source and installed-consumer type checks use the same local compiler.
 
 | Command | Verification |
 | --- | --- |
@@ -19,7 +16,7 @@ npm install --global typescript@5.8.3
 | `npm test` | SDK, CLI, provider, and file/transport behavior using fixtures and loopback servers |
 | `npm run test:coverage` | The functional suite with production source/bin coverage floors |
 | `npm run typecheck` | Positive and expected-negative TypeScript API contracts |
-| `npm run test:package` | Pack, offline install, package contents, docs, SDK, and offline CLI commands |
+| `npm run test:package` | Pack, offline install, root/custom exports and types, browser-safe imports, presets/modules, contents and docs |
 | `npm run build` | Retain a versioned npm tarball after checking its offline installation |
 | `npm run verify` | Source checks, tests, type contracts, and package smoke check |
 
@@ -40,15 +37,23 @@ as evidence that every environment passed.
 ## Suite ownership
 
 - `contract.test.mjs`: request/result contracts, builders, decision policy, and JSON safety.
-- `adapter.test.mjs`: SDK evaluation, extensions, observers, deadlines, and batches.
+- `bridge.test.mjs`: SDK evaluation, extensions, observers, deadlines, and batches.
 - `providers.test.mjs`: provider wire formats, response parsing, model listing, and configuration.
 - `transport.test.mjs`: HTTP policy, limits, retries, cancellation, and deadlines.
+- `deadlines.test.mjs`: synchronous preparation/dispatch/completion and inherited budgets.
+- `result-validation.test.mjs`: provider-selected precision and policy-hook boundaries.
+- `decisions*.test.mjs`: native/common OpenAI codecs, boundaries, preflight, CLI, and smoke-helper fixtures.
+- `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
+- `custom-providers.test.mjs`, `custom-config.test.mjs`: classified SDK paths, provenance, presets/modules, schema and initialization.
+- `generative-helpers.test.mjs`: exported prompt/normalization helper contracts and unsupported input rejection.
 - `config.test.mjs`: file/environment/flag precedence and provider transitions.
 - `cli.test.mjs`: commands, streams, exit codes, modules, and signals.
 - `io.test.mjs`: atomic output, file aliases, and cancellation.
 - `ordered.test.mjs`: ordered streaming and bounded concurrency.
 - `support.mjs` and `fixtures.mjs`: local test setup and synthetic domain data.
-- `types.mts`, `providers.types.mts`: public type inference and rejected API usage.
+- `types.mts`, `providers.types.mts`, `custom.types.mts`: public type inference and rejected API usage.
+- `decisions.types.mts`, `cloudflare.types.mts`: richer questions, native APIs, and precision settings.
+- `cloudflare-worker.types.mts`: compatibility with official Workers binding declarations.
 
 Node's reported test count includes each row of a parameterized input table. It
 is not a count of independent features; retain separate rows when they protect
@@ -78,14 +83,47 @@ Remove-Item Env:RUN_LIVE_TESTS
 Forward provider/model/config options for the selected account. The helper refuses
 to infer without the opt-in flag and returns real results or errors. It checks a
 configured inference path, not model quality or throughput. For model listing
-alone, use `node bin/jev.mjs models --env-file .env`.
+alone, use `node bin/decision.mjs models --env-file .env`.
+Model listing is unsupported for OpenAI Decisions and Cloudflare Clef.
+
+The OpenAI Decisions helper performs four bounded common/native requests when
+invoked with `--decisions`. It includes a valid embedded PNG, typed choices, and
+labelled scores. For example, after setting the same opt-in variable:
+
+```text
+npm run smoke:live -- --decisions --env-file .env
+```
+
+Cloudflare REST can use the ordinary smoke command with
+`--provider cloudflare-decisions --model clef`, `--model clef-flash`, or
+`--model clef-omni`, loading its
+account/token environment explicitly. These invocations each check one common
+request. Native, image, large-distribution, binding, and Gateway checks require
+separate bounded cases; test the latter two in the intended existing runtime and
+Gateway. REST busy rejection has a documented
+[service limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
+Test all three models and both access shapes when changing those paths. Include typed
+string/boolean identity, labelled scores, reported confidence/usage, and distinct
+request/Gateway IDs from concurrent calls. Enabling binding busy mode verifies
+option acceptance; it does not establish behavior under exhausted capacity.
+Header/dimension preflight does not fully decode images, so live image fixtures
+must also contain valid encoded image data.
+Omni fixtures must contain genuinely decodable WAV/MP3 and MP4/WebM media for
+hosted tests. Local authored container fixtures verify inspection and protocol
+behavior without claiming codec validity. Include grouped modalities, duration
+and size boundaries, effective-model overrides, request bodies above 13 MiB,
+and explicit smaller ceilings. Gateway caching/logging should be disabled for
+test payloads, and each bounded run should have a request and total time budget.
+
+The SDK, CLI, and ordinary checks do not create Workers or Gateways. Provisioning
+and cleanup belong to the application's separately authorized environment setup.
 
 ## Package verification
 
 To test a specific local tarball against this source checkout:
 
 ```text
-node scripts/package-smoke.mjs --tarball /path/to/fayegram-ai-jev-adapter-VERSION.tgz
+node scripts/package-smoke.mjs --tarball /path/to/fayegram-ai-decision-bridge-VERSION.tgz
 ```
 
 The check installs the specified archive offline and compares installed bytes,

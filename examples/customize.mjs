@@ -1,4 +1,4 @@
-import { createAdapter, choice } from '../src/index.mjs';
+import { createBridge, choice } from '../src/index.mjs';
 
 /** Question templates are ordinary version-controlled functions. */
 function failureQuestion(includeNetwork) {
@@ -11,8 +11,8 @@ function failureQuestion(includeNetwork) {
 }
 
 try {
-  const adapter = createAdapter();
-  const result = await adapter.evaluate({
+  const bridge = createBridge({ jev: {} });
+  const result = await bridge.evaluate({
     state: { log: 'Connection to the package registry timed out.' },
     questions: { category: failureQuestion(true) },
   });

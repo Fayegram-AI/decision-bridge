@@ -1,4 +1,7 @@
-# Jev Adapter
+# Decision Bridge
+
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Zero runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)](package.json)
 
 A JavaScript SDK that turns supplied information into structured decisions inside
 your application. An optional Node command runner is included for evaluating files.
@@ -8,31 +11,96 @@ scores.
 For example, pass a failed test log to classify the failure and estimate whether
 a missing dependency caused it. Your application decides what to do with the result.
 
-By default, requests go to Jev through TypeSafe's native decision API. You can
-select an OpenAI-compatible endpoint, OpenRouter, Anthropic, or a custom provider
-without changing the `state` / `questions` request format.
+Try the [Decision Playground](https://decision-pg.fayegram.com/).
 
-**Version 0.1.0 · Node.js 22.16+ · ESM · zero runtime dependencies**
+The main SDK supports native decision models: Jev through TypeSafe, OpenAI
+Decisions, and Cloudflare Clef. Custom decision services use the explicit
+`custom/decision` entry point. General-purpose models remain available through
+the opt-in `custom/generative` entry point, with maintained OpenAI-compatible,
+OpenRouter, and Anthropic presets. The bridge handles the shared request and result
+contract; each provider handles its API protocol and model capabilities.
 
-Source: [Fayegram-AI/jev-adapter](https://github.com/Fayegram-AI/jev-adapter).
-For usage questions and bug reports, use the repository's
-[issues](https://github.com/Fayegram-AI/jev-adapter/issues); report security
-issues privately as described in [SECURITY.md](SECURITY.md).
+[OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) also supports ordered text/image
+input, typed string/boolean choices, labelled scores, and dedicated native access.
+[Cloudflare Clef, Clef-flash, and Clef-omni](docs/guides/CLOUDFLARE_DECISIONS.md) provide
+common/native access, embedded images, typed choices, labelled scores, REST,
+Workers AI bindings, and optional AI Gateway routing. Omni additionally supports
+embedded WAV/MP3 audio and MP4/WebM video, ordered images → audio → videos → text.
+The common API checks provider/model capabilities before dispatch; refusals are
+errors.
 
-This is an independent integration, not an official TypeSafe product. The built-in
-generative backends identify their probabilities as elicited model outputs.
+**Version 0.1.0 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+
+The npm package is
+[@fayegram-ai/decision-bridge](https://www.npmjs.com/package/@fayegram-ai/decision-bridge).
+Source and issue reports are maintained at
+[Fayegram-AI/decision-bridge](https://github.com/Fayegram-AI/decision-bridge).
+Report security issues privately as described in [SECURITY.md](SECURITY.md).
+
+This is an independent project. The custom generative presets identify their
+probabilities as elicited model outputs.
 Changing providers does **not** make their accuracy or calibration equivalent.
+
+## Supported models
+
+The built-in decision providers support these model selectors in this release:
+
+| Decision provider | Model selector | Accepted alias | Provider default |
+| --- | --- | --- | --- |
+| Jev through TypeSafe (`jev`) | `jev-latest` | — | `jev-latest` |
+| OpenAI Decisions (`openai-decisions`) | `gpt-6-luna` | — | `gpt-6-luna` |
+| Cloudflare (`cloudflare-decisions`) | `clef` | `@cf/cloudflare/clef` | `clef` |
+| Cloudflare (`cloudflare-decisions`) | `clef-flash` | `@cf/cloudflare/clef-flash` | — |
+| Cloudflare (`cloudflare-decisions`) | `clef-omni` | `@cf/cloudflare/clef-omni` | — |
+
+`jev-latest` is Jev's default alias. Jev also accepts explicit model IDs available through your TypeSafe account;
+use `bridge.listModels()` or the CLI `models` command to inspect that catalog.
+The bridge does not maintain a static list of Jev versions. A moving alias or a
+catalog entry does not guarantee inference access or reproducible model quality.
+OpenAI Decisions currently accepts only `gpt-6-luna` in this integration.
+Cloudflare accepts only the three models above, in short or full-alias form.
+Model discovery is unsupported for OpenAI Decisions and Cloudflare.
+
+Additional decision protocols use [custom decision providers](docs/guides/CUSTOM_DECISION.md).
+General-purpose models use the separate [custom generative](docs/guides/CUSTOM_GENERATIVE.md)
+entry point, with `openai-compatible`, `openrouter`, or `anthropic` presets, or
+an explicit provider module. Those presets require a model ID supported by your
+configured service and have no default model or fixed model catalog.
+
+## Choose a provider
+
+All native providers support shared state and the common `choice`, `noul`, and
+`score` questions. Additional input and question forms depend on the provider:
+
+| Provider | Additional supported features | Guide |
+| --- | --- | --- |
+| Jev | Native decisions through the TypeSafe API | [Provider reference](docs/reference/PROVIDERS.md#native-jev) |
+| OpenAI Decisions | Ordered text/images, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
+| Cloudflare Clef / Clef-flash | Embedded images before text, typed choices, labelled scores, native access, Workers AI binding, optional Gateway | [Cloudflare decisions](docs/guides/CLOUDFLARE_DECISIONS.md) |
+| Cloudflare Clef-omni | The same decision and transport features, plus embedded audio/video | [Omni media and limits](docs/guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video) |
+| Custom decision service | Explicit decision provider contract | [Custom decision providers](docs/guides/CUSTOM_DECISION.md) |
+| Custom generative presets / modules | General-purpose output mapped into decisions; explicit opt-in | [Custom generative providers](docs/guides/CUSTOM_GENERATIVE.md) |
+
+For Cloudflare REST, provide an account ID and API token. Workers binding and
+Gateway are optional paths with their own configured resources. Enabled
+`rejectIfBusy` currently requires the binding path for all three Clef models.
+Enabling it for REST fails local preflight with `UNSUPPORTED_CAPABILITY`; see the
+[service compatibility note](docs/guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
+Use [provider capabilities](docs/reference/PROVIDERS.md#common-request-capabilities)
+and `bridge.validate()` to check a request before inference. Capability support
+does not establish account access or model quality.
 
 ## Use in your application
 
-Use Node.js **22.16 or newer**. Install the package from npm in your application's
-directory:
+For this server-side example, use Node.js **22.16 or newer**. Install the package
+in your application's directory:
 
 ```bash
-npm install @fayegram-ai/jev-adapter
+npm install @fayegram-ai/decision-bridge
 ```
 
-The installed SDK runs without a compilation step.
+The installed SDK runs without a compilation step. See
+[getting started](docs/guides/GETTING_STARTED.md) for source and archive setup.
 
 Create `.env` in your application's directory and set your TypeSafe API key:
 
@@ -47,11 +115,11 @@ Save this complete example as `app.mjs` beside `.env`. The `.mjs` extension enab
 ESM imports without changing your application's `package.json`:
 
 ```javascript
-import { createAdapter, choice, noul, publicError } from '@fayegram-ai/jev-adapter';
+import { createBridge, choice, noul, publicError } from '@fayegram-ai/decision-bridge';
 
 try {
-    const adapter = createAdapter(); // TYPESAFE_API_KEY; model defaults to jev-latest.
-    const result = await adapter.evaluate({
+    const bridge = createBridge({ jev: {} }); // TYPESAFE_API_KEY; model defaults to jev-latest.
+    const result = await bridge.evaluate({
         state: { log: "ModuleNotFoundError: No module named 'pytest'" },
         questions: {
             category: choice('Classify the failure using only the evidence.', {
@@ -84,18 +152,35 @@ Edit `state` and the question definitions for each call. No saved prompt
 registration is required. `publicError()` exposes a stable error code and safe
 message, with HTTP diagnostics when available; see [errors](docs/reference/ERRORS.md).
 
+The example explicitly selects Jev using the `jev` shortcut. For a native provider,
+construct it with `createProvider({ type: 'YOUR_PROVIDER', ...options })` or a
+built-in provider class, then pass it to `createBridge({ provider })`.
+`createBridge()` and `createBridge({})` reject missing provider selection.
+
 Continue with [getting started](docs/guides/GETTING_STARTED.md) for TypeScript,
 CommonJS, and optional command-runner usage, or the [SDK reference](docs/reference/SDK.md)
 for the complete request and result contracts.
 
+## Browser use
+
+The same SDK import works in modern browser applications. Supply credentials
+explicitly; browsers do not have Node's process environment. Direct requests work
+only when the provider permits your web origin through CORS, including the
+authorization and content-type headers. The default Jev endpoint needs TypeSafe
+to allow the app's origin before a browser can call it. A browser-visible API key
+is accessible to users of that app, so use only credentials intended for client
+exposure. See [browser integration](docs/guides/BROWSER.md) for the boundary and
+an example. The optional command runner remains Node-only.
+
 ## Change the backend, not the request
 
 [Switching models](docs/guides/SWITCHING_MODELS.md) provides a complete SDK example
-for changing providers. For a locally served compatible model, construct the adapter
-with an explicit provider:
+for changing native providers. To elicit decisions from a locally served general-purpose
+model, explicitly opt into the maintained custom generative preset:
 
 ```javascript
-import { createAdapter, OpenAICompatibleProvider } from '@fayegram-ai/jev-adapter';
+import { createBridge } from '@fayegram-ai/decision-bridge';
+import { OpenAICompatibleProvider } from '@fayegram-ai/decision-bridge/custom/generative';
 
 const provider = new OpenAICompatibleProvider({
     baseURL: 'http://127.0.0.1:8000/v1',
@@ -104,14 +189,14 @@ const provider = new OpenAICompatibleProvider({
     responseFormat: 'json_schema',      // Must be supported by that endpoint.
     tokenParameter: 'max_tokens',
 });
-const adapter = createAdapter({ provider });
-// await adapter.evaluate(theSameRequest);
+const bridge = createBridge({ provider });
+// await bridge.evaluate(theSameRequest);
 ```
 
-For OpenRouter, use `new OpenRouterProvider({ model: 'your-provider/your-model' })`
+The `custom/generative` entry point also exports the other presets. For OpenRouter, use `new OpenRouterProvider({ model: 'your-provider/your-model' })`
 with `OPENROUTER_API_KEY`. For Anthropic, use
 `new AnthropicProvider({ model: 'your-account-model-id' })` with
-`ANTHROPIC_API_KEY`. Substitute real available model IDs; the adapter does not
+`ANTHROPIC_API_KEY`. Substitute real available model IDs; the bridge does not
 choose an arbitrary remote model on your behalf.
 
 A server may implement only JSON-object or text output. Select that mode explicitly
@@ -120,31 +205,33 @@ answer. It never silently downgrades formats, repairs JSON, or changes models.
 
 ## Optional command runner
 
-The installed package includes `jev-decision` for working with request files.
+The installed package includes `decision-bridge` for working with request files.
+The `decision` and `faye-decision` aliases run the same CLI with the same options.
 Run it through npm from your application directory:
 
 ```bash
-npm exec -- jev-decision init ./my-decisions
-npm exec -- jev-decision validate ./my-decisions/request.json
+npm exec -- decision-bridge init ./my-decisions
+npm exec -- decision-bridge validate ./my-decisions/request.json
 ```
 
 These two commands are offline. To evaluate with a real account, copy the generated
 `.env.example` to `.env` inside `my-decisions`, set the key, then run:
 
 ```bash
-npm exec -- jev-decision evaluate ./my-decisions/request.json --config ./my-decisions/decision.config.json --env-file ./my-decisions/.env
+npm exec -- decision-bridge evaluate ./my-decisions/request.json --config ./my-decisions/decision.config.json --env-file ./my-decisions/.env
 ```
 
 The runner uses explicit environment/configuration paths. See the
 [command reference](docs/reference/CLI.md) for flags, streams, and exit codes.
+Its built-in provider default is Jev; SDK construction requires explicit selection.
 
 ## What this repository produces
 
 | Component | What you get |
 | --- | --- |
-| JavaScript SDK | Import `@fayegram-ai/jev-adapter` in your application; TypeScript declarations are included |
-| Optional command runner | `jev-decision` and its shorter `decision` alias, both backed by `bin/jev.mjs` |
-| npm package artifact | `npm run build` creates and verifies `release/fayegram-ai-jev-adapter-VERSION.tgz` |
+| JavaScript SDK | Import `@fayegram-ai/decision-bridge` in your application; TypeScript declarations are included |
+| Optional command runner | `decision-bridge`, `decision`, and `faye-decision`, all backed by `bin/decision.mjs` |
+| npm package artifact | `npm run build` creates and verifies `release/fayegram-ai-decision-bridge-VERSION.tgz` |
 
 For maintainers, `npm run build` archives the ESM source and verifies an offline
 install of the exact tarball used for the npm release. See
@@ -161,17 +248,21 @@ test suite and development scripts.
 
 | Area | Implementation |
 | --- | --- |
-| Stable contract | Runtime-defined `choice`, `noul`, `score`; shared state; immutable results |
-| Providers | Native Jev; Chat Completions-compatible; OpenRouter preset; Anthropic Messages |
-| SDK | Typed builders, provider factory, cancellation, batch evaluation, context/observer extensions, optional decision policy |
-| Node command | Initialize, evaluate, validate, schema, models, ordered JSONL batches, explicit JSON profiles |
-| Reliability | Bounded payloads, deadlines, limited retries, strict response validation, safe errors, atomic output |
-| Development | Functional tests, coverage, TypeScript contract checks, offline tarball-install smoke test, CI template |
+| Stable contract | Runtime-defined [questions](docs/reference/SDK.md#question-builders), structured state or ordered input, typed answers, immutable results |
+| Native providers | Jev, OpenAI Decisions, Cloudflare Clef/Clef-flash/Clef-omni |
+| Custom providers | Separate decision and generative contracts; opt-in Chat Completions, OpenRouter, and Anthropic presets |
+| SDK | Provider factory, [capability preflight](docs/reference/SDK.md#bridgegetcapabilitiesmodel-and-bridgevalidaterequest), [cancellation](docs/reference/SDK.md#cancellation-and-deadlines), and [ordered batch evaluation](docs/reference/SDK.md#sdk-batch-evaluation) |
+| Application extensions | [State/input preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
+| Node command | [Initialize, evaluate, validate, schema, models, and ordered JSONL batches](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |
+| Reliability | [Transport byte limits and fetch injection](docs/reference/SDK.md#provider-transport-options), deadlines, [limited retries and safe errors](docs/reference/ERRORS.md), strict response validation, atomic output |
+| Development | Functional tests, coverage, TypeScript and Workers binding contracts, offline tarball-install checks, cross-platform CI configuration |
 
 ## Result semantics
 
-`result` contains `answers`, `model`, `usage`, and `meta`. Native Jev confidence is
-preserved. Generative backends **do not invent confidence**; missing token counts
+`result` contains `answers`, `model`, `usage`, and `meta`. Native provider confidence is
+preserved. `bridge.providerKind` and `result.meta.providerKind` distinguish
+`'decision'` from `'generative'`; the bridge takes this classification from the
+provider contract. Generative backends **do not invent confidence**; missing token counts
 are `null`, not zero. Their choices and scores are derived from the returned
 probability distributions. See [SDK reference](docs/reference/SDK.md) and
 [provider compatibility](docs/reference/PROVIDERS.md).
@@ -184,9 +275,16 @@ integration layer on which you can build those policies explicitly.
 
 Start with the [documentation index](docs/README.md), including:
 
-- [Getting started](docs/guides/GETTING_STARTED.md), [customization](docs/guides/CUSTOMIZATION.md), and [custom providers](docs/guides/CUSTOM_PROVIDERS.md).
+- [Getting started](docs/guides/GETTING_STARTED.md), [customization](docs/guides/CUSTOMIZATION.md), and [custom providers](docs/guides/CUSTOM_PROVIDERS.md), including [generative presets](docs/guides/CUSTOM_GENERATIVE.md).
 - [SDK](docs/reference/SDK.md), [configuration](docs/reference/CONFIGURATION.md), [errors](docs/reference/ERRORS.md), and the optional [command runner](docs/reference/CLI.md).
 - [Contributor documentation](docs/development/README.md) and [security](SECURITY.md).
+
+## Project origins
+
+Decision Bridge builds on the original
+[Jev Adapter repository](https://github.com/Fayegram-AI/jev-adapter).
+It carries forward the structured-decision SDK and CLI, with Jev supported
+alongside the other providers.
 
 ## Contributing and verification
 

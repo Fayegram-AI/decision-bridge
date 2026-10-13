@@ -6,17 +6,26 @@ evaluate request files.
 
 ## Prerequisites
 
-Use Node.js **22.16 or newer**, npm, and a TypeSafe API key for the default Jev
-backend. The package runs on the server with Node's built-in `fetch`; it has no
-runtime dependencies and is not a browser SDK. Other backends use their own keys;
-see [switching models](SWITCHING_MODELS.md).
+This guide's example uses Node.js **22.16 or newer**, npm, and a TypeSafe API key
+for the explicitly selected Jev provider. The SDK also loads in modern browsers; direct calls
+depend on the provider's CORS policy and an explicit client-safe credential. See
+[browser integration](BROWSER.md). Other backends use their own keys; see
+[switching models](SWITCHING_MODELS.md).
 
 ## Install into your application
 
-Install the package from npm in your application's directory:
+In your application's directory, install the package from npm:
 
 ```bash
-npm install @fayegram-ai/jev-adapter
+npm install @fayegram-ai/decision-bridge
+```
+
+You can also install a verified local archive, replacing the path below. See
+[packaging and release](../development/RELEASING.md) to build and verify one from
+a source checkout:
+
+```bash
+npm install /path/to/fayegram-ai-decision-bridge-0.1.0.tgz
 ```
 
 The installed package contains the SDK, declarations, command runner, examples,
@@ -32,7 +41,7 @@ TYPESAFE_API_KEY=your_real_key_here
 ```
 
 Add `.env` to your application's `.gitignore`. The SDK reads `TYPESAFE_API_KEY`
-from the process environment when constructing the adapter. It does not load
+from the process environment when constructing the selected Jev provider. It does not load
 `.env` itself; the Node startup command below loads it explicitly. In a deployed
 application, you can supply the same variable through your runtime's environment.
 
@@ -42,11 +51,11 @@ Save this as `app.mjs` beside `.env`. The `.mjs` extension enables ESM regardles
 of your application's `package.json` settings:
 
 ```javascript
-import { createAdapter, choice, noul, publicError } from '@fayegram-ai/jev-adapter';
+import { createBridge, choice, noul, publicError } from '@fayegram-ai/decision-bridge';
 
 try {
-    const adapter = createAdapter(); // Jev; defaults to model jev-latest.
-    const result = await adapter.evaluate({
+    const bridge = createBridge({ jev: {} }); // Jev; defaults to model jev-latest.
+    const result = await bridge.evaluate({
         state: { message: 'I was charged twice for the same invoice.' },
         questions: {
             route: choice('Which team should inspect this message?', {
@@ -79,16 +88,21 @@ probability source as `native`. Predictions depend on the model. Your applicatio
 decides how to use them; the SDK does not route messages or execute actions.
 
 Change `state` and the question instructions/criteria on each call. No prompt
-registration is required. Reuse the adapter for subsequent requests. To choose
-a Jev model explicitly, construct it with `createAdapter({ jev: { model: 'YOUR_MODEL' } })`,
+registration is required. Reuse the bridge for subsequent requests. To choose
+a Jev model explicitly, construct it with `createBridge({ jev: { model: 'YOUR_MODEL' } })`,
 using an ID available to your account. An individual request's `model` overrides
 that default. See the [SDK reference](../reference/SDK.md) for scores, result
 metadata, cancellation, batching, and extensions.
 
-Adapter construction can fail for invalid configuration or missing credentials;
+Bridge construction can fail for invalid configuration or missing credentials;
 evaluation can fail for invalid input or provider errors. Both are inside the
 example's `try` block. `publicError(error)` returns a safe `code` and `message`, plus
 HTTP status, request ID, and attempt count when available. See [errors and recovery](../reference/ERRORS.md).
+
+SDK selection is explicit: use `createBridge({ provider })` with a constructed
+provider or `createBridge({ jev: options })` for Jev. Empty options and omitted
+options are errors. `createProvider` also requires its `type` explicitly.
+The CLI has its own Jev default and does not change SDK selection rules.
 
 ## TypeScript
 
@@ -120,11 +134,11 @@ Save this as `app.mts`. The `.mts` extension makes it an ESM module and produces
 `dist/app.mjs`; no `"type": "module"` setting is needed for this example:
 
 ```typescript
-import { createAdapter, choice, publicError } from '@fayegram-ai/jev-adapter';
+import { createBridge, choice, publicError } from '@fayegram-ai/decision-bridge';
 
 try {
-    const adapter = createAdapter();
-    const result = await adapter.evaluate({
+    const bridge = createBridge({ jev: {} });
+    const result = await bridge.evaluate({
         state: 'An invoice appears twice.',
         questions: {
             route: choice('Which team should inspect this?', {
@@ -156,9 +170,9 @@ Use dynamic import from an async function in a `.cjs` module:
 
 ```javascript
 async function main() {
-    const { createAdapter, noul } = await import('@fayegram-ai/jev-adapter');
-    const adapter = createAdapter();
-    const result = await adapter.evaluate({
+    const { createBridge, noul } = await import('@fayegram-ai/decision-bridge');
+    const bridge = createBridge({ jev: {} });
+    const result = await bridge.evaluate({
         state: 'The test log reports a failure.',
         questions: { failed: noul('Does the log report a failed test?') },
     });
@@ -179,17 +193,18 @@ ESM import entry; it does not provide a native `require()` entry.
 After a local package installation, use `npm exec` from the consuming project:
 
 ```bash
-npm exec -- jev-decision init ./my-decisions
-npm exec -- jev-decision validate ./my-decisions/request.json
+npm exec -- decision-bridge init ./my-decisions
+npm exec -- decision-bridge validate ./my-decisions/request.json
 ```
 
-`init` creates `decision.config.json`, `request.json`, `.env.example`, and `.gitignore`;
-existing files are never overwritten. `validate` checks the request offline.
+`init` creates `decision.config.json`, `decision.config.schema.json`, `request.json`,
+`.env.example`, and `.gitignore`; existing files are never overwritten. The config's
+`$schema` points to the copied schema for editor completion. `validate` checks the request offline.
 Copy the generated `.env.example` to `.env` inside `my-decisions`, then edit its key.
 Evaluate the generated request with explicit paths:
 
 ```bash
-npm exec -- jev-decision evaluate ./my-decisions/request.json --config ./my-decisions/decision.config.json --env-file ./my-decisions/.env
+npm exec -- decision-bridge evaluate ./my-decisions/request.json --config ./my-decisions/decision.config.json --env-file ./my-decisions/.env
 ```
 
 The command runner does not discover `.env` or configuration files automatically.
@@ -200,12 +215,14 @@ covers commands, flags, streams, and exit codes.
 Global installation is optional:
 
 ```bash
-npm install --global @fayegram-ai/jev-adapter
-jev-decision --version
+npm install --global @fayegram-ai/decision-bridge
+decision-bridge --version
 ```
 
+The package also installs `decision` and `faye-decision` as equivalent CLI aliases.
+For example, `npm exec -- faye-decision --version` runs the same command runner.
 The shorter `decision` alias may collide with an existing executable; prefer
-`jev-decision` in automation.
+`decision-bridge` or `faye-decision` in automation.
 
 ## Run from a source checkout
 
@@ -214,6 +231,7 @@ to `.env` (`cp .env.example .env` on macOS/Linux or `Copy-Item .env.example .env
 in PowerShell), then edit the key locally. Run:
 
 ```bash
+npm ci --ignore-scripts
 npm test
 npm run validate
 npm run models
@@ -221,12 +239,14 @@ npm run ask
 npm run example
 ```
 
-The first two commands are offline. `models` lists account models; `ask` evaluates
+`npm ci --ignore-scripts` installs the pinned development dependencies from the
+lockfile; it can access the npm registry and requires no model credentials.
+`npm test` and `npm run validate` are offline. `models` lists account models; `ask` evaluates
 `examples/request.json`; `example` runs the source SDK example. The last three
 explicitly load `.env` when present and access the provider. A model listing does
 not prove inference access; evaluation verifies that path.
 
 Source examples import `../src/index.mjs` and run directly without installing the
-package. Application code should use `@fayegram-ai/jev-adapter` as shown above.
+package. Application code should use `@fayegram-ai/decision-bridge` as shown above.
 See [platform setup](PLATFORMS.md) for operating-system details and
 [contributor documentation](../development/README.md) for development checks.

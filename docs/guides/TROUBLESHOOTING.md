@@ -2,7 +2,7 @@
 
 ## The command cannot find a key
 
-General `node bin/jev.mjs ...` calls need exported environment variables or an
+General `node bin/decision.mjs ...` calls need exported environment variables or an
 explicit `--env-file .env`. Only the documented convenience npm scripts
 preload `.env`. The file must name the selected provider's credential variable.
 Do not pass a TypeSafe key to OpenRouter or vice versa. Existing shell environment
@@ -10,11 +10,13 @@ values win over a file; an old exported value can therefore mask a newly edited 
 
 ## My model or base URL seems ignored
 
-Unknown options are rejected, but precedence still matters: `--model` wins over
-request.model, which wins over provider defaults. Provider changes discard
+Unknown options are rejected, but model precedence still matters:
+`--model > request.model > resolved config/environment model > provider default`.
+Provider changes discard
 incompatible fields inherited from a different JSON profile. Use a complete
 explicit config. A compatible base includes its version prefix, not the final
-`/chat/completions` path. Native Jev/Anthropic origins must not include a path.
+`/chat/completions` path. Jev and the custom Anthropic preset require origins
+without a path. See [configuration](../reference/CONFIGURATION.md#precedence).
 
 ## Structured output is rejected
 
@@ -26,17 +28,36 @@ an approved decision. Large schemas also consume context/output budget.
 
 ## The model returns JSON but confidence is absent
 
-This is expected for generative backends. They produce elicited probabilities,
-not Jev's native confidence statistic. Read `meta.probabilitySource`. A null token
+This is expected for generative backends. They produce elicited probabilities
+and do not report the native confidence carried by Jev, OpenAI Decisions, or
+Cloudflare choice/score answers. Read `meta.probabilitySource`. A null token
 count means the server did not report it. Neither absence should be silently
 converted to a number.
+
+## Cloudflare needs an account ID as well as a token
+
+REST inference targets an account-specific URL. Supply `CLOUDFLARE_ACCOUNT_ID`
+and `CLOUDFLARE_API_TOKEN`, or explicit SDK credentials, for that account.
+Standard REST inference needs no Worker or Gateway. Binding calls instead require
+an injected `env.AI`; Gateway routing requires explicit Gateway configuration.
+See the [Cloudflare guide](CLOUDFLARE_DECISIONS.md#supported-inference-paths).
+
+## Cloudflare REST busy mode is unavailable
+
+The bridge rejects enabled Clef REST busy mode locally with
+`UNSUPPORTED_CAPABILITY` before inference. Direct hosted requests were observed
+to reject the execution field with HTTP 422/code `5012`. Leave `rejectIfBusy`
+disabled for REST, or use the Workers AI binding for the enabled setting.
+This differs from a capacity rejection (`3040`) or an allocation limit (`3036`);
+increasing client retries does not fix unsupported
+execution options. See [capacity and Gateway settings](CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
 
 ## Evaluation succeeds but an extension failed
 
 Inspect `meta.observerFailures`. Observation occurs after inference; a failed log
 sink must not cause another model call. Preparation failures instead throw
 `EXTENSION_ERROR` before continuing to inference. Observe the separate provider,
-adapter, and observer deadlines documented in the SDK reference.
+bridge, and observer deadlines documented in the SDK reference.
 
 ## Batch output is incomplete
 
@@ -55,7 +76,7 @@ development compiler with a broken runtime package.
 
 ## Filing a useful issue
 
-Include adapter version, Node version, OS, command with secrets removed, provider,
+Include bridge version, Node version, OS, command with secrets removed, provider,
 requested model, safe error JSON, and a minimal nonsensitive reproduction. Never
 include `.env`, keys, private prompts, or raw confidential documents. Security
 reports should be private; see the root security policy.

@@ -171,6 +171,12 @@ scratch/
 .claude/
 .cursor/
 .copilot/
+.codex/
+.agents/
+.playwright-cli/
+
+# Local agent instructions remain outside the published source tree.
+[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
 
 # Local working files and generated artifacts.
 /.local/

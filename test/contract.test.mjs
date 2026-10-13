@@ -1,11 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAdapter, createProvider, choice, noul, score, decideChoice, validateRequest,
-  validateResult, evaluateBatch, JevProvider } from '../src/index.mjs';
+import { createBridge, createProvider, choice, noul, score, decideChoice, validateRequest, validateResult, evaluateBatch, JevProvider } from '../src/index.mjs';
 import { request, response, jsonResponse, copy } from './fixtures.mjs';
 
-const fake = () => ({ name: 'test-fixture', defaultModel: 'fixture', evaluate: async () => copy(response) });
+const fake = () => ({ kind: 'decision', name: 'test-fixture', defaultModel: 'fixture', evaluate: async () => copy(response) });
 const policyAnswer = { type: 'choice', choice: 'go', probabilities: { go: 0.8, stop: 0.2 } };
+
+test('standalone request validation requires a request model or explicit default', () => {
+    assert.throws(() => validateRequest(request), { code: 'VALIDATION_ERROR', message: 'model must be a nonempty string.' });
+    assert.equal(validateRequest(request, 'chosen-model').model, 'chosen-model');
+    assert.equal(validateRequest({ ...request, model: 'request-model' }, 'chosen-model').model, 'request-model');
+    assert.equal(validateRequest({ ...request, model: 'request-model' }).model, 'request-model');
+});
+
+test('provider factory rejects implicit selection before resolving credentials', () => {
+    for (const config of [undefined, {}, { apiKey: 'fixture' }, { type: undefined }, { type: null }, { type: '' }]) {
+        assert.throws(() => createProvider(config), { code: 'CONFIGURATION_ERROR' });
+    }
+    assert.throws(() => createProvider(), { code: 'CONFIGURATION_ERROR' });
+});
 
 test('builders preserve literal option labels and freeze their result', () => {
   assert.deepEqual(choice('Choose.', { a: null, b: 'Other' }), { type: 'choice', instructions: 'Choose.', criteria: { a: null, b: 'Other' } });
@@ -17,7 +30,7 @@ test('builders preserve literal option labels and freeze their result', () => {
 
 test('structured instructions and descriptions are preserved', () => {
   const q = choice({ task: 'Classify', examples: [] }, { a: { description: 'One' }, b: ['Two'] });
-  assert.deepEqual(validateRequest({ state: [], questions: { q } }).questions.q, q);
+  assert.deepEqual(validateRequest({ model: 'fixture-model', state: [], questions: { q } }).questions.q, q);
   assert.deepEqual(noul('Evaluate the statement.', { true: { meaning: 'yes' }, false: ['no'] }).criteria.true, { meaning: 'yes' });
 });
 
@@ -38,22 +51,22 @@ for (const [label, input] of [
   ['numeric instructions', { state: 'x', questions: { q: { type: 'noul', instructions: 5 } } }],
 ]) {
   test(`request rejects ${label}`, () => {
-    assert.throws(() => validateRequest(input), { code: 'VALIDATION_ERROR' });
+    assert.throws(() => validateRequest(input, 'fixture-model'), { code: 'VALIDATION_ERROR' });
   });
 }
 
 test('cyclic state is rejected without running the provider', async () => {
   let calls = 0;
   const state = {}; state.loop = state;
-  const client = createAdapter({ jev: { apiKey: 'test', fetchImpl: async () => { calls++; return jsonResponse(); } } });
+  const client = createBridge({ jev: { apiKey: 'test', fetchImpl: async () => { calls++; return jsonResponse(); } } });
   await assert.rejects(client.evaluate({ ...request, state }), { code: 'VALIDATION_ERROR' });
   assert.equal(calls, 0);
 });
 
 test('shared JSON objects are permitted while sparse arrays are rejected', () => {
   const item = { a: 1 };
-  assert.deepEqual(validateRequest({ ...request, state: [item, item] }).state, [item, item]);
-  assert.throws(() => validateRequest({ ...request, state: Array(2) }), { code: 'VALIDATION_ERROR' });
+  assert.deepEqual(validateRequest({ model: 'fixture-model', ...request, state: [item, item] }).state, [item, item]);
+  assert.throws(() => validateRequest({ model: 'fixture-model', ...request, state: Array(2) }), { code: 'VALIDATION_ERROR' });
 });
 
 for (const [label, change] of [
@@ -86,9 +99,11 @@ test('minor probability rounding is tolerated without renormalization', () => {
 });
 
 test('score legends can preserve structured criterion descriptions', () => {
-  const req = copy(request); req.questions.level.criteria[0] = { meaning: 'Low' };
-  const res = copy(response); res.answers.level.legend[0] = { meaning: 'Low' };
-  assert.deepEqual(validateResult(res, req.questions).answers.level.legend[0], { meaning: 'Low' });
+  const req = copy(request); req.questions.level.criteria[0] = { meaning: { label: 'Low', rank: 0 }, tags: ['start'] };
+  const res = copy(response); res.answers.level.legend[0] = { tags: ['start'], meaning: { rank: 0, label: 'Low' } };
+  assert.deepEqual(validateResult(res, req.questions).answers.level.legend[0], res.answers.level.legend[0]);
+  res.answers.level.legend[0].meaning.rank = 1;
+  assert.throws(() => validateResult(res, req.questions), { code: 'INVALID_RESPONSE' });
 });
 
 test('choice policy requires an explicit probability threshold', () => {
@@ -108,23 +123,23 @@ test('choice policy distinguishes selected probability from confidence and suppo
 });
 
 test('null model is rejected instead of silently choosing another model', () => {
-  assert.throws(() => validateRequest({ ...request, model: null }), { code: 'VALIDATION_ERROR' });
+  assert.throws(() => validateRequest({ model: 'fixture-model', ...request, model: null }), { code: 'VALIDATION_ERROR' });
 });
 
 test('JSON copying never invokes non-enumerable toJSON methods', () => {
   const state = { text: 'original' };
   Object.defineProperty(state, 'toJSON', { value() { throw Error('must not be called'); } });
-  assert.throws(() => validateRequest({ ...request, state }), { code: 'VALIDATION_ERROR' });
+  assert.throws(() => validateRequest({ model: 'fixture-model', ...request, state }), { code: 'VALIDATION_ERROR' });
 });
 
 test('a sparse array with an extra property cannot hide missing indices', () => {
   const state = Array(1); state.extra = 'value';
-  assert.throws(() => validateRequest({ ...request, state }), { code: 'VALIDATION_ERROR' });
+  assert.throws(() => validateRequest({ model: 'fixture-model', ...request, state }), { code: 'VALIDATION_ERROR' });
 });
 
 test('object keys named __proto__ are preserved without prototype mutation', () => {
   const state = JSON.parse('{"__proto__":{"polluted":true}}');
-  const normalized = validateRequest({ ...request, state });
+  const normalized = validateRequest({ model: 'fixture-model', ...request, state });
   assert(Object.hasOwn(normalized.state, '__proto__'));
   assert.equal({}.polluted, undefined);
 });
@@ -132,7 +147,7 @@ test('object keys named __proto__ are preserved without prototype mutation', () 
 for (const instructions of [undefined, null, '', '  ', 4, true]) {
   test(`required instructions reject ${JSON.stringify(instructions)}`, () => {
     const q = { type: 'noul', ...(instructions === undefined ? {} : { instructions }) };
-    assert.throws(() => validateRequest({ state: 'x', questions: { q } }), { code: 'VALIDATION_ERROR' });
+    assert.throws(() => validateRequest({ model: 'fixture-model', state: 'x', questions: { q } }), { code: 'VALIDATION_ERROR' });
   });
 }
 
@@ -141,13 +156,13 @@ test('non-enumerable and accessor properties are rejected without invocation', (
     let called = false;
     const state = {};
     Object.defineProperty(state, 'secret', { get() { called = true; return 'x'; }, enumerable });
-    assert.throws(() => validateRequest({ ...request, state }), { code: 'VALIDATION_ERROR' });
+    assert.throws(() => validateRequest({ model: 'fixture-model', ...request, state }), { code: 'VALIDATION_ERROR' });
     assert.equal(called, false);
   }
 });
 
 test('oversized JSON node graph is rejected before provider dispatch', () => {
-  assert.throws(() => validateRequest({ ...request, state: Array(200001).fill(null) }), { code: 'VALIDATION_ERROR' });
+  assert.throws(() => validateRequest({ model: 'fixture-model', ...request, state: Array(200001).fill(null) }), { code: 'VALIDATION_ERROR' });
 });
 
 test('missing confidence is supported only as absence, not a synthesized number', () => {
@@ -157,17 +172,17 @@ test('missing confidence is supported only as absence, not a synthesized number'
 });
 
 for (const options of [null, [], { provder: fake() }]) {
-  test(`adapter rejects malformed or misspelled options ${JSON.stringify(options)}`, () => {
-    assert.throws(() => createAdapter(options), { code: 'CONFIGURATION_ERROR' });
+  test(`bridge rejects malformed or misspelled options ${JSON.stringify(options)}`, () => {
+    assert.throws(() => createBridge(options), { code: 'CONFIGURATION_ERROR' });
   });
 }
 
-test('adapter, provider, batch and extension reject misspelled operational options', async () => {
-  const adapter = createAdapter({ provider: fake() });
-  await assert.rejects(adapter.evaluate(request, { timoutMs: 5 }), { code: 'CONFIGURATION_ERROR' });
-  await assert.rejects(adapter.listModels({ timeOut: 5 }), { code: 'CONFIGURATION_ERROR' });
-  await assert.rejects(evaluateBatch(adapter, [], { concurrencyy: 4 }), { code: 'CONFIGURATION_ERROR' });
-  assert.throws(() => createAdapter({ provider: fake(), extensions: [{ name: 'x', onResults() {} }] }), { code: 'CONFIGURATION_ERROR' });
+test('bridge, provider, batch and extension reject misspelled operational options', async () => {
+  const bridge = createBridge({ provider: fake() });
+  await assert.rejects(bridge.evaluate(request, { timoutMs: 5 }), { code: 'CONFIGURATION_ERROR' });
+  await assert.rejects(bridge.listModels({ timeOut: 5 }), { code: 'CONFIGURATION_ERROR' });
+  await assert.rejects(evaluateBatch(bridge, [], { concurrencyy: 4 }), { code: 'CONFIGURATION_ERROR' });
+  assert.throws(() => createBridge({ provider: fake(), extensions: [{ name: 'x', onResults() {} }] }), { code: 'CONFIGURATION_ERROR' });
   const provider = new JevProvider({ apiKey: 'test-key', fetchImpl: async () => jsonResponse(response) });
   await assert.rejects(provider.evaluate(request, { timeoutMs: 5 }), { code: 'CONFIGURATION_ERROR' });
 });
@@ -190,12 +205,24 @@ test('choice policy rejects unknown abstention labels rather than silently ignor
   assert.throws(() => decideChoice(policyAnswer, { minProbability: 0.7, abstainOptions: ['stpo'] }), { code: 'VALIDATION_ERROR' });
 });
 
+test('choice policy rejects lossy abstention arrays without invoking accessors', () => {
+    let reads = 0;
+    const accessor = ['stop'];
+    Object.defineProperty(accessor, '0', { enumerable: true, get() { reads++; return 'stop'; } });
+    const extra = Object.assign(['stop'], { note: 'unexpected property' });
+    for (const abstainOptions of [new Array(1), accessor, extra]) {
+        assert.throws(() => decideChoice(policyAnswer, { minProbability: 0.7, abstainOptions }),
+            { code: 'VALIDATION_ERROR' });
+    }
+    assert.equal(reads, 0);
+});
+
 test('choice permits the native 255-option boundary and rejects 256 before dispatch', () => {
   const criteria = Object.fromEntries(Array.from({ length: 255 }, (_, i) => [`option-${i}`, null]));
-  assert.equal(Object.keys(validateRequest({ state: '', questions: { pick: {
+  assert.equal(Object.keys(validateRequest({ model: 'fixture-model', state: '', questions: { pick: {
     type: 'choice', instructions: 'Choose.', criteria,
   } } }).questions.pick.criteria).length, 255);
-  assert.throws(() => validateRequest({ state: '', questions: { pick: {
+  assert.throws(() => validateRequest({ model: 'fixture-model', state: '', questions: { pick: {
     type: 'choice', instructions: 'Choose.', criteria: { ...criteria, extra: null },
   } } }), { code: 'VALIDATION_ERROR' });
 });
@@ -206,7 +233,7 @@ for (const q of [
   { type: 'noul', instructions: 'True?', criteria: { true: null } },
 ]) {
   test(`native question descriptions reject undocumented null form ${JSON.stringify(q)}`, () => {
-    assert.throws(() => validateRequest({ state: '', questions: { q } }), { code: 'VALIDATION_ERROR' });
+    assert.throws(() => validateRequest({ model: 'fixture-model', state: '', questions: { q } }), { code: 'VALIDATION_ERROR' });
   });
 }
 

@@ -1,20 +1,23 @@
 {
-  "name": "@fayegram-ai/jev-adapter",
+  "name": "@fayegram-ai/decision-bridge",
   "version": "0.1.0",
-  "description": "JavaScript SDK for structured decisions with native Jev and configurable model backends",
+  "description": "JavaScript SDK and CLI for structured decisions across native decision APIs and configurable model providers",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Fayegram-AI/jev-adapter.git"
+    "url": "git+https://github.com/Fayegram-AI/decision-bridge.git"
   },
-  "homepage": "https://github.com/Fayegram-AI/jev-adapter",
+  "homepage": "https://github.com/Fayegram-AI/decision-bridge",
   "bugs": {
-    "url": "https://github.com/Fayegram-AI/jev-adapter/issues"
+    "url": "https://github.com/Fayegram-AI/decision-bridge/issues"
   },
   "keywords": [
     "decision",
+    "bridge",
     "sdk",
     "cli",
     "jev",
+    "openai",
+    "cloudflare",
     "llm"
   ],
   "type": "module",
@@ -28,12 +31,25 @@
   "exports": {
     ".": {
       "types": "./src/index.d.mts",
+      "browser": "./src/index.mjs",
       "import": "./src/index.mjs"
-    }
+    },
+    "./custom/decision": {
+      "types": "./src/custom/decision.d.mts",
+      "browser": "./src/custom/decision.mjs",
+      "import": "./src/custom/decision.mjs"
+    },
+    "./custom/generative": {
+      "types": "./src/custom/generative/index.d.mts",
+      "browser": "./src/custom/generative/index.mjs",
+      "import": "./src/custom/generative/index.mjs"
+    },
+    "./config.schema.json": "./schemas/decision.config.schema.json"
   },
   "bin": {
-    "jev-decision": "./bin/jev.mjs",
-    "decision": "./bin/jev.mjs"
+    "decision-bridge": "./bin/decision.mjs",
+    "decision": "./bin/decision.mjs",
+    "faye-decision": "./bin/decision.mjs"
   },
   "scripts": {
     "build": "node scripts/build-package.mjs",
@@ -44,10 +60,10 @@
     "verify": "npm run check && npm test && npm run typecheck && npm run test:package",
     "test:package": "node scripts/package-smoke.mjs",
     "smoke:live": "node scripts/live-smoke.mjs",
-    "cli": "node bin/jev.mjs",
-    "models": "node --env-file-if-exists=.env bin/jev.mjs models",
-    "ask": "node --env-file-if-exists=.env bin/jev.mjs evaluate examples/request.json",
-    "validate": "node bin/jev.mjs validate examples/request.json",
+    "cli": "node bin/decision.mjs",
+    "models": "node --env-file-if-exists=.env bin/decision.mjs models",
+    "ask": "node --env-file-if-exists=.env bin/decision.mjs evaluate examples/request.json",
+    "validate": "node bin/decision.mjs validate examples/request.json",
     "example": "node --env-file-if-exists=.env examples/basic.mjs",
     "example:extended": "node --env-file-if-exists=.env examples/extended.mjs"
   },
@@ -62,6 +78,12 @@
     "LICENSE",
     "SECURITY.md",
     "CONTRIBUTING.md",
-    ".env.example"
-  ]
+    ".env.example",
+    "schemas/"
+  ],
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261008.1",
+    "ajv": "8.20.0",
+    "typescript": "5.8.3"
+  }
 }

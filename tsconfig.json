@@ -5,10 +5,20 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": false
   },
-  "include": ["test/types.mts", "test/providers.types.mts", "src/index.d.mts"]
+  "include": [
+    "test/types.mts",
+    "test/providers.types.mts",
+    "test/decisions.types.mts",
+    "test/cloudflare.types.mts",
+    "src/index.d.mts",
+    "test/custom.types.mts"
+  ]
 }

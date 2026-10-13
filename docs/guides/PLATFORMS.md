@@ -2,10 +2,12 @@
 
 ## Compatibility and verification
 
-The server-side JavaScript SDK and optional command runner target native Windows, macOS and Linux with
-Node.js **22.16 or newer**. Runtime uses Node built-ins, with no native add-ons,
-third-party runtime dependencies, compilation step or Bash dependency. WSL is not
-required. This is a Node package, not a standalone `.exe`, `.app`, or browser SDK.
+The SDK targets Node.js **22.16 or newer** on native Windows, macOS, and Linux,
+and modern browsers through a browser application's module bundler. Its SDK
+module graph uses standard web APIs and has no third-party runtime dependencies.
+The optional command runner uses Node built-ins and remains Node-only. WSL and
+Bash are not required, and no standalone `.exe` or `.app` is provided. Direct
+browser calls also depend on [provider CORS and credential rules](BROWSER.md).
 
 For application integration, follow the [SDK quickstart](GETTING_STARTED.md).
 The shell-specific source commands below are for working in a source checkout.
@@ -20,9 +22,9 @@ compatible native Node runtime. See [testing](../development/TESTING.md).
 Open PowerShell at the cloned repository or extracted source directory:
 
 ```powershell
-cd "C:\path\to\jev-adapter-0.1.0"
+cd "C:\path\to\decision-bridge-0.1.0"
 node --version
-node bin/jev.mjs validate examples/request.json
+node bin/decision.mjs validate examples/request.json
 Copy-Item .env.example .env
 notepad .env
 ```
@@ -32,8 +34,8 @@ The following file-based commands work without shell-specific continuation or
 stdin encoding rules:
 
 ```powershell
-node bin/jev.mjs models --env-file .env
-node bin/jev.mjs evaluate examples/request.json --env-file .env
+node bin/decision.mjs models --env-file .env
+node bin/decision.mjs evaluate examples/request.json --env-file .env
 ```
 
 `npm run models` and `npm run ask` are equivalent convenience commands. If a local
@@ -46,17 +48,17 @@ the archive rather than reusing generated `node_modules` or executable shims.
 ## macOS / Linux
 
 ```bash
-cd "/path/to/jev-adapter-0.1.0"
+cd "/path/to/decision-bridge-0.1.0"
 node --version
-node bin/jev.mjs validate examples/request.json
+node bin/decision.mjs validate examples/request.json
 cp .env.example .env
 ```
 
 Edit `.env` locally, then:
 
 ```bash
-node bin/jev.mjs models --env-file .env
-node bin/jev.mjs evaluate examples/request.json --env-file .env
+node bin/decision.mjs models --env-file .env
+node bin/decision.mjs evaluate examples/request.json --env-file .env
 ```
 
 Use a currently maintained, compatible Node release according to your organization’s
@@ -65,22 +67,25 @@ security recommendation to remain on an old patch release.
 
 ## Install in another project
 
-Install the package from npm in the consuming project:
+Install the package with npm from your application's directory:
 
 ```text
-npm install @fayegram-ai/jev-adapter
+npm install @fayegram-ai/decision-bridge
 ```
 
-Import from `@fayegram-ai/jev-adapter` in ESM JavaScript, or invoke the installed
+For installation from a verified local archive, see
+[getting started](GETTING_STARTED.md#install-into-your-application).
+
+Import from `@fayegram-ai/decision-bridge` in ESM JavaScript, or invoke the installed
 command runner through npm from your application directory:
 
 ```text
-npm exec -- jev-decision --version
-npm exec -- jev-decision init ./my-decisions
-npm exec -- jev-decision validate ./my-decisions/request.json
+npm exec -- decision-bridge --version
+npm exec -- decision-bridge init ./my-decisions
+npm exec -- decision-bridge validate ./my-decisions/request.json
 ```
 
-A CommonJS application can use `await import('@fayegram-ai/jev-adapter')` from an async
+A CommonJS application can use `await import('@fayegram-ai/decision-bridge')` from an async
 function; this package exports an ESM entry point, not a native `require()` entry.
 The runtime package includes implementation, examples, type declarations and
 maintained documentation. Use a source checkout for tests and CI. Node/npm and

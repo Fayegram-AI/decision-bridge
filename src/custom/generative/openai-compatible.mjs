@@ -1,13 +1,17 @@
-import { optionsObject, TRANSPORT_FIELDS } from '../options.mjs';
-import { AdapterError, withResponseMeta, requireCondition as check } from '../errors.mjs';
-import { cloneJson, isRecord, validateRequest } from '../validation.mjs';
-import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
-import { buildPrompt, buildResponseSchema, normalizeGenerated, parseGeneratedJson } from '../schema.mjs';
+import { optionsObject, TRANSPORT_FIELDS } from '../../options.mjs';
+import { DecisionError, withResponseMeta, requireCondition as check } from '../../errors.mjs';
+import { cloneJson, isRecord, validateRequest } from '../../validation.mjs';
+import { assertCapabilities, LEGACY_CAPABILITIES } from '../../capabilities.mjs';
+import { JsonTransport, parseBaseURL, validateApiKey } from '../../transport.mjs';
+import { environmentValue } from '../../runtime-env.mjs';
+import { buildPrompt, buildResponseSchema, normalizeGenerated, parseGeneratedJson } from './schema.mjs';
 import { generationOptions, chatUsage } from './shared.mjs';
 
 /** Chat Completions compatibility, with explicit schema/JSON/text modes. */
 export class OpenAICompatibleProvider {
+  getCapabilities() { return LEGACY_CAPABILITIES; }
   name = 'openai-compatible';
+  kind = 'generative';
   probabilitySource = 'elicited';
   #transport;
   #options;
@@ -20,7 +24,7 @@ export class OpenAICompatibleProvider {
     const endpoint = parseBaseURL(baseURL);
     // Never send an ambient OpenAI key to a caller-specified third-party endpoint.
     const supplied = apiKey === undefined && endpoint.origin === 'https://api.openai.com'
-      ? process.env.OPENAI_API_KEY : apiKey;
+      ? environmentValue('OPENAI_API_KEY') : apiKey;
     check(supplied !== null || endpoint.loopback,
       'Unauthenticated connections require an explicitly configured loopback endpoint.', 'CONFIGURATION_ERROR');
     const key = supplied === null ? null : validateApiKey(supplied, 'the selected provider API key');
@@ -37,6 +41,7 @@ export class OpenAICompatibleProvider {
 
   async evaluate(input, options = {}) {
     const request = validateRequest(input, this.defaultModel ?? '');
+    assertCapabilities(request, this.getCapabilities(request.model));
     const prompt = buildPrompt(request);
     const { responseFormat, tokenParameter, maxTokens, parameters } = this.#options;
     const body = { ...parameters, model: request.model, messages: [
@@ -55,10 +60,10 @@ export class OpenAICompatibleProvider {
       const message = completion.message;
       check(isRecord(message), 'Provider completion has no message.', 'INVALID_RESPONSE');
       if (message.refusal || completion.finish_reason === 'content_filter') {
-        throw new AdapterError('Model refused the evaluation.', { code: 'MODEL_REFUSAL', ...meta });
+        throw new DecisionError('Model refused the evaluation.', { code: 'MODEL_REFUSAL', ...meta });
       }
       if (completion.finish_reason === 'length') {
-        throw new AdapterError('Model output was truncated; adjust maxTokens explicitly.', { code: 'TRUNCATED_OUTPUT', ...meta });
+        throw new DecisionError('Model output was truncated; adjust maxTokens explicitly.', { code: 'TRUNCATED_OUTPUT', ...meta });
       }
       check(completion.finish_reason === undefined || completion.finish_reason === null || completion.finish_reason === 'stop',
         'Provider did not finish a JSON response normally.', 'INVALID_RESPONSE');
@@ -84,7 +89,7 @@ export class OpenAICompatibleProvider {
 export class OpenRouterProvider extends OpenAICompatibleProvider {
   name = 'openrouter';
   constructor(configuration = {}) {
-    const { apiKey = process.env.OPENROUTER_API_KEY, parameters = {}, ...options } = optionsObject(configuration,
+    const { apiKey = environmentValue('OPENROUTER_API_KEY'), parameters = {}, ...options } = optionsObject(configuration,
       ['apiKey', 'model', 'responseFormat', 'tokenParameter', 'maxTokens', 'parameters', ...TRANSPORT_FIELDS], 'OpenRouter options');
     const safeParameters = cloneJson(parameters, 'parameters', 'CONFIGURATION_ERROR');
     check(isRecord(safeParameters), 'parameters must be an object.', 'CONFIGURATION_ERROR');

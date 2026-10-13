@@ -1,8 +1,8 @@
-import { createAdapter, choice, noul, score, decideChoice, type Adapter, type DecisionProvider } from '../src/index.mjs';
+import { createBridge, createProvider, choice, noul, score, decideChoice, type Bridge, type DecisionProvider } from '../src/index.mjs';
 
-const adapter: Adapter = createAdapter({ jev: { apiKey: 'typecheck-only' } });
+const bridge: Bridge = createBridge({ jev: { apiKey: 'typecheck-only' } });
 async function typeChecks() {
-  const result = await adapter.evaluate({
+  const result = await bridge.evaluate({
     state: { message: 'sample' },
     questions: {
       route: choice('Route?', { inspect: null, stop: 'Stop.' }),
@@ -30,9 +30,25 @@ async function typeChecks() {
 }
 void typeChecks; // Type checking only. No inference is executed.
 const provider: DecisionProvider = {
-  name: 'future-backend', defaultModel: 'some-model',
+  kind: 'decision', name: 'future-backend', defaultModel: 'some-model',
   async evaluate() { throw new Error('Implementation intentionally omitted; never executed.'); },
 };
-createAdapter({ provider });
+createBridge({ provider });
 // @ts-expect-error Provider and Jev options are mutually exclusive.
-createAdapter({ provider, jev: { apiKey: 'not-used' } });
+createBridge({ provider, jev: { apiKey: 'not-used' } });
+// @ts-expect-error SDK selection is required.
+createBridge();
+// @ts-expect-error Empty options do not select a provider.
+createBridge({});
+// @ts-expect-error An undefined selector does not select a provider.
+createBridge({ jev: undefined });
+// @ts-expect-error Null is not a provider.
+createBridge({ provider: null });
+// @ts-expect-error Null is not Jev configuration.
+createBridge({ jev: null });
+createBridge({ jev: {} });
+createBridge({ provider, jev: undefined });
+// @ts-expect-error Provider factory selection is required.
+createProvider();
+// @ts-expect-error Provider factory type is required.
+createProvider({ apiKey: 'not-used' });

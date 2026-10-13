@@ -1,0 +1,9 @@
+{
+    "$schema": "../../schemas/decision.config.schema.json",
+    "schemaVersion": 1,
+    "provider": "custom-decision",
+    "module": "../custom/decision-provider.mjs",
+    "model": "jev-latest",
+    "apiKeyEnv": "TYPESAFE_API_KEY",
+    "timeoutMs": 30000
+}

@@ -1,7 +1,8 @@
-import { requireCondition as check } from '../errors.mjs';
-import { cloneJson, isRecord } from '../validation.mjs';
+import { requireCondition as check } from '../../errors.mjs';
+import { cloneJson, isRecord } from '../../validation.mjs';
 
 const RESERVED = new Set(['model', 'messages', 'system', 'tools', 'tool_choice', 'toolChoice',
+  'functions', 'function_call',
   'response_format', 'stream', 'stream_options', 'n', 'max_tokens', 'max_completion_tokens',
   'headers', 'apiKey', 'api_key', 'baseURL', 'authorization']);
 
@@ -13,7 +14,7 @@ export function generationOptions({ model, maxTokens = 4096, parameters = {} }) 
   const params = cloneJson(parameters, 'parameters', 'CONFIGURATION_ERROR');
   check(isRecord(params), 'parameters must be an object.', 'CONFIGURATION_ERROR');
   check(!Object.keys(params).some(key => RESERVED.has(key)),
-    'parameters contains a field controlled by the adapter.', 'CONFIGURATION_ERROR');
+    'parameters contains a field controlled by the bridge.', 'CONFIGURATION_ERROR');
   return { model: model?.trim(), maxTokens, parameters: params };
 }
 

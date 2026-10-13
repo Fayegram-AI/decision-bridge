@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "lib": ["ES2022"],
+        "types": ["@cloudflare/workers-types"]
+    },
+    "include": ["test/cloudflare-worker.types.mts", "src/index.d.mts"]
+}

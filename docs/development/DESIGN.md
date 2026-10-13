@@ -2,31 +2,38 @@
 
 ## Native decisions as the application contract
 
-Keep Jev-style state and independent typed questions instead of exposing chat as
-the public abstraction. This gives applications a stable decision interface and
-makes customization explicit at each call. Generative protocols are implementation
-details behind a provider. Consequence: not every model can satisfy this contract
+Use shared state or ordered input and independent typed questions as the public
+contract. The bridge owns orchestration; providers own their model API protocols.
+This gives applications a stable decision interface and makes customization
+explicit at each call. Native decision models are the main package scope;
+generative protocols are opt-in custom strategies with their own public subpath.
+Every provider declares its decision/generative kind. Consequence: not every model can satisfy this contract
 reliably; compatibility and quality must be tested separately.
 
 ## ESM JavaScript with declarations and no runtime dependencies
 
-Use native Node.js fetch, streams, JSON, test runner, and argument parser. Ship
-source plus `.d.mts` types without a transpilation build. Consequence: Node 22.16+
-is required and TypeScript declaration synchronization needs its own tests. A
-browser build and CommonJS entry point are not claimed.
+Use standard fetch, streams, and JSON in the SDK; keep Node's test runner,
+argument parser, and filesystem APIs in development tools and the optional CLI.
+Ship ESM source plus `.d.mts` types without a transpilation build. Consequence:
+Node 22.16+ is required for Node use, while browser use depends on modern web
+APIs and the provider's CORS policy. TypeScript declaration synchronization needs
+its own tests. A CommonJS entry point is not claimed.
 
 ## Provenance is part of the result
 
-Native versus elicited probabilities are tagged. Generative confidence is absent;
-unreported token counts are null. Derive choice/score from distributions instead
-of generating redundant fields. Consequence: applications must handle optional
+Native versus elicited probabilities are tagged. Native codecs preserve reported
+probabilities, confidence, and scores. Generative strategies derive choice/score
+from their elicited distributions and do not supply native confidence;
+unreported token counts are null. Consequence: applications must handle optional
 confidence/usage, and identical output schemas do not imply interchangeable
 calibration or correctness.
 
 ## Fail explicitly instead of silently repairing or falling back
 
-Reject invalid JSON, extra fields, wrong labels, non-normalized probabilities,
-truncation, and refusals. Require explicit output modes and models. Consequence:
+Reject invalid JSON, extra fields, wrong labels, distributions outside the provider
+precision allowance, explicit output truncation, and refusals. Require explicit
+output modes and models. Services may truncate input without reporting it; local
+byte limits do not guarantee token fit. Consequence:
 some calls fail that a permissive wrapper might guess at, but failures remain
 observable and cannot silently change budgets or decision policies.
 
