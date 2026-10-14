@@ -25,7 +25,7 @@ You can also install a verified local archive, replacing the path below. See
 a source checkout:
 
 ```bash
-npm install /path/to/fayegram-ai-decision-bridge-0.1.0.tgz
+npm install /path/to/fayegram-ai-decision-bridge-0.1.1.tgz
 ```
 
 The installed package contains the SDK, declarations, command runner, examples,

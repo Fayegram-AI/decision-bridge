@@ -72,7 +72,10 @@ they interact; [errors](ERRORS.md#retry-policy) lists retryable statuses.
 `model` and `safetyIdentifier`. New forms require declared provider capabilities;
 see [OpenAI Decisions](../guides/OPENAI_DECISIONS.md) and
 [Cloudflare Clef](../guides/CLOUDFLARE_DECISIONS.md). The request model
-wins over the provider's default. No default is assumed for a generative provider.
+wins over the provider's configured default, which an omitted request model inherits.
+OpenAI Decisions uses the `default` selector when its provider configuration omits
+`model`; `luna` and explicit `gpt-6-luna` are also supported. Its selectors
+resolve to upstream IDs within the provider. No default is assumed for a generative provider.
 `options` accepts `signal: AbortSignal` and `timeoutMs`, overriding the bridge's
 60-second evaluation budget for this call. It does not mutate the provider's
 independent transport timeout, including Workers AI binding calls.
@@ -92,10 +95,12 @@ when client retries are configured.
 ### `bridge.getCapabilities(model?)` and `bridge.validate(request)`
 
 Capability lookup is synchronous and reports implemented features and limits.
-`validate` resolves the model, snapshots/freezes the request, and checks capabilities
+`validate` applies the default model selection, snapshots/freezes the request, and checks capabilities
 and preparation-extension compatibility without inference. Unsupported features
 fail with `UNSUPPORTED_CAPABILITY` before dispatch. Native Decisions has no model
 listing operation; capability lookup is not account model discovery.
+OpenAI validated requests retain the selected value, while preflight checks the
+resolved outgoing request, including its model ID, against the byte limit.
 
 Providers can implement optional `validateRequest(resolvedRequest)` for additional
 static checks. This synchronous hook receives a frozen request, must return no
@@ -207,7 +212,8 @@ estimated token count is fabricated.
 | --- | --- |
 | `provider` | Bridge backend name; native Jev reports `typesafe` |
 | `providerKind` | `decision` or `generative`; authoritative provider classification, never response-selected |
-| `requestedModel` | Resolved model requested by the caller |
+| `requestedModel` | Selected model after applying the provider default; OpenAI retains `default`, `luna`, or the explicit ID |
+| `resolvedModel` | Upstream model ID sent by OpenAI Decisions; optional for other providers |
 | `probabilitySource` | `native`, `elicited`, or custom/`unspecified` provenance |
 | `confidenceSource` | `native` or `unavailable` for built-in providers |
 | `modelSource` | `reported` or `requested` fallback for built-in providers |

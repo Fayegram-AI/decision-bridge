@@ -123,6 +123,10 @@ function graph(url) {
 }
 graph(entry);
 assert(![...seen].some(url => url.includes('/custom/generative/')), 'Root SDK imports generative strategy');
+// Construct Node's Web API fixture before removing globals; SDK import and execution stay below.
+const openaiResponse = Response.json({ model: 'reported-model', answers: [{ type: 'predicate', name: 'q', probability: 0.7 }],
+    usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1,
+        input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } });
 delete globalThis.process; delete globalThis.Buffer;
 const sdk = await import(${JSON.stringify(name)});
 const decision = await import(${JSON.stringify(name + '/custom/decision')});
@@ -137,11 +141,21 @@ for (const define of [decision.defineDecisionProvider, generative.defineGenerati
     assert.equal((await sdk.createBridge({ provider }).evaluate({ state: '', questions: { q: sdk.noul('True?') } })).answers.q.noul, 0.7);
 }
 console.log('All SDK subpaths import and evaluate without Node globals; root excludes generative strategies.');
+const openai = sdk.createProvider({ type: 'openai-decisions', model: 'luna', apiKey: 'fixture', fetchImpl: async (_, init) => {
+    const request = JSON.parse(init.body);
+    assert.equal(request.model, 'gpt-6-luna');
+    return openaiResponse;
+} });
+const selected = await sdk.createBridge({ provider: openai }).evaluate({ state: '', questions: { q: sdk.noul('True?') } });
+assert.equal(selected.meta.requestedModel, 'luna');
+assert.equal(selected.meta.resolvedModel, 'gpt-6-luna');
+assert.equal(selected.model, 'reported-model');
+console.log('OpenAI selectors resolve and preserve metadata without Node globals.');
 `;
 }
 
 export function consumerTypes(name) {
-    return `import { createBridge, createProvider, noul, type Provider } from ${JSON.stringify(name)};
+    return `import { createBridge, createProvider, noul, type Provider, type OpenAIDecisionsTransportMetadata } from ${JSON.stringify(name)};
 import { defineDecisionProvider, type DecisionProviderDefinition } from ${JSON.stringify(name + '/custom/decision')};
 import { defineGenerativeProvider, createGenerativeProvider, OpenAICompatibleProvider,
     type GenerativeProvider, type OpenAICompatibleOptions, buildResponseSchema } from ${JSON.stringify(name + '/custom/generative')};
@@ -155,6 +169,17 @@ const options: OpenAICompatibleOptions = { apiKey: 'fixture', model: 'fixture' }
 createBridge({ provider: new OpenAICompatibleProvider(options) });
 createGenerativeProvider({ type: 'anthropic', model: 'fixture', apiKey: 'fixture' });
 buildResponseSchema({ q: noul('True?') });
+async function nativeSelection() {
+    const provider = createProvider({ type: 'openai-decisions', model: 'luna', apiKey: 'compile-only' });
+    const native = await provider.createDecision({ input: '', questions: [{ type: 'predicate', instructions: 'True?' }] });
+    const metadata: OpenAIDecisionsTransportMetadata = native.meta;
+    const requested: string = metadata.requestedModel;
+    const resolved: string = metadata.resolvedModel;
+    const common = await createBridge({ provider }).evaluate({ state: '', questions: { q: noul('True?') } });
+    const commonResolved: string | undefined = common.meta.resolvedModel;
+    return { requested, resolved, commonResolved };
+}
+void nativeSelection;
 // @ts-expect-error General-purpose presets are not root providers.
 createProvider({ type: 'openai-compatible', model: 'fixture' });
 // @ts-expect-error Generative provenance cannot claim native probabilities.

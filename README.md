@@ -29,7 +29,7 @@ embedded WAV/MP3 audio and MP4/WebM video, ordered images → audio → videos �
 The common API checks provider/model capabilities before dispatch; refusals are
 errors.
 
-**Version 0.1.0 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.1 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
 The npm package is
 [@fayegram-ai/decision-bridge](https://www.npmjs.com/package/@fayegram-ai/decision-bridge).
@@ -41,24 +41,30 @@ This is an independent project. The custom generative presets identify their
 probabilities as elicited model outputs.
 Changing providers does **not** make their accuracy or calibration equivalent.
 
-## Supported models
+## Model selectors
 
-The built-in decision providers support these model selectors in this release:
+Use these model selectors with the built-in decision providers:
 
-| Decision provider | Model selector | Accepted alias | Provider default |
-| --- | --- | --- | --- |
-| Jev through TypeSafe (`jev`) | `jev-latest` | — | `jev-latest` |
-| OpenAI Decisions (`openai-decisions`) | `gpt-6-luna` | — | `gpt-6-luna` |
-| Cloudflare (`cloudflare-decisions`) | `clef` | `@cf/cloudflare/clef` | `clef` |
-| Cloudflare (`cloudflare-decisions`) | `clef-flash` | `@cf/cloudflare/clef-flash` | — |
-| Cloudflare (`cloudflare-decisions`) | `clef-omni` | `@cf/cloudflare/clef-omni` | — |
+| Decision provider | Model selectors | Provider default |
+| --- | --- | --- |
+| Jev through TypeSafe (`jev`) | `jev-latest` | `jev-latest` |
+| OpenAI Decisions (`openai-decisions`) | `default`, `luna` | `default` |
+| Cloudflare (`cloudflare-decisions`) | `clef`, `@cf/cloudflare/clef` | `clef` |
+| Cloudflare (`cloudflare-decisions`) | `clef-flash`, `@cf/cloudflare/clef-flash` | — |
+| Cloudflare (`cloudflare-decisions`) | `clef-omni`, `@cf/cloudflare/clef-omni` | — |
 
 `jev-latest` is Jev's default alias. Jev also accepts explicit model IDs available through your TypeSafe account;
 use `bridge.listModels()` or the CLI `models` command to inspect that catalog.
 The bridge does not maintain a static list of Jev versions. A moving alias or a
 catalog entry does not guarantee inference access or reproducible model quality.
-OpenAI Decisions currently accepts only `gpt-6-luna` in this integration.
-Cloudflare accepts only the three models above, in short or full-alias form.
+For OpenAI Decisions, `default` selects the provider default and `luna` selects
+the supported Luna-family model. Decision Bridge resolves selectors to supported
+upstream model IDs before calling the service. Mappings are fixed by the installed
+Decision Bridge release. Explicit supported model IDs can also be selected; see
+the [OpenAI model selection guide](docs/guides/OPENAI_DECISIONS.md#model-selection)
+for details. Results retain the selected value in `meta.requestedModel`,
+the outgoing ID in `meta.resolvedModel`, and the service-reported model in `model`.
+Cloudflare accepts only the three models above, in short or full form.
 Model discovery is unsupported for OpenAI Decisions and Cloudflare.
 
 Additional decision protocols use [custom decision providers](docs/guides/CUSTOM_DECISION.md).

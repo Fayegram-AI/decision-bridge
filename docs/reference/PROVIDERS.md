@@ -2,10 +2,10 @@
 
 ## Native routes
 
-| Provider type | Wire API | Credential | Default model | Output strategy |
+| Provider type | Wire API | Credential | Default selector | Output strategy |
 | --- | --- | --- | --- | --- |
 | `jev` | `POST /v1/systemone` at api.typesafe.ai | `TYPESAFE_API_KEY` | `jev-latest` | Native typed decisions |
-| `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `gpt-6-luna` | Native Decisions with common and dedicated access |
+| `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `default` | Native Decisions with common and dedicated access |
 | `cloudflare-decisions` | Workers AI REST model route or `AI.run` binding | `CLOUDFLARE_API_TOKEN` and account ID for REST | `clef` | Native Clef decisions with common and dedicated access |
 
 `createProvider()` and the root SDK export these three native providers only.
@@ -15,9 +15,12 @@ maintained, but are not native decision models. See [custom providers](../guides
 
 ## Supported model selection
 
-See the root README's [model list](../../README.md#supported-models) for the
-built-in selectors and aliases. Jev accepts `jev-latest` and explicit Jev IDs from
-its account catalog. OpenAI Decisions supports only `gpt-6-luna` in this release.
+The [model selector inventory](../../README.md#model-selectors) summarizes the
+built-in providers. Jev accepts `jev-latest` and explicit Jev IDs from
+its account catalog. OpenAI Decisions accepts `default`, `luna`, and explicit
+`gpt-6-luna`. Decision Bridge resolves these to the upstream `gpt-6-luna` model
+in this release. The selected value remains in `meta.requestedModel`, the outgoing
+ID in `meta.resolvedModel`, and the service-reported identity in the response's `model`.
 Cloudflare supports `clef`, `clef-flash`, and `clef-omni`, including each full
 `@cf/cloudflare/<model>` alias. Unsupported OpenAI/Cloudflare selectors fail
 local preflight with `UNSUPPORTED_CAPABILITY`.

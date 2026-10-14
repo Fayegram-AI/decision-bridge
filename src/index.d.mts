@@ -1,8 +1,9 @@
 /** JSON values are read-only because the bridge snapshots/freezes its boundaries. */
 import type { NativeDecisionRequest, OpenAIDecisionResponse, OpenAIDecisionUsage,
-    OpenAIDecisionsMetadata, TransportMetadata } from './decisions.d.mts';
+    OpenAIDecisionsMetadata, OpenAIDecisionsTransportMetadata } from './decisions.d.mts';
 export type { NativeDecisionInputPart, NativeDecisionMessage, NativeDecisionQuestion, NativeDecisionRequest,
-    NativeDecisionAnswer, OpenAIDecisionResponse, OpenAIDecisionUsage, OpenAIDecisionsMetadata, TransportMetadata } from './decisions.d.mts';
+    NativeDecisionAnswer, OpenAIDecisionResponse, OpenAIDecisionUsage, OpenAIDecisionsMetadata,
+    OpenAIDecisionsTransportMetadata, TransportMetadata } from './decisions.d.mts';
 import type { CloudflareDecisionsOptions, CloudflareDecisionRequest, CloudflareDecisionResponse,
     CloudflareTransportMetadata, CloudflareDecisionsMetadata } from './cloudflare-decisions.d.mts';
 export type { CloudflareDecisionModel, CloudflareDecisionImage, CloudflareDecisionAudio, CloudflareDecisionVideo,
@@ -88,6 +89,8 @@ export interface ProviderResult<Q extends Questions = Questions> {
 }
 export interface Metadata {
   readonly provider: string; readonly providerKind: ProviderKind; readonly requestedModel: string;
+  /** Upstream model ID sent after provider selection, when supplied by the provider. */
+  readonly resolvedModel?: string;
   readonly probabilitySource: 'native' | 'elicited' | 'unspecified' | (string & {});
   readonly confidenceSource?: 'native' | 'unavailable' | (string & {});
   readonly modelSource?: 'reported' | 'requested';
@@ -171,7 +174,7 @@ export class OpenAIDecisionsProvider implements DecisionProvider {
     validateRequest(request: ResolvedRequest): void;
     evaluate<const Q extends Questions>(request: EvaluationRequest<Q>, options?: ProviderCallOptions): Promise<ProviderResult<Q>>;
     createDecision(request: NativeDecisionRequest, options?: ProviderCallOptions):
-        Promise<{ readonly decision: OpenAIDecisionResponse; readonly meta: TransportMetadata }>;
+        Promise<{ readonly decision: OpenAIDecisionResponse; readonly meta: OpenAIDecisionsTransportMetadata }>;
 }
 export class CloudflareDecisionsProvider implements DecisionProvider {
     readonly kind: 'decision'; readonly name: 'cloudflare-decisions'; readonly probabilitySource: 'native'; readonly defaultModel: string;

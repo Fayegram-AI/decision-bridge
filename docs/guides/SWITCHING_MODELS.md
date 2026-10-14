@@ -4,7 +4,7 @@ The bridge's request contains `questions`, either `state` or ordered `input`, an
 optionally `model`. Ordered input and richer question types require provider capabilities.
 The provider translates it into that service's wire protocol and validates the
 response. Select a provider when constructing your SDK bridge.
-The root README lists [supported model selectors and aliases](../../README.md#supported-models).
+See [model selectors and provider defaults](../../README.md#model-selectors).
 
 ## Native and custom selection
 
@@ -72,7 +72,7 @@ example and provide that backend's credential in `.env`:
 | Native SDK `createProvider` type | Credential variable | Model selection |
 | --- | --- | --- |
 | `jev` | `TYPESAFE_API_KEY` | Defaults to `jev-latest`; an explicit model overrides it |
-| `openai-decisions` | `OPENAI_API_KEY` | Defaults to `gpt-6-luna` |
+| `openai-decisions` | `OPENAI_API_KEY` | Defaults to `default`; also accepts `luna` and explicit `gpt-6-luna` |
 | `cloudflare-decisions` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for REST | Defaults to `clef`; also supports `clef-flash` and `clef-omni` |
 
 Custom generative presets use `createGenerativeProvider` instead. Their types are
@@ -83,7 +83,7 @@ using the following native alternatives:
 
 ```javascript
 createProvider({ type: 'jev', model: 'jev-latest' });
-createProvider({ type: 'openai-decisions', model: 'gpt-6-luna' });
+createProvider({ type: 'openai-decisions', model: 'luna' });
 createProvider({ type: 'cloudflare-decisions', model: 'clef-flash' });
 createGenerativeProvider({ type: 'openai-compatible', model: process.env.DECISION_MODEL });
 createGenerativeProvider({ type: 'anthropic', model: process.env.DECISION_MODEL });
@@ -95,6 +95,12 @@ make no inference calls. `evaluate()` sends the request. In the SDK, a request's
 The SDK does not automatically read `DECISION_*` settings: this example passes
 `process.env.DECISION_MODEL` explicitly. The SDK factory property is **`type`**;
 a command-runner JSON profile uses **`provider`**.
+
+OpenAI's `default` selector chooses the provider default and `luna` chooses the
+supported Luna-family model. Both currently resolve to upstream `gpt-6-luna`
+through Decision Bridge. Use `model: 'gpt-6-luna'` to select that explicit upstream
+ID. Mappings are fixed by the installed package release; results expose the
+selection in `meta.requestedModel` and outgoing ID in `meta.resolvedModel`.
 
 For Jev and the generative providers, list models with `await bridge.listModels()`.
 OpenAI Decisions and Cloudflare Clef do not implement model discovery and return
@@ -143,7 +149,7 @@ uppercase model placeholders with IDs available to your account/server:
 
 ```bash
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider jev --model jev-latest --env-file .env
-npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider openai-decisions --model gpt-6-luna --env-file .env
+npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider openai-decisions --model default --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider cloudflare-decisions --model clef-flash --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider custom-generative --preset openrouter --model VENDOR/MODEL_ID --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider custom-generative --preset openai-compatible --model MODEL_ID --env-file .env

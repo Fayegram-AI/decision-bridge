@@ -154,7 +154,7 @@ test('Cloudflare configuration precedence and provider switching keep provider f
     assert.equal(switched.config.accountId, undefined);
     assert.equal(switched.config.gateway, undefined);
     assert.equal(switched.config.rejectIfBusy, undefined);
-    assert.equal(switched.config.model, 'gpt-6-luna');
+    assert.equal(switched.config.model, 'default');
     await assert.rejects(loadConfig({ env: { DECISION_REJECT_IF_BUSY: 'yes' } }), { code: 'CONFIGURATION_ERROR' });
     const generative = await invoke(['validate', '-', '--provider', 'cloudflare-decisions', '--max-tokens', '100'], native);
     assert.equal(generative.code, 2);

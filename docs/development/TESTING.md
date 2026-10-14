@@ -42,7 +42,7 @@ as evidence that every environment passed.
 - `transport.test.mjs`: HTTP policy, limits, retries, cancellation, and deadlines.
 - `deadlines.test.mjs`: synchronous preparation/dispatch/completion and inherited budgets.
 - `result-validation.test.mjs`: provider-selected precision and policy-hook boundaries.
-- `decisions*.test.mjs`: native/common OpenAI codecs, boundaries, preflight, CLI, and smoke-helper fixtures.
+- `decisions*.test.mjs`: native/common OpenAI codecs, selectors and model identities, boundaries, preflight, CLI, and smoke-helper fixtures.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
 - `custom-providers.test.mjs`, `custom-config.test.mjs`: classified SDK paths, provenance, presets/modules, schema and initialization.
 - `generative-helpers.test.mjs`: exported prompt/normalization helper contracts and unsupported input rejection.
@@ -62,6 +62,28 @@ different contract or protocol paths.
 All model responses used by ordinary tests are synthetic. HTTP integration servers
 listen on loopback. Tests do not require account keys or make paid model calls.
 Test workspaces are temporary.
+
+### OpenAI model-selector coverage
+
+For changes to OpenAI selection or preparation, run the focused suites from the
+source root:
+
+```text
+node --test test/decisions-selectors.test.mjs test/decisions-preflight.test.mjs test/decisions-cli.test.mjs
+```
+
+These cover omitted, `default`, `luna`, and explicit upstream selection; unsupported
+and malformed values; independently selected, outgoing, and reported identities;
+capabilities and extension context; immutable input; SDK batch preflight; resolved
+wire-byte limits; CLI precedence and mixed-selector rows; and generated requests
+that inherit later configuration changes. Existing Decisions suites also cover
+revalidation after input preparation, refusals, retries, and deadlines.
+
+Type and installed-package checks exercise metadata declarations, SDK/CLI
+selection, and browser execution without Node globals. Use `npm run verify` for
+the complete integration check. A selector mapping change must be verified against
+the target model's protocol and capabilities; local fixtures alone do not establish
+compatibility with a newly selected upstream model.
 
 ## Optional authenticated provider smoke check
 

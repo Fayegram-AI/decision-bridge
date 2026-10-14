@@ -7,8 +7,11 @@ import { spawn } from 'node:child_process';
 import { createBridge, createProvider, noul } from ${JSON.stringify(name)};
 const usage = { input_tokens: 1, output_tokens: 0, total_tokens: 1,
     input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } };
-const response = request => ({ model: request.model, usage,
-    answers: request.questions.map(q => ({ type: 'predicate', name: q.name ?? null, probability: 0.7 })) });
+const response = request => {
+    assert.equal(request.model, 'gpt-6-luna');
+    return { model: 'reported-model', usage,
+        answers: request.questions.map(q => ({ type: 'predicate', name: q.name ?? null, probability: 0.7 })) };
+};
 const provider = createProvider({ type: 'openai-decisions', apiKey: 'fixture', fetchImpl: async (_, init) =>
     new Response(JSON.stringify(response(JSON.parse(init.body)))) });
 const bridge = createBridge({ provider });
@@ -16,6 +19,17 @@ const common = { input: [{ type: 'text', text: 'Installed package fixture' }], q
 assert.equal((await bridge.evaluate(common)).answers.yes.noul, 0.7);
 const native = { input: 'Installed package fixture', questions: [{ type: 'predicate', instructions: 'True?' }] };
 assert.equal((await provider.createDecision(native)).decision.answers[0].probability, 0.7);
+assert.equal(provider.defaultModel, 'default');
+for (const model of ['default', 'luna', 'gpt-6-luna']) {
+    const result = await bridge.evaluate({ ...common, model });
+    assert.equal(result.model, 'reported-model');
+    assert.equal(result.meta.requestedModel, model);
+    assert.equal(result.meta.resolvedModel, 'gpt-6-luna');
+    const direct = await provider.createDecision({ ...native, model });
+    assert.equal(direct.decision.model, 'reported-model');
+    assert.equal(direct.meta.requestedModel, model);
+    assert.equal(direct.meta.resolvedModel, 'gpt-6-luna');
+}
 const server = createServer(async (req, res) => {
     assert.equal(req.url, '/v1/decisions');
     assert.equal(req.headers.authorization, 'Bearer fixture');
@@ -32,8 +46,14 @@ try {
         let out = ''; let err = ''; child.stdout.on('data', b => { out += b; }); child.stderr.on('data', b => { err += b; });
         child.stdin.end(input); const [code] = await once(child, 'close'); assert.equal(code, 0, err); return out;
     }
-    assert.equal(JSON.parse(await cli(['evaluate', '-', ...flags], JSON.stringify(common))).answers.yes.noul, 0.7);
-    assert.equal(JSON.parse(await cli(['evaluate', '-', ...flags, '--native'], JSON.stringify(native))).decision.answers[0].probability, 0.7);
+    const selected = JSON.parse(await cli(['evaluate', '-', ...flags, '--model', 'luna'], JSON.stringify(common)));
+    assert.equal(selected.answers.yes.noul, 0.7);
+    assert.equal(selected.meta.requestedModel, 'luna');
+    assert.equal(selected.meta.resolvedModel, 'gpt-6-luna');
+    const direct = JSON.parse(await cli(['evaluate', '-', ...flags, '--native'], JSON.stringify(native)));
+    assert.equal(direct.decision.answers[0].probability, 0.7);
+    assert.equal(direct.meta.requestedModel, 'default');
+    assert.equal(direct.meta.resolvedModel, 'gpt-6-luna');
     const rows = (await cli(['batch', '-', ...flags, '--native'], JSON.stringify(native) + '\\n' + JSON.stringify(native) + '\\n'))
         .trim().split('\\n').map(JSON.parse);
     assert.deepEqual(rows.map(row => row.ok), [true, true]);

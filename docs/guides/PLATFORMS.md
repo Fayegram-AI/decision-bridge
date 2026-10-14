@@ -22,7 +22,7 @@ compatible native Node runtime. See [testing](../development/TESTING.md).
 Open PowerShell at the cloned repository or extracted source directory:
 
 ```powershell
-cd "C:\path\to\decision-bridge-0.1.0"
+cd "C:\path\to\decision-bridge-0.1.1"
 node --version
 node bin/decision.mjs validate examples/request.json
 Copy-Item .env.example .env
@@ -48,7 +48,7 @@ the archive rather than reusing generated `node_modules` or executable shims.
 ## macOS / Linux
 
 ```bash
-cd "/path/to/decision-bridge-0.1.0"
+cd "/path/to/decision-bridge-0.1.1"
 node --version
 node bin/decision.mjs validate examples/request.json
 cp .env.example .env

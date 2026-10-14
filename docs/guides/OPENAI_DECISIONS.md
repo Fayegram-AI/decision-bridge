@@ -1,12 +1,49 @@
 # OpenAI Decisions
 
-The `openai-decisions` provider implements the native `POST /v1/decisions` API,
-supporting `gpt-6-luna` as its default and only accepted model in this release.
+The `openai-decisions` provider implements the native `POST /v1/decisions` API.
+Its default model selector is `default`; `luna` selects the supported Luna-family
+model, and `gpt-6-luna` selects that explicit upstream ID. Decision Bridge resolves
+all three selections to `gpt-6-luna` in this release before calling the service.
 This integration follows the official [Decisions guide](https://developers.openai.com/api/docs/guides/decisions)
 and [API reference](https://developers.openai.com/api/reference/resources/decisions/methods/create).
 Account access and remote limits still apply. Unknown models fail locally with
 `UNSUPPORTED_CAPABILITY`. The opt-in `openai-compatible` preset in `custom/generative` continues
 using Chat Completions.
+
+## Model selection
+
+```javascript
+import { createProvider } from '@fayegram-ai/decision-bridge';
+
+createProvider({ type: 'openai-decisions' }); // Selects default.
+createProvider({ type: 'openai-decisions', model: 'luna' });
+createProvider({ type: 'openai-decisions', model: 'gpt-6-luna' });
+```
+
+These are alternative configurations. An omitted request `model` inherits the
+provider's configured selection; an explicit request `model` overrides it.
+With no provider or request model configured, the selection is `default`:
+
+| Selection | Selected value | Current upstream target |
+| --- | --- | --- |
+| Omitted, with no configured model | `default` | `gpt-6-luna` |
+| `default` | `default` | `gpt-6-luna` |
+| `luna` | `luna` | `gpt-6-luna` |
+| `gpt-6-luna` | `gpt-6-luna` | `gpt-6-luna` |
+
+Mappings are fixed by the installed Decision Bridge release; there is
+no runtime model discovery, automatic upgrading, or fallback after failure.
+The `default` selector follows the provider default, while `luna` stays within
+the Luna family. The resolved upstream model must have a supported capability
+profile before a selector can target it.
+
+`provider.defaultModel` and `bridge.defaultModel` expose the configured selection,
+using `default` when provider configuration omits `model`. Validated requests and
+extension context retain the effective selected value. Successful common
+and native calls expose `meta.requestedModel` for that selection and
+`meta.resolvedModel` for the upstream ID sent. The common `result.model` and native
+`decision.model` preserve the service-reported identity, which may differ from
+the outgoing ID. Byte limits apply to the resolved wire request.
 
 ## Common bridge access
 
@@ -141,14 +178,15 @@ const { decision, meta } = await provider.createDecision({
 }, { signal: controller.signal });
 ```
 
-An omitted model resolves to the provider default. Native input accepts text or
+An omitted model inherits the provider's configured selection. Native input accepts text or
 multiple user messages containing text or ordered `input_text`/`input_image`
 parts. Only user roles are supported. Files, external image URLs, audio, tools,
 and item references are rejected locally. Exported `NativeDecisionRequest` and
 related types describe this format.
 
 `decision` preserves native answer arrays, optional question names, probabilities,
-confidence, and full usage. `meta` contains transport duration, attempt count,
+confidence, and full usage. `meta` has the exported `OpenAIDecisionsTransportMetadata`
+shape: requested/resolved model identities, transport duration, attempt count,
 and request ID when available. Results are immutable. This method bypasses
 common bridge extensions.
 
@@ -197,6 +235,10 @@ provider. Native evaluation/validation/batch require an explicit file or `-`.
 Mode is never inferred from JSON. Initialization writes a native request, which
 must still be evaluated with `--native`. Offline validation checks built-in
 capabilities without credentials; custom capabilities are checked at evaluation.
+OpenAI initialization stores the model selection in configuration and omits it
+from the generated request so later configuration changes apply. The default
+configuration uses `default`. Offline validation reports the selected value as
+`model` and the outgoing upstream ID as `resolvedModel`.
 Decisions offline validation also checks native field limits and the configured
 request byte limit in both modes.
 

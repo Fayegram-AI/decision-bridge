@@ -39,6 +39,11 @@ export interface OpenAIDecisionResponse {
 export interface TransportMetadata {
     readonly attempts: number; readonly durationMs: number; readonly requestId?: string;
 }
+/** Selected model, resolved outgoing ID, and transport diagnostics for native calls. */
+export interface OpenAIDecisionsTransportMetadata extends TransportMetadata {
+    readonly requestedModel: string;
+    readonly resolvedModel: string;
+}
 export type OpenAIDecisionsMetadata = {
     readonly usage: OpenAIDecisionUsage;
     readonly answers: Readonly<Record<string, { readonly type: 'predicate' | 'choice' | 'score'; readonly confidence?: number }>>;

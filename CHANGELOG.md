@@ -2,6 +2,10 @@
 
 Notable user-facing changes by version.
 
+## 0.1.1
+
+- Add OpenAI `default`/`luna` selectors and requested/resolved model metadata; improve CLI configuration and documentation.
+
 ## 0.1.0
 
 Initial release of Decision Bridge as `@fayegram-ai/decision-bridge`.

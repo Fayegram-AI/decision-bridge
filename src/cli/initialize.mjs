@@ -4,6 +4,7 @@ import { DecisionError } from '../errors.mjs';
 import { validateRequest } from '../validation.mjs';
 import { decisionProfile } from './decisions.mjs';
 import { validateConfig, KEY_ENVS } from './config-validation.mjs';
+import { OPENAI_DEFAULT_MODEL } from '../providers/openai-profile.mjs';
 
 /** Templates are honest edit points for an unknown protocol, never fake inference. */
 function providerTemplate(kind) {
@@ -38,6 +39,7 @@ export async function initialize(directory, config, native = false, moduleBase =
         ...(generateModule ? { module: './provider.mjs' } : {}),
         ...(config.module ? { module: resolve(moduleBase, config.module) } : {}),
         ...(config.provider === 'jev' && config.model === undefined ? { model: 'jev-latest' } : {}),
+        ...(config.provider === 'openai-decisions' && config.model === undefined ? { model: OPENAI_DEFAULT_MODEL } : {}),
         ...(custom && config.model === undefined ? { model: 'YOUR_MODEL' } : {}),
     }, { complete: true });
     const request = { state: "ModuleNotFoundError: No module named 'pytest'", questions: {
@@ -47,12 +49,16 @@ export async function initialize(directory, config, native = false, moduleBase =
         missing_dependency: { type: 'noul', instructions: 'Does this indicate a missing Python package?' },
     } };
     const profile = decisionProfile(config.provider);
+    const sample = native ? profile.native(profile.encode(validateRequest(request, template.model)),
+        profile.options(template)) : request;
+    // OpenAI request files inherit selection from configuration, including after later edits.
+    const generated = { ...sample };
+    if (config.provider === 'openai-decisions') delete generated.model;
     const schema = await readFile(new URL('../../schemas/decision.config.schema.json', import.meta.url), 'utf8');
     const files = {
         'decision.config.json': JSON.stringify(template, null, 2) + '\n',
         'decision.config.schema.json': schema,
-        'request.json': JSON.stringify(native ? profile.native(profile.encode(validateRequest(request, template.model)),
-            profile.options(template)) : request, null, 2) + '\n',
+        'request.json': JSON.stringify(generated, null, 2) + '\n',
         '.env.example': `${template.apiKeyEnv}=replace_with_your_api_key\n` +
             (config.provider === 'cloudflare-decisions' ? 'CLOUDFLARE_ACCOUNT_ID=replace_with_your_account_id\n' : ''),
         '.gitignore': '.env\n.env.*\n!.env.example\nnode_modules/\n*.tmp\n',

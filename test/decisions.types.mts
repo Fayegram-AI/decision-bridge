@@ -1,6 +1,6 @@
-import { choice, noul, scoreLevels, createBridge, createProvider, decideChoice, type NativeDecisionRequest, type ProviderConfig, type Extension, type DecisionProvider, type ProviderResult, type OpenAIDecisionUsage, type OpenAIDecisionsMetadata, type JsonValue } from '../src/index.mjs';
+import { choice, noul, scoreLevels, createBridge, createProvider, decideChoice, type NativeDecisionRequest, type ProviderConfig, type Extension, type DecisionProvider, type ProviderResult, type OpenAIDecisionUsage, type OpenAIDecisionsMetadata, type OpenAIDecisionsTransportMetadata, type JsonValue } from '../src/index.mjs';
 
-const configuration: ProviderConfig = { type: 'openai-decisions', apiKey: 'compile-only' };
+const configuration: ProviderConfig = { type: 'openai-decisions', apiKey: 'compile-only', model: 'luna' };
 const provider = createProvider({ type: 'openai-decisions', apiKey: 'compile-only' });
 const bridge = createBridge({ provider });
 const extensions: readonly Extension[] = [{ name: 'prepare', prepareInput(parts) {
@@ -30,6 +30,12 @@ async function checks() {
     const native = await provider.createDecision(request);
     const tokens: number = native.decision.usage.total_tokens;
     const attempts: number = native.meta.attempts;
+    const selection: OpenAIDecisionsTransportMetadata = native.meta;
+    const requested: string = selection.requestedModel;
+    const resolved: string = selection.resolvedModel;
+    const commonResolved: string | undefined = result.meta.resolvedModel;
+    // @ts-expect-error Selection metadata is immutable.
+    selection.resolvedModel = 'other';
     bridge.validate({ state: '', questions: { q: noul('True?') } });
     bridge.getCapabilities().images;
     // @ts-expect-error Ordered input and state are mutually exclusive.
@@ -46,7 +52,7 @@ async function checks() {
     result.answers.typed.probabilities.push({ value: true, probability: 1 });
     // @ts-expect-error Common labelled scores need two levels.
     scoreLevels('Rate.', [{ label: 'Only' }]);
-    return { value, score, label, typed, cache, tokens, attempts, wrong };
+    return { value, score, label, typed, cache, tokens, attempts, requested, resolved, commonResolved, wrong };
 }
 void checks;
 void configuration;

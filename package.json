@@ -1,6 +1,6 @@
 {
   "name": "@fayegram-ai/decision-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "JavaScript SDK and CLI for structured decisions across native decision APIs and configurable model providers",
   "repository": {
     "type": "git",

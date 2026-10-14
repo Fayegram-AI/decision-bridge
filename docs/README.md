@@ -7,8 +7,8 @@ Install `@fayegram-ai/decision-bridge` with npm; the
 [getting started guide](guides/GETTING_STARTED.md#install-into-your-application)
 also covers installation from a verified archive.
 The hosted playground is [Decision Playground](https://decision-pg.fayegram.com/).
-The root README lists [supported model selectors and aliases](../README.md#supported-models),
-including the distinction between built-in decision models and custom generative presets.
+See [model selectors and provider defaults](../README.md#model-selectors) for
+built-in decision models and the separate custom generative presets.
 
 Decision Bridge is a JavaScript SDK with an optional command runner. It evaluates
 supplied `state` or ordered `input`, plus `questions`, with an explicitly selected
@@ -27,7 +27,7 @@ the OpenAI and Cloudflare guides cover both.
 | [Browser integration](guides/BROWSER.md) | Direct browser use, CORS requirements, and credential exposure |
 | [Platforms](guides/PLATFORMS.md) | Windows, macOS, and Linux setup |
 | [Switching models](guides/SWITCHING_MODELS.md) | Backend and model selection |
-| [OpenAI Decisions](guides/OPENAI_DECISIONS.md) | Native/common decision access, ordered images, typed values, and capability checks |
+| [OpenAI Decisions](guides/OPENAI_DECISIONS.md) | Model selectors and upstream targets, selection metadata, common/native access, ordered images, and typed values |
 | [Cloudflare Clef / Clef-flash / Clef-omni](guides/CLOUDFLARE_DECISIONS.md) | Common/native decisions, embedded images and Omni audio/video, REST and Workers AI binding, busy-mode compatibility, and optional Gateway |
 | [Customization](guides/CUSTOMIZATION.md) | Questions, templates, extensions, and policies |
 | [Custom providers](guides/CUSTOM_PROVIDERS.md) | Common classified contract and explicit CLI module loading |

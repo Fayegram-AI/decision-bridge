@@ -5,8 +5,9 @@ import { builtInCapabilities } from '../capabilities.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
 import { environmentValue } from '../runtime-env.mjs';
 import { validateDecisionResponse } from './decisions-validation.mjs';
-import { encodeCommonDecision, decodeCommonDecision } from './decisions-codec.mjs';
-import { preflightCommonDecision, preflightDecision } from './decisions-preflight.mjs';
+import { decodeCommonDecision } from './decisions-codec.mjs';
+import { preflightCommonDecision, prepareCommonDecision, prepareDecision } from './decisions-preflight.mjs';
+import { OPENAI_DEFAULT_MODEL } from './openai-profile.mjs';
 
 /** Native Decisions transport. Common and dedicated access share a single codec. */
 export class OpenAIDecisionsProvider {
@@ -17,7 +18,7 @@ export class OpenAIDecisionsProvider {
     #maxRequestBytes;
 
     constructor(options = {}) {
-        const { apiKey, model = 'gpt-6-luna', baseURL = 'https://api.openai.com', maxRetries = 0, ...transportOptions } =
+        const { apiKey, model = OPENAI_DEFAULT_MODEL, baseURL = 'https://api.openai.com', maxRetries = 0, ...transportOptions } =
             optionsObject(options, ['apiKey', 'model', 'baseURL', ...TRANSPORT_FIELDS], 'OpenAI Decisions options');
         const endpoint = parseBaseURL(baseURL, { originOnly: true });
         const supplied = apiKey === undefined && endpoint.origin === 'https://api.openai.com'
@@ -36,16 +37,22 @@ export class OpenAIDecisionsProvider {
         preflightCommonDecision(request, { model: this.defaultModel, maxRequestBytes: this.#maxRequestBytes });
     }
 
-    async createDecision(input, options = {}) {
-        const request = preflightDecision(input, { model: this.defaultModel, maxRequestBytes: this.#maxRequestBytes });
-        const { data, meta } = await this.#transport.request('POST', '/v1/decisions', request, options);
-        const decision = withResponseMeta(meta, () => validateDecisionResponse(data, request));
+    /** Dispatch only prepared wire input; keep selection and reported identity independent. */
+    async #perform({ request, native }, options) {
+        const { data, meta: transport } = await this.#transport.request('POST', '/v1/decisions', native, options);
+        const meta = { ...transport, requestedModel: request.model, resolvedModel: native.model };
+        const decision = withResponseMeta(meta, () => validateDecisionResponse(data, native));
         return freezeJson({ decision, meta });
     }
 
+    async createDecision(input, options = {}) {
+        const prepared = prepareDecision(input, { model: this.defaultModel, maxRequestBytes: this.#maxRequestBytes });
+        return this.#perform(prepared, options);
+    }
+
     async evaluate(input, options = {}) {
-        const request = preflightCommonDecision(input, { model: this.defaultModel, maxRequestBytes: this.#maxRequestBytes });
-        const { decision, meta } = await this.createDecision(encodeCommonDecision(request), options);
-        return freezeJson(withResponseMeta(meta, () => decodeCommonDecision(decision, request, meta)));
+        const prepared = prepareCommonDecision(input, { model: this.defaultModel, maxRequestBytes: this.#maxRequestBytes });
+        const { decision, meta } = await this.#perform(prepared, options);
+        return freezeJson(withResponseMeta(meta, () => decodeCommonDecision(decision, prepared.request, meta)));
     }
 }

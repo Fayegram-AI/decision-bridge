@@ -1,6 +1,7 @@
 import { DecisionError, requireCondition as check } from './errors.mjs';
 import { cloneJson, freezeJson, isRecord } from './validation.mjs';
 import { CLOUDFLARE_MODELS } from './providers/cloudflare-profile.mjs';
+import { openaiModelProfile } from './providers/openai-profile.mjs';
 
 /** Conservative defaults preserve the pre-existing custom-provider contract. */
 export const LEGACY_CAPABILITIES = freezeJson({
@@ -8,11 +9,6 @@ export const LEGACY_CAPABILITIES = freezeJson({
     labeledScores: false, safetyIdentifier: false,
     maxImages: 0, maxChoiceOptions: 255, maxScoreLevels: 10,
     audio: false, videos: false, maxAudioClips: 0, maxVideos: 0,
-});
-const OPENAI_CAPABILITIES = freezeJson({
-    supported: true, orderedInput: true, images: true, typedChoices: true,
-    labeledScores: true, safetyIdentifier: true,
-    maxImages: 128, maxChoiceOptions: 255, maxScoreLevels: null,
 });
 
 const CLOUDFLARE_CAPABILITIES = freezeJson({
@@ -29,7 +25,8 @@ export function builtInCapabilities(type, model) {
             maxAudioClips: profile?.omni ? 4 : 0, maxVideos: profile?.omni ? 2 : 0 });
     }
     if (type !== 'openai-decisions') return LEGACY_CAPABILITIES;
-    return freezeJson({ ...LEGACY_CAPABILITIES, ...OPENAI_CAPABILITIES, supported: model === 'gpt-6-luna' });
+    const profile = openaiModelProfile(model);
+    return freezeJson({ ...LEGACY_CAPABILITIES, ...profile, supported: !!profile });
 }
 
 export function providerCapabilities(provider, model) {

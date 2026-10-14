@@ -41,7 +41,8 @@ test('common and native offline validation use model defaults without credential
         [{ ...common, safetyIdentifier: identifier }, []], [{ ...native, safety_identifier: identifier }, ['--native']]]) {
         const result = await invoke(['validate', '-', '--provider', 'openai-decisions', ...extra], JSON.stringify(input));
         assert.equal(result.code, 0, result.stderr);
-        assert.equal(JSON.parse(result.stdout).model, 'gpt-6-luna');
+        assert.equal(JSON.parse(result.stdout).model, 'default');
+        assert.equal(JSON.parse(result.stdout).resolvedModel, 'gpt-6-luna');
         assert.equal(JSON.parse(result.stdout).questionCount, 1);
     }
     const result = await invoke(['evaluate', '-', '--provider', 'jev'], JSON.stringify(common));
@@ -87,7 +88,8 @@ test('native init creates a request that validates with --native', async t => {
     const init = await invoke(['init', '--provider', 'openai-decisions', '--native'], undefined, { cwd });
     assert.equal(init.code, 0, init.stderr);
     const config = JSON.parse(await readFile(join(cwd, 'decision.config.json'), 'utf8'));
-    assert.equal(config.model, 'gpt-6-luna');
+    assert.equal(config.model, 'default');
+    assert.equal(Object.hasOwn(JSON.parse(await readFile(join(cwd, 'request.json'), 'utf8')), 'model'), false);
     assert.equal(config.apiKeyEnv, 'OPENAI_API_KEY');
     const result = await invoke(['validate', 'request.json', '--config', 'decision.config.json', '--native'], undefined, { cwd });
     assert.equal(result.code, 0, result.stderr);
@@ -125,7 +127,7 @@ test('OpenAI generation settings fail offline and provider switches discard them
     const cwd = await temporaryWorkspace(t);
     await writeFile(join(cwd, 'config.json'), JSON.stringify({ provider: 'custom-generative', preset: 'openai-compatible', model: 'other', responseFormat: 'text', maxTokens: 10 }));
     const loaded = await loadConfig({ configPath: 'config.json', cwd, env: {}, overrides: { provider: 'openai-decisions' } });
-    assert.equal(loaded.config.model, 'gpt-6-luna');
+    assert.equal(loaded.config.model, 'default');
     assert.equal(loaded.config.maxTokens, undefined);
     assert.equal(loaded.config.responseFormat, undefined);
     assert.equal(loaded.config.maxRetries, undefined);
@@ -135,6 +137,79 @@ test('native model listing reports unsupported operation', async () => {
     const result = await invoke(['models', '--provider', 'openai-decisions']);
     assert.equal(result.code, 1);
     assert.equal(JSON.parse(result.stderr).error.code, 'UNSUPPORTED_OPERATION');
+});
+
+test('OpenAI selectors follow CLI precedence through offline validation and common/native calls', async t => {
+    const cwd = await temporaryWorkspace(t);
+    const { bodies, flags, env } = await serverFor(t, response => { response.model = 'reported-model'; });
+    await writeFile(join(cwd, 'config.json'), JSON.stringify({ provider: 'openai-decisions', model: 'luna' }));
+    const cases = [
+        { selected: 'luna', extra: [], extraEnv: {} },
+        { selected: 'default', extra: [], extraEnv: { DECISION_MODEL: 'default' } },
+        { selected: 'gpt-6-luna', model: 'gpt-6-luna', extra: [], extraEnv: { DECISION_MODEL: 'luna' } },
+        { selected: 'default', model: 'luna', extra: ['--model', 'default'], extraEnv: { DECISION_MODEL: 'gpt-6-luna' } },
+    ];
+    for (const [input, mode] of [[common, []], [native, ['--native']]]) {
+        for (const entry of cases) {
+            const request = { ...input, ...(entry.model ? { model: entry.model } : {}) };
+            const args = ['-', '--config', 'config.json', ...mode, ...entry.extra];
+            const validated = await invoke(['validate', ...args], JSON.stringify(request), { cwd, env: entry.extraEnv });
+            assert.equal(validated.code, 0, validated.stderr);
+            assert.equal(JSON.parse(validated.stdout).model, entry.selected);
+            assert.equal(JSON.parse(validated.stdout).resolvedModel, 'gpt-6-luna');
+            const evaluated = await invoke(['evaluate', ...args, ...flags], JSON.stringify(request),
+                { cwd, env: { ...env, ...entry.extraEnv } });
+            assert.equal(evaluated.code, 0, evaluated.stderr);
+            const result = JSON.parse(evaluated.stdout);
+            assert.equal(result.meta.requestedModel, entry.selected);
+            assert.equal(result.meta.resolvedModel, 'gpt-6-luna');
+            assert.equal(mode.length ? result.decision.model : result.model, 'reported-model');
+        }
+    }
+    for (const model of ['unknown', '', null]) {
+        const result = await invoke(['evaluate', '-', ...flags], JSON.stringify({ ...common, model }), { env });
+        assert.equal(result.code, 2);
+    }
+    assert.equal(bodies.length, cases.length * 2);
+    assert(bodies.every(body => body.model === 'gpt-6-luna'));
+});
+
+test('initialized OpenAI requests inherit later configuration changes in both modes', async t => {
+    const { flags, env } = await serverFor(t);
+    for (const mode of [[], ['--native']]) {
+        const cwd = await temporaryWorkspace(t);
+        const initialized = await invoke(['init', '--provider', 'openai-decisions', '--model', 'luna', ...mode], undefined, { cwd });
+        assert.equal(initialized.code, 0, initialized.stderr);
+        const request = JSON.parse(await readFile(join(cwd, 'request.json'), 'utf8'));
+        assert.equal(Object.hasOwn(request, 'model'), false);
+        const configPath = join(cwd, 'decision.config.json');
+        const config = JSON.parse(await readFile(configPath, 'utf8'));
+        assert.equal(config.model, 'luna');
+        config.model = 'default';
+        await writeFile(configPath, JSON.stringify(config));
+        const result = await invoke(['evaluate', 'request.json', '--config', 'decision.config.json', ...mode, ...flags], undefined, { cwd, env });
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(JSON.parse(result.stdout).meta.requestedModel, 'default');
+    }
+});
+
+test('common and native JSONL batches retain independent row selectors', async t => {
+    const { bodies, flags, env } = await serverFor(t);
+    const models = ['default', 'luna', 'gpt-6-luna'];
+    for (const [input, mode] of [[common, []], [native, ['--native']]]) {
+        const rows = [...models, 'unknown'].map(model => JSON.stringify({ ...input, model })).join('\n');
+        const result = await invoke(['batch', '-', ...flags, ...mode], rows, { env });
+        assert.equal(result.code, 1, result.stderr);
+        const records = result.stdout.trim().split('\n').map(JSON.parse);
+        records.slice(0, 3).forEach((record, index) => {
+            assert.equal(record.ok, true);
+            assert.equal(record.result.meta.requestedModel, models[index]);
+            assert.equal(record.result.meta.resolvedModel, 'gpt-6-luna');
+        });
+        assert.equal(records[3].error.code, 'UNSUPPORTED_CAPABILITY');
+    }
+    assert.equal(bodies.length, 6);
+    assert(bodies.every(body => body.model === 'gpt-6-luna'));
 });
 
 test('offline common and native validation reject encoded field and byte limits before credentials', async t => {

@@ -77,6 +77,9 @@ validation failures can still return HTTP 422/5012 and retain safe diagnostics.
 Keep the default disabled setting for ordinary REST
 inference; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
 
-Keep a request ID and available Gateway log ID, bridge version, configured provider, requested/reported model,
-and template revision for incident analysis. Log input or results only under your
+Keep a request ID and available Gateway log ID, bridge version, configured provider,
+model selection, reported model, and template revision for incident analysis.
+For successful OpenAI calls, retain
+the requested selection, resolved outgoing ID, and reported model separately;
+see [model identities](../guides/OPENAI_DECISIONS.md#model-selection). Log input or results only under your
 own data-handling policy. No logging or telemetry is enabled by default.

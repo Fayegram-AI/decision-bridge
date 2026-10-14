@@ -2,6 +2,7 @@ import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
 import { isTextWithinLimit, validateImage } from '../input.mjs';
 import { builtInCapabilities } from '../capabilities.mjs';
+import { OPENAI_DEFAULT_MODEL } from './openai-profile.mjs';
 
 const own = (value, key) => Object.hasOwn(value, key);
 function fields(value, allowed, required, label, code = 'VALIDATION_ERROR') {
@@ -12,8 +13,8 @@ function text(value, label, max = 1048576) {
     check(isTextWithinLimit(value, max), `Invalid ${label}.`);
 }
 
-/** Validate the Decisions wire contract independently of the common API limits. */
-export function validateDecisionRequest(input, defaultModel = 'gpt-6-luna') {
+/** Validate native fields while retaining the selected model for preparation and metadata. */
+export function validateDecisionRequest(input, defaultModel = OPENAI_DEFAULT_MODEL) {
     const request = cloneJson(input, 'native decision request');
     fields(request, ['input', 'model', 'questions', 'safety_identifier'], ['input', 'questions'], 'decision request');
     const model = request.model ?? defaultModel;

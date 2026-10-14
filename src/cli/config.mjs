@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { parseEnv } from 'node:util';
+import { OPENAI_DEFAULT_MODEL } from '../providers/openai-profile.mjs';
 import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { validateConfig, NUMERIC, PROVIDER_FIELDS } from './config-validation.mjs';
 export { validateConfig } from './config-validation.mjs';
@@ -78,7 +79,7 @@ export async function loadConfig({ configPath, envFile, overrides = {}, cwd = pr
   if (config.provider === 'jev' && config.model === undefined && effectiveEnv.JEV_MODEL?.trim()) {
     config.model = effectiveEnv.JEV_MODEL.trim();
   }
-  if (config.provider === 'openai-decisions' && config.model === undefined) config.model = 'gpt-6-luna';
+  if (config.provider === 'openai-decisions' && config.model === undefined) config.model = OPENAI_DEFAULT_MODEL;
   if (config.provider === 'cloudflare-decisions' && config.model === undefined) config.model = 'clef';
   return { config, env: effectiveEnv, moduleBase };
 }

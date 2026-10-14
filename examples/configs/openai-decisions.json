@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "provider": "openai-decisions",
-    "model": "gpt-6-luna",
+    "model": "default",
     "apiKeyEnv": "OPENAI_API_KEY",
     "maxRetries": 0
 }

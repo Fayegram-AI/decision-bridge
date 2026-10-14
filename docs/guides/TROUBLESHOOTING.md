@@ -18,6 +18,20 @@ explicit config. A compatible base includes its version prefix, not the final
 `/chat/completions` path. Jev and the custom Anthropic preset require origins
 without a path. See [configuration](../reference/CONFIGURATION.md#precedence).
 
+## OpenAI reports a versioned model after I select default or luna
+
+`default` and `luna` are Decision Bridge model selectors. Both currently resolve
+to `gpt-6-luna`, which is the upstream ID sent to OpenAI. Successful common and
+native calls expose the selection as `meta.requestedModel` and the outgoing ID
+as `meta.resolvedModel`. `result.model` or native `decision.model` preserves the
+service-reported identity, which may differ from the outgoing ID.
+
+An omitted request model inherits the configured model. OpenAI initialization
+omits `model` from its generated requests so later configuration edits apply.
+If selection fails with `UNSUPPORTED_CAPABILITY`, check the
+[accepted selectors](OPENAI_DECISIONS.md#model-selection); the bridge does not
+discover another model or fall back after failure.
+
 ## Structured output is rejected
 
 Check that the selected endpoint/model supports the requested `json_schema` mode.

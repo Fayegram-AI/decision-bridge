@@ -17,7 +17,7 @@ extension path.
 `Provider` requires a nonempty `name`, explicit `kind: 'decision' | 'generative'`,
 and `evaluate(request, { signal? })`. Optional fields and hooks are:
 
-- `defaultModel`: a nonempty model ID, otherwise the request must supply one.
+- `defaultModel`: a nonempty selection string, otherwise the request must supply one.
 - `probabilitySource`: known provenance; generative providers use `elicited`.
 - `getCapabilities(model)`: a pure synchronous capability profile.
 - `validateRequest(request)`: pure synchronous provider preflight; no inference.
@@ -31,7 +31,9 @@ that implement this contract directly. Missing or invalid kinds fail at construc
 `bridge.providerKind` and `result.meta.providerKind` come from the contract and
 cannot be overridden by response metadata.
 
-The request is already snapshotted, validated, resolved to a model, and frozen.
+The request is already snapshotted, validated, supplied with an effective model
+selection, and frozen. Its model string retains the selection; any mapping to an
+upstream ID belongs to the provider's preparation and transport.
 Return canonical `{ model, answers, usage, meta? }`; the bridge validates and
 freezes the result. Custom providers own API encoding, transport, response mapping,
 credential destinations, bounded bodies, safe errors, and cancellation cleanup.

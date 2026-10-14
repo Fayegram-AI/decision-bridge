@@ -5,7 +5,7 @@
 Decision Bridge exposes one application contract for structured decisions. The
 bridge owns request snapshots, common validation, extension sequencing, the total
 deadline, final result validation, immutable results, and bounded observations.
-A Provider owns its API encoding, transport, decoding, model defaults,
+A provider owns its API encoding, transport, decoding, model selection,
 capabilities, and native operations. Multiple models sharing a protocol can use
 one provider implementation.
 
@@ -46,6 +46,26 @@ shared evaluation deadline and extension lifecycle.
 Application policy decides whether a downstream action is permitted. The SDK
 returns decisions without executing actions or maintaining an agent loop.
 
+## Model selection and request preparation
+
+The bridge applies the provider's configured default when a request omits `model`.
+Its validated request and extension context retain that selected string. A provider
+may resolve a selection to an upstream ID while preparing its outgoing request;
+the shared provider contract has no selector-resolution hook.
+
+OpenAI's `openai-profile.mjs` owns the `default` selection, accepted selectors,
+upstream targets, and capabilities. Common and native preparation retain the
+validated selection separately from the resolved native request. Preflight returns
+the selected request, while serialization and byte-limit checks use the resolved
+request. Common evaluation and native `createDecision()` share dispatch, which
+sends only that resolved request.
+
+Successful OpenAI calls report the selected string in `meta.requestedModel` and
+the outgoing ID in `meta.resolvedModel`. The response's `model` retains the
+service-reported identity. CLI offline validation and execution use the same
+preflight, and generated OpenAI requests inherit selection from configuration.
+See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
+
 ## Module map
 
 | Module | Responsibility |
@@ -61,6 +81,7 @@ returns decisions without executing actions or maintaining an agent loop.
 | `src/custom/generative/` | Opt-in protocol presets, schema, prompts, and result derivation |
 | `schemas/decision.config.schema.json` | Shipped CLI configuration structure and editor support |
 | `src/providers/` | API orchestration, model profiles, preflight, codecs, bounded image/audio/video inspection, and transports |
+| `src/providers/openai-profile.mjs`, `src/providers/decisions-preflight.mjs` | Release-owned OpenAI selection, capabilities, and preparation of selected and outgoing requests |
 | `src/embedded.mjs` | Shared embedded data URL and canonical base64 checks |
 | `src/transport.mjs`, `src/response-transport.mjs` | Credential destinations, bounded bodies, safe errors, retries |
 | `src/async.mjs` | Deadlines and cancellation races |

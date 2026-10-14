@@ -43,6 +43,17 @@ Read JSON config only when named. Load custom ESM only when explicitly selected.
 Protect credential destinations and expose bounded callbacks. Consequence: plugins
 are powerful and must be trusted; cancellation is not a JavaScript sandbox.
 
+## Release-owned model selectors
+
+OpenAI Decisions offers `default` for the provider's default supported model and
+`luna` for the supported Luna-family model, alongside explicit supported upstream
+IDs. The installed package fixes the target and capability profile for each
+selector. The provider resolves it locally before serialization; no discovery,
+automatic upgrade, or fallback occurs during a call. Consequence: applications can
+use a stable selection string while inspecting selected, outgoing, and reported
+model identities separately. A future target change requires an intentional
+package update and verification of that model's protocol and capabilities.
+
 ## Conservative retries and independent observations
 
 Retry selected explicit transient HTTP statuses within a deadline. Do not retry

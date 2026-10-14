@@ -4,8 +4,8 @@ Use `cloudflare-decisions` for hosted inference with `clef` (the default),
 `clef-flash`, or `clef-omni`. All three support common bridge requests and the
 dedicated native API. Each accepts its full `@cf/cloudflare/<model>` alias.
 The provider normalizes the endpoint identifier and the required input selector together.
-See the root README's [model list](../../README.md#supported-models) for the exact
-short selectors and full aliases.
+See the [model selector inventory](../../README.md#model-selectors) for supported
+short selectors and full forms.
 
 | Model | Hosted context, in tokens | Default client request budget | Media |
 | --- | ---: | ---: | --- |

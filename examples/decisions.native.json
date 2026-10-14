@@ -1,5 +1,5 @@
 {
-    "model": "gpt-6-luna",
+    "model": "default",
     "input": "Export fails in Safari but works in Chrome.",
     "questions": [
         { "type": "predicate", "name": "browser_specific", "instructions": "Is the failure browser-specific?" },

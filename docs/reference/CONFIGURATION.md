@@ -40,7 +40,7 @@ profile. Gateway configuration is optional for either SDK transport and for CLI 
 | `schemaVersion` | 1; optional, but generated profiles include it |
 | `provider` | `jev` default, `openai-decisions`, `cloudflare-decisions`, `custom-decision`, `custom-generative` |
 | `preset` | `custom-generative` only: `openai-compatible`, `openrouter`, `anthropic`; mutually exclusive with module |
-| `model` | Nonempty model ID; built-in native providers have defaults; required for generative evaluation unless the request supplies it |
+| `model` | Nonempty model selector or supported upstream ID; built-in native providers have defaults; required for generative evaluation unless the request supplies it |
 | `baseURL` | HTTPS API base; loopback may use HTTP |
 | `apiKeyEnv` | Credential environment variable name; inline `apiKey` is rejected |
 | `noAuth` | Boolean; true only for loopback OpenAI-compatible endpoints |
@@ -88,8 +88,8 @@ existing process environment > --env-file values
 The loader does not mutate the process environment. The SDK independently reads
 its documented ambient credential variables at provider construction.
 
-The [supported-model list](../../README.md#supported-models) records native
-selectors, aliases and defaults. Configuration precedence does not expand a
+The [model selector list](../../README.md#model-selectors) records native
+selectors and defaults. Configuration precedence does not expand a
 provider's accepted models or grant account access.
 
 For evaluation model selection:
@@ -99,7 +99,9 @@ For evaluation model selection:
 ```
 
 Jev defaults to `jev-latest`, with `JEV_MODEL` as a legacy/direct convenience.
-Native OpenAI Decisions defaults to `gpt-6-luna`; it accepts transport settings
+Native OpenAI Decisions defaults to `default` and accepts `luna` or explicit
+`gpt-6-luna`; Decision Bridge currently resolves each to upstream `gpt-6-luna`.
+OpenAI accepts transport settings
 and rejects generative output settings. Its default retry count is zero. Cloudflare Clef defaults to `clef`, uses
 account/token credentials, rejects generation settings, and also defaults to zero retries.
 A `DECISION_MODEL` or file model takes precedence over that convenience.

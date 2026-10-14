@@ -214,6 +214,7 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
         ? (await import('../custom/generative/schema.mjs')).buildResponseSchema : undefined;
       await writeJson(command === 'schema' ? buildResponseSchema(request.questions)
         : { valid: true, validationScope: isModule(loaded.config) ? 'structure' : 'provider', questionCount: Object.keys(request.questions).length, model: selectedModel,
+          ...(profile?.resolveModel ? { resolvedModel: profile.resolveModel(request.model) } : {}),
           ...(values.native ? { native: true } : {}) });
     } else {
       let request;

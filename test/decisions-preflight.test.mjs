@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { DecisionError, createBridge, OpenAIDecisionsProvider, evaluateBatch, choice, noul, scoreLevels, validateRequest } from '../src/index.mjs';
 import { decisionResponse } from './decisions-fixtures.mjs';
 import { jsonResponse } from './fixtures.mjs';
+import { encodeCommonDecision } from '../src/providers/decisions-codec.mjs';
 
 const common = { state: '', questions: { q: noul('True?') } };
 
@@ -97,6 +98,20 @@ test('prepared state and ordered input are checked again against wire byte limit
         await assert.rejects(bridge.evaluate(input), { code: 'REQUEST_TOO_LARGE' });
     }
     assert.equal(prepared, 2);
+    assert.equal(requests.length, 0);
+});
+
+test('selector byte budgets use the resolved model before common, native and batch dispatch', async () => {
+    const input = { ...common, state: 'x'.repeat(30), model: 'luna' };
+    const native = encodeCommonDecision(input);
+    const maxRequestBytes = Buffer.byteLength(JSON.stringify(native));
+    assert(Buffer.byteLength(JSON.stringify({ ...native, model: 'gpt-6-luna' })) > maxRequestBytes);
+    const { bridge, provider, requests } = fixture({ model: 'luna', maxRequestBytes });
+    bridge.validate(common);
+    assert.throws(() => bridge.validate(input), { code: 'REQUEST_TOO_LARGE' });
+    await assert.rejects(provider.evaluate(input), { code: 'REQUEST_TOO_LARGE' });
+    await assert.rejects(provider.createDecision(native), { code: 'REQUEST_TOO_LARGE' });
+    await assert.rejects(evaluateBatch(bridge, [common, input]), { code: 'REQUEST_TOO_LARGE' });
     assert.equal(requests.length, 0);
 });
 

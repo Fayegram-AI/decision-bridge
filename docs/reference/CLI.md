@@ -20,8 +20,9 @@ it with `node bin/decision.mjs` from a source checkout. `decision` and
 The CLI defaults to Jev. Flags override `DECISION_*` environment settings, which
 override an explicit config file and then built-in defaults. It constructs an
 explicit provider for the SDK; `createBridge` itself has no implicit selection.
-Use the root README's [model list](../../README.md#supported-models) to select a
-supported native model. Custom generative presets require an explicit model ID.
+Choose a supported native model from the
+[model selector inventory](../../README.md#model-selectors).
+Custom generative presets require an explicit model ID.
 
 ## Commands
 
@@ -32,6 +33,12 @@ for native request/response structures on `init`, `evaluate`, `validate`, or
 or `-`. See [OpenAI Decisions](../guides/OPENAI_DECISIONS.md) and
 [Cloudflare Clef](../guides/CLOUDFLARE_DECISIONS.md) for examples. Both providers report
 model listing as unsupported.
+OpenAI model selection defaults to `default`; use `--model luna` for the Luna
+family or an explicit supported upstream ID. Both stable selectors currently
+resolve to `gpt-6-luna` within Decision Bridge. OpenAI `validate` reports the
+selected value in `model` and the outgoing ID in `resolvedModel`, without credentials.
+Successful common and native calls include `meta.requestedModel` and
+`meta.resolvedModel`; response models retain the service-reported identity.
 Cloudflare CLI execution uses REST. The Workers AI binding is an SDK transport;
 there is no CLI binding selector. Gateway settings route the selected REST request.
 
@@ -71,6 +78,10 @@ explicit service implementation error until you connect it. An existing
 `--provider-module` is referenced without execution or overwrite. All profiles
 include a copied JSON Schema for editor validation. See [custom providers](../guides/CUSTOM_PROVIDERS.md).
 
+OpenAI initialization writes the selected model into configuration, using `default`
+when omitted. Its generated common and native requests omit `model`, allowing
+later configuration changes to control selection.
+
 ## Flags
 
 | Flag | Meaning |
@@ -80,7 +91,7 @@ include a copied JSON Schema for editor validation. See [custom providers](../gu
 | `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `custom-decision`, `custom-generative` |
 | `--preset NAME` | custom-generative preset: `openai-compatible`, `openrouter`, or `anthropic`; exclusive with module |
 | `--native` | Explicit native Decisions input/output; init/evaluate/validate/batch only |
-| `--model ID` | Overrides input JSON model and provider default |
+| `--model SELECTOR` | Model selector or supported upstream ID; overrides input JSON model and configured default |
 | `--base-url URL` | Custom endpoint; requires explicit credential selection |
 | `--api-key-env NAME` | Environment variable name, never the key itself |
 | `--account-id ID` | Cloudflare REST account ID |
