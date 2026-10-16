@@ -11,6 +11,10 @@ reference does not imply that authenticated inference was run against its servic
 | TypeSafe request/response API | https://docs.typesafe.ai/api |
 | TypeSafe JavaScript examples | https://docs.typesafe.ai/sdk/javascript |
 | Native model listing and aliases | https://docs.typesafe.ai/models |
+| Jev image assets and experimental opt-in | https://docs.typesafe.ai/images |
+| Jev bounding boxes | https://docs.typesafe.ai/primitives/box |
+| Jev 1.14 release | https://typesafe.ai/blog/jev-1-14 |
+| Jev nullable usage compatibility | https://docs.typesafe.ai/sdk/javascript/changelog |
 | Choice decisions | https://docs.typesafe.ai/primitives/choice |
 | Noul probabilities | https://docs.typesafe.ai/primitives/noul |
 | Score rubric and weighted expectation | https://docs.typesafe.ai/primitives/score |

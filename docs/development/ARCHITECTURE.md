@@ -38,7 +38,7 @@ Application / CLI
   application policy / storage / downstream action
 ```
 
-Native OpenAI and Cloudflare providers also expose `createDecision` directly.
+Native Jev, OpenAI and Cloudflare providers also expose `createDecision` directly.
 Common and native paths share provider validation, codecs, and bounded transport.
 Direct native calls use provider deadlines; bridge calls additionally enforce the
 shared evaluation deadline and extension lifecycle.
@@ -82,6 +82,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `schemas/decision.config.schema.json` | Shipped CLI configuration structure and editor support |
 | `src/providers/` | API orchestration, model profiles, preflight, codecs, bounded image/audio/video inspection, and transports |
 | `src/providers/openai-profile.mjs`, `src/providers/decisions-preflight.mjs` | Release-owned OpenAI selection, capabilities, and preparation of selected and outgoing requests |
+| `src/providers/jev-profile.mjs`, `src/providers/jev-preflight.mjs`, `src/providers/jev-images.mjs` | Jev experimental policy, common/native assets, and image preflight |
 | `src/embedded.mjs` | Shared embedded data URL and canonical base64 checks |
 | `src/transport.mjs`, `src/response-transport.mjs` | Credential destinations, bounded bodies, safe errors, retries |
 | `src/async.mjs` | Deadlines and cancellation races |
@@ -102,7 +103,8 @@ claiming equivalent statistical semantics across models.
 
 The bridge takes result-validation policy from the provider contract. Cloudflare
 uses an allowance for four-decimal distributions; other built-ins retain the
-baseline. Response metadata cannot relax validation. See the [SDK reference](../reference/SDK.md).
+baseline. Jev additionally permits explicitly unknown token counts while requiring
+native confidence. Response metadata cannot relax validation. See the [SDK reference](../reference/SDK.md).
 Application code passes that precision explicitly when using `decideChoice`; the
 policy helper does not infer it from the answer or its metadata.
 

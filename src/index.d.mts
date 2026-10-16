@@ -1,4 +1,6 @@
 /** JSON values are read-only because the bridge snapshots/freezes its boundaries. */
+import type { JevDangerZone, JevQuestions, JevDecisionRequest, JevDecisionResponse, JevTransportMetadata } from './jev.d.mts';
+export type { JevDangerZone, JevImageAsset, JevQuestions, JevDecisionRequest, JevDecisionResponse, JevTransportMetadata } from './jev.d.mts';
 import type { NativeDecisionRequest, OpenAIDecisionResponse, OpenAIDecisionUsage,
     OpenAIDecisionsMetadata, OpenAIDecisionsTransportMetadata } from './decisions.d.mts';
 export type { NativeDecisionInputPart, NativeDecisionMessage, NativeDecisionQuestion, NativeDecisionRequest,
@@ -25,6 +27,15 @@ export interface NoulQuestion {
   readonly type: 'noul'; readonly instructions: Instructions;
   readonly criteria?: { readonly true?: Instructions; readonly false?: Instructions };
 }
+export interface BoxQuestion {
+    readonly type: 'box'; readonly instructions: Instructions; readonly criteria?: never;
+}
+export interface BoxCoordinates {
+    readonly top: number; readonly bottom: number; readonly left: number; readonly right: number;
+}
+export interface BoxAnswer {
+    readonly type: 'box'; readonly box: BoxCoordinates; readonly confidence?: number;
+}
 export interface ScoreQuestion<C extends ScoreCriteria = ScoreCriteria> {
   readonly type: 'score'; readonly instructions: Instructions; readonly criteria: C;
   readonly levels?: never;
@@ -45,7 +56,7 @@ export type DecisionInputPart = { readonly type: 'text'; readonly text: string }
     | { readonly type: 'audio'; readonly dataUrl: string }
     | { readonly type: 'video'; readonly dataUrl: string };
 export type OrderedInput = readonly DecisionInputPart[];
-export type Question = ChoiceQuestion | TypedChoiceQuestion | NoulQuestion | ScoreQuestion | LabeledScoreQuestion;
+export type Question = ChoiceQuestion | TypedChoiceQuestion | NoulQuestion | ScoreQuestion | LabeledScoreQuestion | BoxQuestion;
 export type Questions = Readonly<Record<string, Question>>;
 export interface ChoiceAnswer<K extends string = string> {
   readonly type: 'choice'; readonly choice: K;
@@ -71,7 +82,7 @@ type ChoiceLabel<K> = K extends string ? K : K extends number ? `${K}` : never;
 export type AnswerFor<Q extends Question> = Q extends TypedChoiceQuestion<infer O> ? TypedChoiceAnswer<O[number]['value']>
   : Q extends LabeledScoreQuestion<infer L> ? LabeledScoreAnswer<L>
   : Q extends ChoiceQuestion<infer C>
-  ? ChoiceAnswer<ChoiceLabel<keyof C>> : Q extends NoulQuestion ? NoulAnswer : ScoreAnswer;
+  ? ChoiceAnswer<ChoiceLabel<keyof C>> : Q extends NoulQuestion ? NoulAnswer : Q extends BoxQuestion ? BoxAnswer : ScoreAnswer;
 export type EvaluationRequest<Q extends Questions = Questions> = {
     readonly questions: Q; readonly model?: string; readonly safetyIdentifier?: string | null;
 } & ({ readonly state: State; readonly input?: never } | { readonly input: OrderedInput; readonly state?: never });
@@ -110,7 +121,7 @@ export interface ModelList {
     readonly release_date?: string; readonly [key: string]: unknown }[];
   readonly has_more?: boolean; readonly last_id?: string;
 }
-export interface ResultValidationOptions { readonly native?: boolean; readonly probabilityDecimalPlaces?: number; }
+export interface ResultValidationOptions { readonly native?: boolean; readonly nullableUsage?: boolean; readonly probabilityDecimalPlaces?: number; }
 export type ProviderKind = 'decision' | 'generative';
 export interface Provider {
   readonly kind: ProviderKind;
@@ -125,6 +136,7 @@ export interface Provider {
 }
 export interface DecisionProvider extends Provider { readonly kind: 'decision'; }
 export interface Capabilities {
+    readonly boxes?: boolean;
     readonly audio?: boolean; readonly videos?: boolean;
     readonly maxAudioClips?: number | null; readonly maxVideos?: number | null;
     readonly supported: boolean; readonly orderedInput: boolean; readonly images: boolean;
@@ -146,7 +158,7 @@ export interface TransportOptions {
   timeoutMs?: number; maxRetries?: number; maxRequestBytes?: number; maxResponseBytes?: number;
   fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>;
 }
-export interface JevOptions extends TransportOptions { apiKey?: string; model?: string; baseURL?: string; }
+export interface JevOptions extends TransportOptions { apiKey?: string; model?: string; baseURL?: string; dangerZone?: JevDangerZone; }
 export interface OpenAIDecisionsOptions extends TransportOptions { apiKey?: string; model?: string; baseURL?: string; }
 export interface Bridge {
   readonly provider: string; readonly providerKind: ProviderKind; readonly defaultModel?: string;
@@ -166,6 +178,10 @@ export class JevProvider implements DecisionProvider {
   evaluate<const Q extends Questions>(request: EvaluationRequest<Q>, options?: ProviderCallOptions): Promise<ProviderResult<Q>>;
   listModels(options?: ProviderCallOptions): Promise<ModelList>;
   getCapabilities(model?: string): Capabilities;
+  getResultValidationOptions(model?: string): ResultValidationOptions;
+  validateRequest(request: ResolvedRequest): void;
+  createDecision<const Q extends JevQuestions>(request: JevDecisionRequest<Q>, options?: ProviderCallOptions):
+      Promise<{ readonly decision: JevDecisionResponse<Q>; readonly meta: JevTransportMetadata }>;
 }
 export class OpenAIDecisionsProvider implements DecisionProvider {
     readonly kind: 'decision'; readonly name: 'openai-decisions'; readonly probabilitySource: 'native'; readonly defaultModel: string;
@@ -187,10 +203,12 @@ export class CloudflareDecisionsProvider implements DecisionProvider {
         Promise<{ readonly decision: CloudflareDecisionResponse; readonly meta: CloudflareTransportMetadata }>;
 }
 export type CloudflareDecisionsConfig = { type: 'cloudflare-decisions' } & CloudflareDecisionsOptions;
-export type ProviderConfig = ({ type: 'jev' } & JevOptions)
+export type JevConfig = { type: 'jev' } & JevOptions;
+export type ProviderConfig = JevConfig
   | ({ type: 'openai-decisions' } & OpenAIDecisionsOptions)
   | CloudflareDecisionsConfig;
 export type OpenAIDecisionsConfig = { type: 'openai-decisions' } & OpenAIDecisionsOptions;
+export function createProvider(options: JevConfig): JevProvider;
 export function createProvider(options: OpenAIDecisionsConfig): OpenAIDecisionsProvider;
 export function createProvider(options: CloudflareDecisionsConfig): CloudflareDecisionsProvider;
 export function createProvider(options: ProviderConfig | OpenAIDecisionsConfig): DecisionProvider;
@@ -200,6 +218,7 @@ export function choice<const C extends ChoiceCriteria>(instructions: Instruction
 export function noul(instructions: Instructions, criteria?: NoulQuestion['criteria']): NoulQuestion;
 export function score<const C extends ScoreCriteria>(instructions: Instructions, criteria: C): ScoreQuestion<C>;
 export function scoreLevels<const L extends ScoreLevels>(instructions: Instructions, levels: L): LabeledScoreQuestion<L>;
+export function box(instructions: Instructions): BoxQuestion;
 export interface ChoicePolicyOptions<K extends string | boolean = string> {
     minProbability: number; minMargin?: number; abstainOptions?: readonly K[];
     /** Provider-declared probability precision; omission retains the baseline tolerance. */

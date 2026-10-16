@@ -164,7 +164,7 @@ test('Cloudflare JSON and JSONL accept records above 8 MiB and retain the 13 MiB
     const large = JSON.stringify({ ...native, state: 'x'.repeat(8 * 1024 * 1024) });
     const result = await invoke(['validate', '-', '--provider', 'cloudflare-decisions'], large);
     assert.equal(result.code, 0, result.stderr);
-    const legacy = await invoke(['validate', '-', '--provider', 'jev'], large);
+    const legacy = await invoke(['validate', '-', '--provider', 'custom-generative', '--preset', 'openai-compatible'], large);
     assert.equal(legacy.code, 2);
     assert.equal(JSON.parse(legacy.stderr).error.code, 'INPUT_TOO_LARGE');
     const huge = await invoke(['validate', '-', '--provider', 'cloudflare-decisions'],

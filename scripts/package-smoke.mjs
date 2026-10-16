@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { decisionsScenario, cloudflareScenario } from './package/native-scenarios.mjs';
+import { jevScenario } from './package/jev-scenario.mjs';
 import { customScenario, browserScenario, consumerTypes } from './package/custom-scenarios.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const temporary = mkdtempSync(join(tmpdir(), 'decision package '));
@@ -44,7 +45,7 @@ import { createBridge, DecisionError, noul, createProvider } from ${JSON.stringi
 // Check the complete installed entry point against its public contract.
 assert.deepEqual(Object.keys(sdk).sort(), [
     'createBridge', 'JevProvider', 'OpenAIDecisionsProvider', 'CloudflareDecisionsProvider',
-    'createProvider', 'choice', 'noul', 'score', 'scoreLevels', 'decideChoice',
+    'createProvider', 'choice', 'noul', 'score', 'scoreLevels', 'box', 'decideChoice',
     'evaluateBatch', 'DecisionError', 'publicError',
     'validateRequest', 'validateResult',
 ].sort());
@@ -69,6 +70,7 @@ console.log('Installed SDK imports and evaluates a local test fixture.');\n`;
   for (const [file, source] of [
     ['decisions-smoke.mjs', decisionsScenario(name)],
     ['cloudflare-smoke.mjs', cloudflareScenario(name)],
+    ['jev-smoke.mjs', jevScenario(name)],
     ['custom-smoke.mjs', customScenario(name)],
     ['browser-smoke.mjs', browserScenario(name)],
   ]) {

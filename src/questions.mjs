@@ -13,3 +13,5 @@ export const noul = (instructions, criteria) => build({
 });
 export const score = (instructions, criteria) => build({ type: 'score', instructions, criteria });
 export const scoreLevels = (instructions, levels) => build({ type: 'score', instructions, levels });
+/** One bounding box; use a separate noul to check whether the target is present. */
+export const box = instructions => build({ type: 'box', instructions });

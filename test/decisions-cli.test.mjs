@@ -50,8 +50,8 @@ test('common and native offline validation use model defaults without credential
     assert.equal(JSON.parse(result.stderr).error.code, 'UNSUPPORTED_CAPABILITY');
 });
 
-test('native mode requires explicit provider and input and is never guessed', async () => {
-    for (const args of [['validate', '-', '--native'], ['evaluate', '--provider', 'openai-decisions', '--native'],
+test('native mode requires a supported provider and explicit input and is never guessed', async () => {
+    for (const args of [['validate', '-', '--provider', 'custom-generative', '--preset', 'openai-compatible', '--native'], ['evaluate', '--provider', 'openai-decisions', '--native'],
         ['schema', '-', '--provider', 'openai-decisions', '--native']]) {
         const result = await invoke(args, JSON.stringify(native));
         assert.equal(result.code, 2);

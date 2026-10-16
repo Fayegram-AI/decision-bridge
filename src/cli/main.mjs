@@ -15,7 +15,8 @@ import { assertDistinctFiles, createWriter, readJson, readJsonLines } from './io
 import { mapOrdered } from './ordered.mjs';
 
 const SAMPLE_PATH = fileURLToPath(new URL('../../examples/request.json', import.meta.url));
-const BOOLS = ['help', 'version', 'pretty', 'compact', 'no-auth', 'force', 'native', 'reject-if-busy', 'no-reject-if-busy'];
+const BOOLS = ['help', 'version', 'pretty', 'compact', 'no-auth', 'force', 'native', 'reject-if-busy', 'no-reject-if-busy',
+    'jev-images', 'no-jev-images', 'jev-long-context', 'no-jev-long-context'];
 const STRINGS = ['config', 'env-file', 'provider', 'preset', 'model', 'base-url', 'api-key-env', 'timeout-ms',
   'retries', 'max-tokens', 'response-format', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id'];
 const FIELD_MAP = { preset: 'preset', provider: 'provider', model: 'model', 'base-url': 'baseURL', 'api-key-env': 'apiKeyEnv',
@@ -50,6 +51,10 @@ Options:
   --timeout-ms N            End-to-end evaluation/provider deadline
   --retries N               HTTP retries, 0–10; Decisions default 0, others 2
   --native                  Selected decision provider native format (init/evaluate/validate/batch)
+  --jev-images              Enable experimental Jev images and box questions
+  --no-jev-images           Explicitly disable Jev images
+  --jev-long-context        Enable experimental Jev 262k context
+  --no-jev-long-context     Explicitly disable Jev long context
   --account-id ID           Cloudflare account (otherwise CLOUDFLARE_ACCOUNT_ID)
   --reject-if-busy          Unavailable for Clef REST; rejected before inference
   --no-reject-if-busy       Explicitly disable Cloudflare capacity rejection
@@ -95,7 +100,7 @@ function argumentsFor(argv) {
 }
 
 function overridesFor(values) {
-  const overrides = {};
+  const overrides = Object.create(null);
   for (const [flag, field] of Object.entries(FIELD_MAP)) if (values[flag] !== undefined) {
     const value = values[flag];
     if (['timeoutMs', 'maxRetries', 'maxTokens'].includes(field)) {
@@ -107,6 +112,12 @@ function overridesFor(values) {
   check(!(values['reject-if-busy'] && values['no-reject-if-busy']), 'Choose one reject-if-busy flag.', 'USAGE_ERROR');
   if (values['reject-if-busy'] || values['no-reject-if-busy']) overrides.rejectIfBusy = !!values['reject-if-busy'];
   if (values['gateway-id'] !== undefined) overrides.gateway = { id: values['gateway-id'] };
+  for (const [flag, field] of [['jev-images', 'images'], ['jev-long-context', 'longContext']]) {
+    check(!(values[flag] && values['no-' + flag]), 'Choose one Jev feature flag for each setting.', 'USAGE_ERROR');
+    if (values[flag] || values['no-' + flag]) overrides.dangerZone = {
+      ...(Object.hasOwn(overrides, 'dangerZone') ? overrides.dangerZone : {}), [field]: !!values[flag],
+    };
+  }
   return overrides;
 }
 
@@ -171,7 +182,7 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
       '--native requires a decision provider and init/evaluate/validate/batch.', 'USAGE_ERROR');
     check(!values.native || command === 'init' || values.input || positionals[1],
       '--native requires an explicit input file or -.', 'USAGE_ERROR');
-    check(command !== 'models' || !profile,
+    check(command !== 'models' || !profile || profile.models,
       'This decision provider does not implement model listing.', 'UNSUPPORTED_OPERATION');
     activeEnv = loaded.env;
     explicitSecret = loaded.config.apiKeyEnv ? activeEnv[loaded.config.apiKeyEnv] : undefined;
@@ -201,7 +212,7 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
       if (profile && command !== 'schema') return profile.common(raw, profile.options(loaded.config));
       const request = validateRequest(raw, raw?.model ?? loaded.config.model ?? 'validation-only');
       if (!isModule(loaded.config)) assertCapabilities(request,
-        builtInCapabilities(loaded.config.provider, request.model));
+        builtInCapabilities(loaded.config.provider, request.model, loaded.config));
       return request;
     };
     if (command === 'init') {

@@ -48,7 +48,7 @@ guides. These are SDK options, not per-evaluation bridge options.
 | --- | --- |
 | `timeoutMs` | 30,000 ms; positive integer through 2,147,483,647; one transport budget for dispatch, retries, backoff, and response reading |
 | `maxRetries` | Additional eligible attempts, 0–10; Jev and generative presets default to 2, native OpenAI and Cloudflare to 0 |
-| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
+| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB; Jev defaults to and caps at 32 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
 | `maxResponseBytes` | 8 MiB; configurable from 1 byte through 64 MiB; applies while reading the response body |
 | `fetchImpl` | Optional `(url: string, init?: RequestInit) => Promise<Response>`; defaults to the runtime's `fetch` |
 
@@ -146,6 +146,10 @@ const q3 = score('How far did processing progress?', [
 ]);
 ```
 
+`box(instructions)` returns a box question with no criteria; supported providers
+must declare `boxes: true`. Jev supports it with experimental image opt-in and
+a supported model; see [Jev images and boxes](../guides/JEV.md).
+
 Builders return immutable question objects. `choice(instructions, criteria)` accepts
 a label map containing 1 to 255 options. `noul(instructions, criteria?)` accepts an
 optional criteria object,
@@ -201,7 +205,8 @@ rubric exactly. Generative providers calculate score and legend locally. Native
 values are validated and preserved, not normalized or replaced.
 
 **Usage:** `input_tokens` and `output_tokens` are nonnegative integers or null.
-Jev, OpenAI Decisions, and Cloudflare require reported integer counts. OpenAI and
+Jev accepts explicitly null counts as unknown; OpenAI Decisions and Cloudflare
+require reported integer counts. OpenAI and
 Anthropic cache creation/read counts are preserved separately when provided;
 Cloudflare does not fabricate cache or total-token fields. No total price, inferred cache saving, or
 estimated token count is fabricated.
@@ -231,7 +236,8 @@ unavailable metadata exists. Result objects and nested data returned by the brid
 are immutable. Standalone validation functions return snapshots, not frozen values.
 
 `schemaVersion` remains 1 for legacy requests and 2 for ordered images/text or
-richer question forms. Audio/video requests use 3. This result version is separate
+richer question forms. Audio/video requests use 3; requests with boxes use 4.
+This result version is separate
 from the CLI configuration schema, which remains 1.
 
 ## Extensions
@@ -304,6 +310,8 @@ automatic model fallback. The CLI has a separate streaming JSONL implementation.
 - `createProvider(config)`: factory requiring an explicit `type` equal to `jev`,
   `openai-decisions`, or `cloudflare-decisions`.
 - `JevProvider`, `OpenAIDecisionsProvider`, `CloudflareDecisionsProvider`: native provider classes.
+- `box(instructions)` and `JevProvider.createDecision(request, options?)`:
+  bounding boxes and native JSON assets; see the [Jev guide](../guides/JEV.md).
 - `scoreLevels(instructions, levels)` and the array overload of `choice`:
   labelled rubrics and typed string/boolean options, with provider capability checks.
 - `OpenAIDecisionsProvider.createDecision(request, options?)`: dedicated native
@@ -314,9 +322,9 @@ automatic model fallback. The CLI has a separate streaming JSONL implementation.
   an own `input.model` property or an explicitly supplied default; inherited
   models are ignored, and it never selects a Jev model.
   Question builders and schema generation validate without selecting an inference model.
-- `validateResult(input, questions, { native = false, probabilityDecimalPlaces })`: snapshot supplied
+- `validateResult(input, questions, { native = false, nullableUsage = false, probabilityDecimalPlaces })`: snapshot supplied
   questions and validate the canonical result; native mode requires confidence
-  and reported counts.
+  and reported counts unless the provider explicitly enables nullable usage.
 - `decideChoice(answer, { minProbability, minMargin = 0, abstainOptions = [], probabilityDecimalPlaces })`:
   returns a policy result, never executes an action. `minProbability` is required.
 - `DecisionError`, `publicError(error)`: public structured failure handling.

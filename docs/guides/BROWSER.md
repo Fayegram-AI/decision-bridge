@@ -35,6 +35,9 @@ headers used by the SDK. For Jev evaluation those include `POST`, `Authorization
 and `Content-Type`. If the preflight is rejected, the browser sends no evaluation
 request; neither the SDK nor a browser setting can override that server policy.
 Check your intended origin with TypeSafe before relying on direct Jev calls.
+When Jev experimental features are enabled, CORS must also permit the selected
+`TypeSafe-Danger-Zone-Images` and `TypeSafe-Danger-Zone-Long-Context` headers.
+The [Jev guide](JEV.md) covers browser-safe embedded assets and boxes.
 
 Any key delivered to browser JavaScript can be read by the app's users. Only use
 a credential that the provider explicitly permits for browser exposure. If an

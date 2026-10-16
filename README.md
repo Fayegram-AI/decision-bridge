@@ -29,7 +29,7 @@ embedded WAV/MP3 audio and MP4/WebM video, ordered images → audio → videos �
 The common API checks provider/model capabilities before dispatch; refusals are
 errors.
 
-**Version 0.1.1 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.2 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
 The npm package is
 [@fayegram-ai/decision-bridge](https://www.npmjs.com/package/@fayegram-ai/decision-bridge).
@@ -53,7 +53,7 @@ Use these model selectors with the built-in decision providers:
 | Cloudflare (`cloudflare-decisions`) | `clef-flash`, `@cf/cloudflare/clef-flash` | — |
 | Cloudflare (`cloudflare-decisions`) | `clef-omni`, `@cf/cloudflare/clef-omni` | — |
 
-`jev-latest` is Jev's default alias. Jev also accepts explicit model IDs available through your TypeSafe account;
+`jev-latest` is Jev's default alias. Jev also accepts `jev-preview` and explicit model IDs available through your TypeSafe account;
 use `bridge.listModels()` or the CLI `models` command to inspect that catalog.
 The bridge does not maintain a static list of Jev versions. A moving alias or a
 catalog entry does not guarantee inference access or reproducible model quality.
@@ -80,7 +80,7 @@ All native providers support shared state and the common `choice`, `noul`, and
 
 | Provider | Additional supported features | Guide |
 | --- | --- | --- |
-| Jev | Native decisions through the TypeSafe API | [Provider reference](docs/reference/PROVIDERS.md#native-jev) |
+| Jev | Native decisions, opt-in images, boxes, and long context through TypeSafe | [Jev guide](docs/guides/JEV.md) |
 | OpenAI Decisions | Ordered text/images, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
 | Cloudflare Clef / Clef-flash | Embedded images before text, typed choices, labelled scores, native access, Workers AI binding, optional Gateway | [Cloudflare decisions](docs/guides/CLOUDFLARE_DECISIONS.md) |
 | Cloudflare Clef-omni | The same decision and transport features, plus embedded audio/video | [Omni media and limits](docs/guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video) |

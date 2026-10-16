@@ -155,7 +155,7 @@ console.log('OpenAI selectors resolve and preserve metadata without Node globals
 }
 
 export function consumerTypes(name) {
-    return `import { createBridge, createProvider, noul, type Provider, type OpenAIDecisionsTransportMetadata } from ${JSON.stringify(name)};
+    return `import { createBridge, createProvider, JevProvider, box, noul, type Provider, type OpenAIDecisionsTransportMetadata } from ${JSON.stringify(name)};
 import { defineDecisionProvider, type DecisionProviderDefinition } from ${JSON.stringify(name + '/custom/decision')};
 import { defineGenerativeProvider, createGenerativeProvider, OpenAICompatibleProvider,
     type GenerativeProvider, type OpenAICompatibleOptions, buildResponseSchema } from ${JSON.stringify(name + '/custom/generative')};
@@ -180,6 +180,14 @@ async function nativeSelection() {
     return { requested, resolved, commonResolved };
 }
 void nativeSelection;
+async function jevSelection() {
+    const provider = new JevProvider({ model: 'jev-preview', dangerZone: { images: true } });
+    const result = await provider.createDecision({ state: 'photo-ref', questions: { q: box('The target') },
+        assets: { 'photo-ref': { format: 'png', data_base64: 'compile-only' } } });
+    const left: number = result.decision.answers.q.box.left;
+    return left;
+}
+void jevSelection;
 // @ts-expect-error General-purpose presets are not root providers.
 createProvider({ type: 'openai-compatible', model: 'fixture' });
 // @ts-expect-error Generative provenance cannot claim native probabilities.

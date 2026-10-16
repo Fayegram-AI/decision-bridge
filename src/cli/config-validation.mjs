@@ -2,13 +2,14 @@ import { requireCondition as check } from '../errors.mjs';
 import { cloneJson, isRecord } from '../validation.mjs';
 import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudflare-profile.mjs';
 import { generationOptions } from '../custom/generative/shared.mjs';
+import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 
 export const PROVIDERS = ['jev', 'openai-decisions', 'cloudflare-decisions', 'custom-decision', 'custom-generative'];
 export const PRESETS = ['openai-compatible', 'openrouter', 'anthropic'];
 export const TRANSPORT = ['baseURL', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes'];
 export const GENERATION = ['maxTokens', 'responseFormat', 'tokenParameter', 'parameters', 'noAuth'];
 export const PROVIDER_FIELDS = [...TRANSPORT, ...GENERATION, 'apiKeyEnv', 'model', 'preset', 'module',
-    'options', 'accountId', 'rejectIfBusy', 'gateway'];
+    'options', 'accountId', 'rejectIfBusy', 'gateway', 'dangerZone'];
 const FIELDS = new Set(['$schema', 'schemaVersion', 'provider', 'timeoutMs', ...PROVIDER_FIELDS]);
 export const NUMERIC = new Set(['timeoutMs', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes', 'maxTokens']);
 export const KEY_ENVS = { jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
@@ -56,7 +57,14 @@ export function validateConfig(input, { complete = false } = {}) {
     check(config.module === undefined || ['custom-decision', 'custom-generative'].includes(config.provider),
         'module requires custom-decision or custom-generative.', 'CONFIGURATION_ERROR');
     check(config.options === undefined || isModule(config), 'options requires a custom provider module.', 'CONFIGURATION_ERROR');
+    // Validate nested shape even when a partial file omits its provider selector.
+    if (Object.hasOwn(config, 'dangerZone')) config.dangerZone = jevDangerZone(config.dangerZone);
     if (config.provider !== undefined) {
+        if (config.provider !== 'jev') check(!Object.hasOwn(config, 'dangerZone'),
+            'dangerZone requires Jev.', 'CONFIGURATION_ERROR');
+        else {
+            jevRequestLimit(config.maxRequestBytes);
+        }
         if (config.provider !== 'cloudflare-decisions') check(['accountId', 'rejectIfBusy', 'gateway'].every(key => config[key] === undefined),
             'Cloudflare settings require cloudflare-decisions.', 'CONFIGURATION_ERROR');
         else {

@@ -44,7 +44,7 @@ contract. The following additional forms are checked before dispatch:
 
 | Provider | Ordered text / embedded images | Typed string/boolean choices | Labelled score levels | Safety identifier | Model listing |
 | --- | --- | --- | --- | --- | --- |
-| Jev | Unsupported | Unsupported | Unsupported | Unsupported | Supported |
+| Jev | Ordered text; images with explicit opt-in | Unsupported | Unsupported | Unsupported | Supported |
 | OpenAI Decisions | Supported; up to 128 images, preserving order | Supported | Supported | Supported | Unsupported |
 | Cloudflare Clef / Clef-flash | Supported; up to four images before text | Supported | Supported; 2–10 levels | Unsupported | Unsupported |
 | Cloudflare Clef-omni | Supported; up to four images before audio/video/text | Supported | Supported; 2–10 levels | Unsupported | Unsupported |
@@ -62,7 +62,11 @@ capability fields `audio`, `videos`, `maxAudioClips`, and `maxVideos` normalize 
 false/zero when omitted, preserving legacy custom profiles. Cloudflare's older
 models and all other shipped providers reject audio/video before inference.
 
-Dedicated `createDecision()` access is available on OpenAI Decisions and
+Jev additionally supports `box` questions on `jev-preview` and pinned 1.14+ models
+when `dangerZone.images` is enabled. Other built-ins reject box questions.
+See the [Jev guide](../guides/JEV.md) for asset placement and experimental opt-ins.
+
+Dedicated `createDecision()` access is available on Jev, OpenAI Decisions and
 Cloudflare providers. It uses each service's native request/response shape and
 bypasses bridge preparation and observation hooks.
 
@@ -73,6 +77,12 @@ The request directly contains `model`, shared `state`, and `questions`. Jev's
 intermediate language model, skill, portal prompt, or chat conversion is used.
 `GET /v1/models` lists native models. A listed catalog can differ from valid aliases;
 `jev-latest` is the documented stable alias.
+
+`jev-preview` selects the preview release. Images and longer context require
+explicit `dangerZone` settings. Common image input preserves ordering; native
+`createDecision()` additionally accepts JSON assets referenced in state,
+instructions, and criteria. Box outputs preserve normalized edges and confidence.
+See the [Jev guide](../guides/JEV.md) for limits and absence handling.
 
 Pin a version after evaluating it for your workload rather than assuming a moving
 alias yields reproducible quality. Store the returned `model` along with the

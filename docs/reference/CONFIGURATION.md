@@ -46,10 +46,11 @@ profile. Gateway configuration is optional for either SDK transport and for CLI 
 | `noAuth` | Boolean; true only for loopback OpenAI-compatible endpoints |
 | `timeoutMs` | Positive integer up to 2,147,483,647 milliseconds |
 | `maxRetries` | Integer 0–10; OpenAI/Cloudflare default 0; Jev and generative presets default 2 |
-| `maxRequestBytes`, `maxResponseBytes` | Positive integer through 64 MiB; default 8 MiB. Cloudflare requests: Clef/Clef-flash default/cap 13 MiB; Omni default 36 MiB, configurable through 64 MiB |
+| `maxRequestBytes`, `maxResponseBytes` | Positive integer through 64 MiB; default 8 MiB. Jev requests default/cap 32 MiB. Cloudflare requests: Clef/Clef-flash default/cap 13 MiB; Omni default 36 MiB, configurable through 64 MiB |
 | `accountId` | Cloudflare REST account ID; otherwise `CLOUDFLARE_ACCOUNT_ID` |
 | `rejectIfBusy` | Cloudflare boolean; default false, incompatible with retries. Effective true fails REST preflight with `UNSUPPORTED_CAPABILITY`; see the [binding support and REST limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) |
 | `gateway` | Cloudflare Gateway object; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) |
+| `dangerZone` | Jev-only `{ images?: boolean, longContext?: boolean }`; both default false; see the [Jev guide](../guides/JEV.md) |
 | `maxTokens` | Generative output budget, 1–1,048,576; default 4096 |
 | `responseFormat` | Compatible generative presets: `json_schema`, `json_object`, `text` |
 | `tokenParameter` | Compatible generative presets: `max_completion_tokens` or `max_tokens` |
@@ -58,6 +59,10 @@ profile. Gateway configuration is optional for either SDK transport and for CLI 
 | `options` | Custom factory's JSON options, e.g. its own baseURL |
 
 Upper numeric limits validate client configuration, not vendor model capabilities.
+Jev requests default to and are capped at 32 MiB; a smaller `maxRequestBytes`
+lowers that ceiling. `DECISION_JEV_IMAGES` and `DECISION_JEV_LONG_CONTEXT`
+accept `true` or `false`; their CLI overrides are `--jev-images`,
+`--no-jev-images`, `--jev-long-context`, and `--no-jev-long-context`.
 Cloudflare selects its byte budget from the effective request model, including
 per-call overrides. An explicit smaller `maxRequestBytes` remains the ceiling;
 selecting Omni cannot enlarge it. Omni's default is a bridge policy, not a

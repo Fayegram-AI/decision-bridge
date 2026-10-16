@@ -165,6 +165,9 @@ test('providers and legacy custom providers reject new features without fetching
         { ...common, safetyIdentifier: null }, { state: '', questions: { q: choice('Pick.', [{ value: true }]) } },
         { state: '', questions: { q: scoreLevels('Rate.', [{ label: 'Low' }, { label: 'High' }]) } }];
     for (const provider of providers) for (const request of requests) {
+        // Jev now maps ordered text; its disabled image capability still rejects
+        // the image-bearing and richer question forms exercised below.
+        if (provider instanceof JevProvider && request === requests[0]) continue;
         await assert.rejects(createBridge({ provider }).evaluate(request), { code: 'UNSUPPORTED_CAPABILITY' });
         if (provider.name !== 'custom') await assert.rejects(provider.evaluate(request), { code: 'UNSUPPORTED_CAPABILITY' });
     }

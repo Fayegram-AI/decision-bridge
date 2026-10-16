@@ -51,6 +51,12 @@ there is no CLI binding selector. Gateway settings route the selected REST reque
 | `models` | List the configured provider's models; may be paginated |
 | `batch FILE\|-` | Stream JSONL inputs and ordered JSONL result/error records |
 
+Jev supports both common and `--native` requests for evaluation, validation,
+initialization, and ordered batches. Experimental images/boxes require
+`--jev-images`, and longer context requires `--jev-long-context` (or matching
+JSON configuration). Use `--no-jev-images` and `--no-jev-long-context` to
+override enabled settings. See the [Jev guide](../guides/JEV.md).
+
 No input filename on `evaluate`, `validate`, or `schema` selects the bundled sample,
 not stdin. Use `-` explicitly for stdin. Empty invocation prints help. Configuration
 and credential errors do not cause fallback to another backend.
@@ -91,6 +97,8 @@ later configuration changes to control selection.
 | `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `custom-decision`, `custom-generative` |
 | `--preset NAME` | custom-generative preset: `openai-compatible`, `openrouter`, or `anthropic`; exclusive with module |
 | `--native` | Explicit native Decisions input/output; init/evaluate/validate/batch only |
+| `--jev-images`, `--no-jev-images` | Enable/disable experimental Jev images and boxes |
+| `--jev-long-context`, `--no-jev-long-context` | Enable/disable experimental Jev 262k context |
 | `--model SELECTOR` | Model selector or supported upstream ID; overrides input JSON model and configured default |
 | `--base-url URL` | Custom endpoint; requires explicit credential selection |
 | `--api-key-env NAME` | Environment variable name, never the key itself |
@@ -172,7 +180,10 @@ delivery needs separate validation.
 
 ## I/O and resource limits
 
-Single JSON input: **8 MiB**. JSONL: **8 MiB per line, 64 MiB total**. Config:
+Single JSON input normally uses **8 MiB**. JSONL normally uses **8 MiB per line,
+64 MiB total**. Jev permits **32 MiB** for a single JSON input or JSONL record,
+then checks serialized requests against its configured ceiling (32 MiB by default).
+Config:
 **1 MiB**. Environment file: **64 KiB**. Provider request and response default to
 8 MiB each, configurable to at most 64 MiB. Cloudflare reads single JSON inputs
 and individual JSONL records within 64 MiB, then applies model-specific serialized

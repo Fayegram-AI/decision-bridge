@@ -4,6 +4,7 @@ import { parseEnv } from 'node:util';
 import { OPENAI_DEFAULT_MODEL } from '../providers/openai-profile.mjs';
 import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { validateConfig, NUMERIC, PROVIDER_FIELDS } from './config-validation.mjs';
+import { jevDangerZone } from '../providers/jev-profile.mjs';
 export { validateConfig } from './config-validation.mjs';
 export { configuredProvider } from './provider-loader.mjs';
 
@@ -12,6 +13,7 @@ const ENV_FIELDS = {
     DECISION_API_KEY_ENV: 'apiKeyEnv', DECISION_TIMEOUT_MS: 'timeoutMs',
     DECISION_MAX_RETRIES: 'maxRetries', DECISION_RESPONSE_FORMAT: 'responseFormat',
     DECISION_ACCOUNT_ID: 'accountId', DECISION_REJECT_IF_BUSY: 'rejectIfBusy', DECISION_GATEWAY_ID: 'gateway',
+    DECISION_JEV_IMAGES: 'jevImages', DECISION_JEV_LONG_CONTEXT: 'jevLongContext',
 };
 
 async function boundedFile(path, maxBytes, label) {
@@ -47,13 +49,17 @@ export async function loadConfig({ configPath, envFile, overrides = {}, cwd = pr
     fileConfig = validateConfig(fileConfig);
     moduleBase = dirname(path);
   }
-  const environment = {};
+  const environment = Object.create(null);
   for (const [key, field] of Object.entries(ENV_FIELDS)) {
     if (effectiveEnv[key] === undefined) continue;
     const value = effectiveEnv[key];
     if (NUMERIC.has(field)) check(typeof value === 'string' && /^\d+$/.test(value),
       'Numeric DECISION_* variables must contain decimal integers.', 'CONFIGURATION_ERROR');
-    if (field === 'rejectIfBusy') {
+    if (field === 'jevImages' || field === 'jevLongContext') {
+      check(value === 'true' || value === 'false', 'Jev DECISION_* flags must be true or false.', 'CONFIGURATION_ERROR');
+      environment.dangerZone = { ...(Object.hasOwn(environment, 'dangerZone') ? environment.dangerZone : {}),
+        [field === 'jevImages' ? 'images' : 'longContext']: value === 'true' };
+    } else if (field === 'rejectIfBusy') {
       check(value === 'true' || value === 'false', 'DECISION_REJECT_IF_BUSY must be true or false.', 'CONFIGURATION_ERROR');
       environment[field] = value === 'true';
     } else environment[field] = field === 'gateway' ? { id: value } : NUMERIC.has(field) ? Number(value) : value;
@@ -62,6 +68,10 @@ export async function loadConfig({ configPath, envFile, overrides = {}, cwd = pr
   // environment-selected provider must not inherit that provider's key/endpoint.
   function mergeProviderLayer(base, layer, layerModuleBase = moduleBase) {
     const next = { ...base };
+    const dangerZone = Object.hasOwn(layer, 'dangerZone') ? layer.dangerZone : undefined;
+    // Validate before spreading, without filling defaults that would erase a
+    // different opt-in from a lower layer.
+    if (dangerZone !== undefined) jevDangerZone(dangerZone);
     // File and flag paths have different bases. Equal path text can identify
     // different implementations; compare destinations before changing the base.
     const moduleChanged = layer.module !== undefined && (typeof layer.module !== 'string' ||
@@ -72,6 +82,9 @@ export async function loadConfig({ configPath, envFile, overrides = {}, cwd = pr
     if (changed) for (const key of PROVIDER_FIELDS) delete next[key];
     if (layer.module !== undefined) moduleBase = layerModuleBase;
     return { ...next, ...layer,
+      ...(dangerZone === undefined ? {} : { dangerZone: {
+        ...(Object.hasOwn(next, 'dangerZone') ? next.dangerZone : {}), ...dangerZone,
+      } }),
       ...(layer.gateway === undefined ? {} : { gateway: { ...next.gateway, ...layer.gateway } }) };
   }
   const config = validateConfig(mergeProviderLayer(mergeProviderLayer(

@@ -2,6 +2,11 @@
 
 Notable user-facing changes by version.
 
+## 0.1.2
+
+- Add opt-in Jev images, typed bounding boxes, native JSON assets, and long context
+  across SDK and CLI, with capability preflight and nullable token usage.
+
 ## 0.1.1
 
 - Add OpenAI `default`/`luna` selectors and requested/resolved model metadata; improve CLI configuration and documentation.

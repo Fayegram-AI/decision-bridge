@@ -17,7 +17,7 @@ validated, structured decisions.
 For provider-specific input forms, consult the
 [capability comparison](reference/PROVIDERS.md#common-request-capabilities).
 The common bridge API and dedicated native APIs have separate request shapes;
-the OpenAI and Cloudflare guides cover both.
+the Jev, OpenAI and Cloudflare guides cover both.
 
 ## Use the bridge
 
@@ -27,6 +27,7 @@ the OpenAI and Cloudflare guides cover both.
 | [Browser integration](guides/BROWSER.md) | Direct browser use, CORS requirements, and credential exposure |
 | [Platforms](guides/PLATFORMS.md) | Windows, macOS, and Linux setup |
 | [Switching models](guides/SWITCHING_MODELS.md) | Backend and model selection |
+| [Jev](guides/JEV.md) | Common/native images, boxes, experimental long context, model selection, and CLI opt-ins |
 | [OpenAI Decisions](guides/OPENAI_DECISIONS.md) | Model selectors and upstream targets, selection metadata, common/native access, ordered images, and typed values |
 | [Cloudflare Clef / Clef-flash / Clef-omni](guides/CLOUDFLARE_DECISIONS.md) | Common/native decisions, embedded images and Omni audio/video, REST and Workers AI binding, busy-mode compatibility, and optional Gateway |
 | [Customization](guides/CUSTOMIZATION.md) | Questions, templates, extensions, and policies |

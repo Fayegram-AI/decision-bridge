@@ -29,13 +29,27 @@
                     "$ref": "#/$defs/retries"
                 },
                 "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 33554432
                 },
                 "maxResponseBytes": {
                     "$ref": "#/$defs/bytes"
                 },
                 "provider": {
                     "const": "jev"
+                },
+                "dangerZone": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "images": {
+                            "type": "boolean"
+                        },
+                        "longContext": {
+                            "type": "boolean"
+                        }
+                    }
                 }
             }
         },

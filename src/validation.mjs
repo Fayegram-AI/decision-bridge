@@ -97,9 +97,9 @@ export function validateRequest(input, defaultModel) {
   for (const [id, q] of Object.entries(request.questions)) {
     check(nonempty(id), 'Question IDs must be nonempty.');
     check(isRecord(q), 'Every question must be an object.');
-    allowedKeys(q, q.type === 'choice' ? ['type', 'instructions', 'criteria', 'options'] :
+    allowedKeys(q, q.type === 'box' ? ['type', 'instructions'] : q.type === 'choice' ? ['type', 'instructions', 'criteria', 'options'] :
       q.type === 'score' ? ['type', 'instructions', 'criteria', 'levels'] : ['type', 'instructions', 'criteria'], 'question');
-    check(['choice', 'noul', 'score'].includes(q.type), 'Question type must be choice, noul, or score.');
+    check(['choice', 'noul', 'score', 'box'].includes(q.type), 'Question type must be choice, noul, score, or box.');
     check(own(q, 'instructions') && q.instructions !== null && isEntry(q.instructions),
       'instructions are required and must be text, a JSON object, or an array.');
     if (typeof q.instructions === 'string') check(nonempty(q.instructions), 'instructions must not be empty.');
@@ -158,7 +158,7 @@ function distribution(value, labels, decimalPlaces) {
 
 /** Validate, but do not invent, round, or normalize model results. */
 export function validateResult(input, questions, options = {}) {
-  const { native, probabilityDecimalPlaces } = validateResultOptions(options);
+  const { native, nullableUsage, probabilityDecimalPlaces } = validateResultOptions(options);
   const result = cloneJson(input, 'response', 'INVALID_RESPONSE');
   // Snapshot both sides so rubric comparison uses JSON values without executing accessors.
   const questionSnapshot = cloneJson(questions, 'questions');
@@ -168,7 +168,7 @@ export function validateResult(input, questions, options = {}) {
   check(nonempty(result.model), 'Response must include model.', 'INVALID_RESPONSE');
   exactKeys(result.answers, Object.keys(questionSnapshot), 'answers', 'INVALID_RESPONSE');
   for (const [id, q] of Object.entries(questionSnapshot)) {
-    check(isRecord(q) && ['noul', 'choice', 'score'].includes(q.type), 'A valid question type is required.');
+    check(isRecord(q) && ['noul', 'choice', 'score', 'box'].includes(q.type), 'A valid question type is required.');
     if (q.type === 'choice' && own(q, 'options')) check(Array.isArray(q.options) && q.options.length > 0 &&
       q.options.every(option => isRecord(option)), 'Typed choice requires nonempty option objects.');
     if (q.type === 'score' && own(q, 'levels')) check(Array.isArray(q.levels) && q.levels.length >= 2 &&
@@ -178,13 +178,20 @@ export function validateResult(input, questions, options = {}) {
     if (q.type === 'score' && !own(q, 'levels')) check(Array.isArray(q.criteria) && q.criteria.length >= 2 && q.criteria.length <= 10, 'score requires 2–10 levels.');
     const answer = result.answers[id];
     check(isRecord(answer) && answer.type === q.type, 'Answer type must match its question.', 'INVALID_RESPONSE');
-    allowedKeys(answer, q.type === 'noul' ? ['type', 'noul'] : q.type === 'choice'
+    allowedKeys(answer, q.type === 'box' ? ['type', 'box', 'confidence'] : q.type === 'noul' ? ['type', 'noul'] : q.type === 'choice'
       ? ['type', 'choice', 'probabilities', 'confidence'] : ['type', 'score', 'legend', 'probabilities', 'confidence'], 'answer', 'INVALID_RESPONSE');
     if (q.type === 'noul') {
       probability(answer.noul, 'noul');
       continue;
     }
     if (native || own(answer, 'confidence')) probability(answer.confidence, 'confidence');
+    if (q.type === 'box') {
+      exactKeys(answer.box, ['top', 'bottom', 'left', 'right'], 'box', 'INVALID_RESPONSE');
+      Object.values(answer.box).forEach(value => probability(value, 'box edge'));
+      check(answer.box.left < answer.box.right && answer.box.top < answer.box.bottom,
+        'Box edges must enclose a positive area.', 'INVALID_RESPONSE');
+      continue;
+    }
     if (q.type === 'choice' && q.options) {
       validateTypedChoice(answer, q.options, probabilityDecimalPlaces);
       continue;
@@ -215,7 +222,7 @@ export function validateResult(input, questions, options = {}) {
     if (own(result.usage, field)) check(Number.isSafeInteger(result.usage[field]) && result.usage[field] >= 0, 'Invalid cache token count.', 'INVALID_RESPONSE');
   }
   for (const field of ['input_tokens', 'output_tokens']) {
-    check((!native && result.usage[field] === null) ||
+    check(((!native || nullableUsage) && result.usage[field] === null) ||
       (Number.isSafeInteger(result.usage[field]) && result.usage[field] >= 0),
       'Token counts must be nonnegative safe integers.', 'INVALID_RESPONSE');
   }

@@ -6,14 +6,17 @@ export function validateResultOptions(options) {
         [Object.prototype, null].includes(Object.getPrototypeOf(options)) &&
         Object.getOwnPropertySymbols(options).length === 0 &&
         Object.entries(Object.getOwnPropertyDescriptors(options)).every(([key, descriptor]) =>
-            ['native', 'probabilityDecimalPlaces'].includes(key) && descriptor.enumerable && 'value' in descriptor),
+            ['native', 'nullableUsage', 'probabilityDecimalPlaces'].includes(key) && descriptor.enumerable && 'value' in descriptor),
     'Result-validation options contain an unknown field or accessor.', 'CONFIGURATION_ERROR');
-    const { native = false, probabilityDecimalPlaces } = options;
+    // Only own data fields select policy; inherited values and getters are not settings.
+    const { native = false, nullableUsage = false, probabilityDecimalPlaces } = Object.assign(Object.create(null), options);
     check(typeof native === 'boolean', 'native must be boolean.', 'CONFIGURATION_ERROR');
+    check(typeof nullableUsage === 'boolean', 'nullableUsage must be boolean.', 'CONFIGURATION_ERROR');
     check(probabilityDecimalPlaces === undefined || (Number.isSafeInteger(probabilityDecimalPlaces) &&
         probabilityDecimalPlaces >= 1 && probabilityDecimalPlaces <= 15),
     'probabilityDecimalPlaces must be an integer from 1 to 15.', 'CONFIGURATION_ERROR');
-    return { native, ...(probabilityDecimalPlaces === undefined ? {} : { probabilityDecimalPlaces }) };
+    // Keep even an omitted precision as an own value when callers read this policy again.
+    return { native, nullableUsage, probabilityDecimalPlaces };
 }
 
 /** Preserve native numbers. Only grid-aligned values receive the rounding budget. */

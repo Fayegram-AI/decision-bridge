@@ -19,6 +19,7 @@
     "test/decisions.types.mts",
     "test/cloudflare.types.mts",
     "src/index.d.mts",
-    "test/custom.types.mts"
+    "test/custom.types.mts",
+    "test/jev.types.mts"
   ]
 }
