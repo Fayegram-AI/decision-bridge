@@ -20,7 +20,9 @@ function settingsFor(options) {
 
 export function cloudflareBindingBody(request, gateway) {
     const { options, ...inputs } = request;
-    return { inputs, options: { returnRawResponse: true, rejectIfBusy: options?.rejectIfBusy ?? false,
+    const { rejectIfBusy = false, ...inference } = options ?? {};
+    return { inputs: { ...inputs, ...(Object.keys(inference).length ? { options: inference } : {}) },
+        options: { returnRawResponse: true, rejectIfBusy,
         ...(gateway ? { gateway } : {}) } };
 }
 
@@ -35,9 +37,8 @@ export function preflightCloudflareDecision(input, options = {}) {
     check(model === 'clef-omni' || !['audio', 'videos'].some(key => Object.hasOwn(request, key)),
         'Audio and video require clef-omni.', 'UNSUPPORTED_CAPABILITY');
     const common = validateRequest({ model, state: request.state, questions: request.questions }, model);
-    check(Object.keys(common.questions).length <= 64, 'Cloudflare accepts at most 64 questions.');
     for (const [id, question] of Object.entries(common.questions)) {
-        check(/^[A-Za-z0-9_.-]{1,100}$/.test(id), 'Cloudflare question IDs must use letters, digits, _, ., or - within 100 characters.');
+        check(/^[A-Za-z0-9_.-]+$/.test(id), 'Cloudflare question IDs must use letters, digits, _, ., or -.');
         check(!Object.hasOwn(question, 'options') && !Object.hasOwn(question, 'levels'),
             'Cloudflare native questions use criteria; typed choices and levels belong to the common API.');
         if (question.type === 'choice') check(Object.keys(question.criteria).length >= 2,

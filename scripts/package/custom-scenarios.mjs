@@ -133,6 +133,14 @@ const decision = await import(${JSON.stringify(name + '/custom/decision')});
 const generative = await import(${JSON.stringify(name + '/custom/generative')});
 graph(import.meta.resolve(${JSON.stringify(name + '/custom/decision')}));
 graph(import.meta.resolve(${JSON.stringify(name + '/custom/generative')}));
+graph(import.meta.resolve(${JSON.stringify(name + '/extraction')}));
+graph(import.meta.resolve(${JSON.stringify(name + '/live')}));
+const extraction = await import(${JSON.stringify(name + '/extraction')});
+const live = await import(${JSON.stringify(name + '/live')});
+extraction.validateExtractionRequest({ state: '4', fields: { amount: { type: 'number' } } });
+const controller = live.createLiveDecisions({ transport: { send() {}, subscribe() { return () => {}; } } });
+assert.equal((await controller.requestDecision()).status, 'submitted');
+controller.dispose();
 for (const define of [decision.defineDecisionProvider, generative.defineGenerativeProvider]) {
     const provider = define({ name: 'browser-fixture', defaultModel: 'fixture', async evaluate(request) {
         return { model: request.model, answers: { q: { type: 'noul', noul: 0.7 } },

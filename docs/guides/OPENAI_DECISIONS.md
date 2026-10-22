@@ -1,5 +1,8 @@
 # OpenAI Decisions
 
+Conversation/tool history, remote images and prompt caching require **0.1.3 or
+later**. See [version availability](../README.md#version-availability).
+
 The `openai-decisions` provider implements the native `POST /v1/decisions` API.
 Its default model selector is `default`; `luna` selects the supported Luna-family
 model, and `gpt-6-luna` selects that explicit upstream ID. Decision Bridge resolves
@@ -80,8 +83,9 @@ That native choice's confidence is retained in provider metadata.
 
 ## Ordered text and images
 
-Provide exactly one of `state` or `input`. An existing JSON array supplied as
-`state` retains its original meaning. New `input` is a nonempty ordered array:
+Choose exactly one of `state`, ordered `input` or `conversation`. An existing
+JSON array supplied as `state` retains its original meaning. Ordered `input` is
+a nonempty array:
 
 ```javascript
 const result = await bridge.evaluate({
@@ -95,9 +99,9 @@ const result = await bridge.evaluate({
 });
 ```
 
-Images must be nonempty inline base64 data URLs, such as
-`data:image/png;base64,...`. The bridge does not fetch image URLs or read files.
-Convert image bytes in your application. OpenAI permits at most 128 images.
+Images accept inline base64 data URLs or an exclusive common `url` HTTP(S)
+reference. Native images use `image_url` for either form. References are forwarded;
+the bridge does not fetch URLs or read files. Image-count admission is server-owned.
 Detail accepts `low`, `high`, `auto`, `original`, or null; omission uses the service
 default. Text/image ordering is preserved.
 
@@ -105,9 +109,8 @@ The default transport request/response limits are 8 MiB each, including encoded
 images. Set `maxRequestBytes` explicitly for larger requests, up to the existing
 64 MiB ceiling. These local limits do not override service limits.
 
-`safetyIdentifier` is an optional per-request opaque string of at most 128
-Unicode characters, or null. It maps to `safety_identifier`; avoid private identity
-data. Character limits count Unicode code points rather than UTF-16 code units.
+`safetyIdentifier` is an optional per-request opaque string or null. It maps
+to `safety_identifier`; length admission remains upstream.
 
 ## Typed choices and labelled scores
 
@@ -130,35 +133,38 @@ coercion to object keys are not supported. TypeScript preserves literal unions.
 `scoreLevels` stores ordered `levels` instead of `criteria` and requires at least
 two `{ label, description? }` objects. Its answer retains the numeric score and
 index-keyed probability map, with the original level objects in the legend.
-OpenAI choice questions require 2–255 unique options in both common forms and
-native requests. Labelled scores do not inherit Jev's 10-level limit; legacy
-score criteria retain the 2–10-level limit. JSON snapshots and transport caps
-apply to all requests.
+Choices require at least two distinct options for OpenAI. Service count ceilings
+are not enforced locally. Both labelled and legacy scores retain ordered levels;
+JSON safety and configured client wire budgets apply to all forms.
 
 ## Capabilities and preparation
 
 `bridge.getCapabilities(model?)` synchronously reports support and limits for
 ordered input, images, typed choices, labelled scores, and safety identifiers.
+It also reports conversation/tool history, remote images and prompt caching.
 `bridge.validate(request)` resolves the model, snapshots/freezes the request,
 and checks capabilities without inference. Unsupported combinations fail before
 dispatch with `UNSUPPORTED_CAPABILITY`.
 
-Preflight also checks the encoded native field limits and the complete UTF-8 wire
+Preflight also checks the encoded native structure and the complete UTF-8 wire
 body against `maxRequestBytes`. SDK array batches check every raw request before
 dispatching any entry. Prepared input is revalidated during each evaluation.
 
-Jev, OpenAI-compatible, OpenRouter, and Anthropic currently support the legacy
-common forms. Existing custom providers default to that profile; implement
+Jev supports shared state and ordered text, with experimental images and boxes;
+the maintained generative presets use legacy shared-state forms. Existing custom
+providers default to the legacy profile; implement
 `getCapabilities(model)` and corresponding behavior to support new forms.
 
-Use `prepareInput(parts, context)` for ordered input and `prepareState` for state.
+Use `prepareInput(parts, context)` for ordered input, `prepareState` for state,
+and `prepareConversation(items, context)` for conversation history.
 A preparation extension must implement the hook for the form being used;
 incompatible extensions fail explicitly rather than being skipped. Extensions
-can implement both hooks. `onResult` works with either form and runs only after
+can implement all three preparation hooks. `onResult` works with every form and runs only after
 success, with the existing isolated-failure policy.
 
 Legacy common requests retain `meta.schemaVersion: 1`. New input/question forms
-or safety identifiers use version 2.
+or safety identifiers use version 2. Conversation, remote image URLs or cache
+controls select version 5; see [conversation and prompt caching](#conversation-and-prompt-caching).
 
 ## Dedicated native access
 
@@ -178,11 +184,11 @@ const { decision, meta } = await provider.createDecision({
 }, { signal: controller.signal });
 ```
 
-An omitted model inherits the provider's configured selection. Native input accepts text or
-multiple user messages containing text or ordered `input_text`/`input_image`
-parts. Only user roles are supported. Files, external image URLs, audio, tools,
-and item references are rejected locally. Exported `NativeDecisionRequest` and
-related types describe this format.
+An omitted model inherits the provider's configured selection. Native input accepts
+text, role-aware messages, assistant output/refusal content and function/custom-tool
+calls and outputs. Images may be embedded or remote HTTP(S) references. File IDs,
+audio and item references remain unsupported. Exported native types describe the
+Decisions-specific representation; tool payload strings remain verbatim.
 
 `decision` preserves native answer arrays, optional question names, probabilities,
 confidence, and full usage. `meta` has the exported `OpenAIDecisionsTransportMetadata`
@@ -239,7 +245,7 @@ OpenAI initialization stores the model selection in configuration and omits it
 from the generated request so later configuration changes apply. The default
 configuration uses `default`. Offline validation reports the selected value as
 `model` and the outgoing upstream ID as `resolvedModel`.
-Decisions offline validation also checks native field limits and the configured
+Decisions offline validation also checks native structure and the configured
 request byte limit in both modes.
 
 The `schema` command remains a generative utility and rejects the new request
@@ -250,3 +256,25 @@ From a source checkout, the optional `npm run smoke:live -- --decisions --env-fi
 checks four bounded requests when `RUN_LIVE_TESTS=1` is explicitly set. It checks
 protocol behavior rather than prediction quality, disables retries, and prints
 only model identities and token usage. Normal verification never runs it.
+
+## Conversation and prompt caching
+
+Common requests select exactly one of `state`, ordered `input` or `conversation`.
+Conversation items use `NativeDecisionInputItem`: user/developer/system messages,
+assistant messages with optional commentary/final_answer phase, function calls,
+custom tool calls and their outputs. Tool outputs reference preceding call IDs.
+System/developer content is text; assistant parts are output text or refusal.
+
+`promptCacheKey` and `promptCacheOptions` map to native `prompt_cache_key` and
+`prompt_cache_options`. Options support implicit/explicit mode and Decisions'
+30m TTL. Eligible common text/image parts accept `promptCacheBreakpoint` with
+explicit mode or null; native content uses `prompt_cache_breakpoint`. The adapter
+preserves breakpoints, omission and explicit nulls without selecting cache writes.
+
+Use `prepareConversation(items, context)` to transform conversation input.
+Transformations are snapshotted, frozen and revalidated before dispatch. Capability
+flags are `conversation`, `toolHistory`, `remoteImages` and `promptCaching`;
+existing custom providers default to false. New-feature requests use common
+schema version 5; existing forms retain versions 1–4.
+
+See [Live Decisions](LIVE_DECISIONS.md) for the separate connection lifecycle.

@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { spawnSync } from 'node:child_process';
 import { createBridge, JevProvider } from '../src/index.mjs';
 import { JsonTransport, parseBaseURL } from '../src/transport.mjs';
+import { retryAfter } from '../src/response-transport.mjs';
 import { request, response, jsonResponse } from './fixtures.mjs';
 
 async function localServer(t, handler) {
@@ -240,9 +241,56 @@ test('request IDs are bounded and redact credentials', async () => {
 });
 
 test('Retry-After HTTP dates are respected rather than shortened', async () => {
-  const transport = new JsonTransport({ baseURL: 'https://example.com', timeoutMs: 10,
+  // Leave time for response setup; the 60-second hint must exceed the deadline.
+  const transport = new JsonTransport({ baseURL: 'https://example.com', timeoutMs: 1000,
     fetchImpl: async () => jsonResponse({}, 429, { 'retry-after': new Date(Date.now() + 60000).toUTCString() }) });
   await assert.rejects(transport.request('GET', '/test'), { code: 'RETRY_BUDGET_EXCEEDED' });
+});
+
+test('invalid Retry-After values do not become public delay hints or exhaust retry budgets', async () => {
+    for (const hint of ['0x10', '1e3', '+10', '1.5', '2030-01-01', 'Jan 1 2030', 'Fri, 31 Feb 2094 08:49:37 GMT']) {
+        const transport = new JsonTransport({ baseURL: 'https://example.com', maxRetries: 0,
+            fetchImpl: async () => jsonResponse({}, 429, { 'retry-after': hint }) });
+        await assert.rejects(transport.request('GET', '/test'), error => {
+            assert.equal(error.status, 429);
+            assert.equal(error.retryAfterMs, undefined, hint);
+            return true;
+        });
+    }
+    let calls = 0;
+    const transport = new JsonTransport({ baseURL: 'https://example.com', timeoutMs: 5000, maxRetries: 1,
+        fetchImpl: async () => ++calls === 1 ? jsonResponse({}, 429, { 'retry-after': '1e3' }) : jsonResponse() });
+    assert.equal((await transport.request('GET', '/test')).meta.attempts, 2);
+    assert.equal(calls, 2);
+});
+
+test('Retry-After accepts all HTTP date forms as UTC regardless of local timezone', () => {
+    const moduleURL = new URL('../src/response-transport.mjs', import.meta.url).href;
+    const script = `import { retryAfter } from ${JSON.stringify(moduleURL)};
+        Date.now = () => Date.UTC(1994, 10, 6, 8, 48, 37);
+        console.log(JSON.stringify([
+            'Sun, 06 Nov 1994 08:49:37 GMT',
+            'Sunday, 06-Nov-94 08:49:37 GMT',
+            'Sun Nov  6 08:49:37 1994',
+        ].map(value => retryAfter(new Headers({ 'retry-after': value })))));`;
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        encoding: 'utf8', env: { ...process.env, TZ: 'America/New_York' }, timeout: 30000,
+    });
+    assert.equal(child.status, 0, child.stderr);
+    assert.deepEqual(JSON.parse(child.stdout), [60000, 60000, 60000]);
+});
+
+test('Retry-After handles decimal seconds, past dates and the legacy fifty-year window', t => {
+    const now = Date.UTC(2026, 9, 21);
+    t.mock.method(Date, 'now', () => now);
+    const delay = value => retryAfter(new Headers({ 'retry-after': value }));
+    assert.equal(delay('0'), 0);
+    assert.equal(delay('007'), 7000);
+    assert.equal(delay('Wednesday, 01-Jan-70 00:00:00 GMT'), Date.UTC(2070, 0, 1) - now);
+    assert.equal(delay('Sunday, 01-Jan-78 00:00:00 GMT'), 0);
+    assert.equal(delay('Sun, 06 Nov 1994 08:49:37 GMT'), 0);
+    assert.equal(delay(''), undefined);
+    assert.equal(delay('-1'), undefined);
 });
 
 test('native provider cancellation retains safe request ID and attempt count', async () => {

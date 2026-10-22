@@ -12,22 +12,27 @@ const responseMetadata = response => ({
 });
 
 /** The two dispatch mechanisms share bounded reads, cancellation, retries and errors. */
-export class CloudflareDecisionTransport {
+export class CloudflareTransport {
     #transports = new Map();
     #ceiling;
     #kind;
     #accountId;
     #ai;
     #gateway;
+    #requestLimit;
+    #bindingBody;
 
-    constructor(options) {
+    constructor(options, { requestLimit = cloudflareRequestLimit, bindingBody = cloudflareBindingBody,
+        models = ['clef', 'clef-omni'] } = {}) {
         const { transport = 'rest', accountId, apiKey, baseURL = 'https://api.cloudflare.com',
             ai, gateway, fetchImpl, model: _model, rejectIfBusy: _busy, ...limits } = options;
         this.#kind = transport;
         this.#gateway = gateway;
         this.#ceiling = limits.maxRequestBytes;
+        this.#requestLimit = model => requestLimit(model, this.#ceiling);
+        this.#bindingBody = bindingBody;
         const shared = { ...limits, errorDecoder: cloudflareError, responseMetadata };
-        const byteLimits = new Set(['clef', 'clef-omni'].map(model => cloudflareRequestLimit(model, this.#ceiling)));
+        const byteLimits = new Set(models.map(model => this.#requestLimit(model)));
         if (transport === 'binding') {
             check(ai !== null && typeof ai === 'object' && typeof ai.run === 'function',
                 'Binding transport requires an ai binding with run().', 'CONFIGURATION_ERROR');
@@ -52,12 +57,14 @@ export class CloudflareDecisionTransport {
     }
 
     request(request, options) {
-        const transport = this.#transports.get(cloudflareRequestLimit(request.model, this.#ceiling));
+        const transport = this.#transports.get(this.#requestLimit(request.model));
         if (this.#kind === 'rest') return transport.request('POST',
             '/client/v4/accounts/' + encodeURIComponent(this.#accountId) + '/ai/run/@cf/cloudflare/' + request.model,
             request, options);
-        const body = cloudflareBindingBody(request, this.#gateway);
+        const body = this.#bindingBody(request, this.#gateway);
         return transport.request(body, (_serialized, signal) => this.#ai.run(
             '@cf/cloudflare/' + request.model, body.inputs, { ...body.options, signal }), options);
     }
 }
+
+export class CloudflareDecisionTransport extends CloudflareTransport {}

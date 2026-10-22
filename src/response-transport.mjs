@@ -13,8 +13,9 @@ const BYTE_VIEW_KIND = Object.getOwnPropertyDescriptor(BYTE_VIEW_PROTOTYPE, Symb
 /** Shared wire-size check for offline preflight and actual HTTP dispatch. */
 export function serializeRequestBody(body, maxRequestBytes = 8 * 1024 * 1024) {
   const serialized = body === undefined ? undefined : JSON.stringify(body);
-  check(serialized === undefined || UTF8_ENCODER.encode(serialized).byteLength <= maxRequestBytes,
-    'Provider request exceeds the byte limit.', 'REQUEST_TOO_LARGE');
+  if (serialized !== undefined && UTF8_ENCODER.encode(serialized).byteLength > maxRequestBytes) {
+    throw new DecisionError('Request exceeds the configured client byte budget.', { code: 'REQUEST_TOO_LARGE', source: 'client' });
+  }
   return serialized;
 }
 
@@ -35,15 +36,52 @@ export function sanitizeId(value, secrets = []) {
   return safe.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 200) || undefined;
 }
 
-function retryDelay(headers, attempt) {
-  const raw = headers.get('retry-after');
-  if (raw !== null) {
-    const seconds = Number(raw);
-    const milliseconds = raw.trim() !== '' && Number.isFinite(seconds)
-      ? seconds * 1000 : Date.parse(raw) - Date.now();
-    if (Number.isFinite(milliseconds) && milliseconds >= 0) return milliseconds;
-  }
-  return Math.min(8000, 250 * 2 ** attempt) * (0.5 + Math.random());
+/** RFC 9110 HTTP dates use UTC, including the timezone-free asctime form. */
+function httpDate(value, now) {
+    let parts = /^([A-Z][a-z]{2}), (\d{2}) ([A-Z][a-z]{2}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/.exec(value);
+    let legacy = false;
+    if (!parts) {
+        parts = /^([A-Z][a-z]+), (\d{2})-([A-Z][a-z]{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) GMT$/.exec(value);
+        legacy = !!parts;
+    }
+    if (!parts) {
+        const match = /^([A-Z][a-z]{2}) ([A-Z][a-z]{2}) (\d{2}| \d) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/.exec(value);
+        if (!match) return undefined;
+        const [, weekday, month, day, hour, minute, second, year] = match;
+        parts = [value, weekday, day, month, year, hour, minute, second];
+    }
+    const [, weekday, dayText, monthText, yearText, hourText, minuteText, secondText] = parts;
+    const days = legacy ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(monthText);
+    const [day, hour, minute, second] = [dayText, hourText, minuteText, secondText].map(Number);
+    if (!days.includes(weekday) || month < 0 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60) return undefined;
+    const future = new Date(now);
+    future.setUTCFullYear(future.getUTCFullYear() + 50);
+    let year = Number(yearText) + (legacy ? Math.floor(future.getUTCFullYear() / 100) * 100 : 0);
+    const dateFor = selectedYear => {
+        const date = new Date(0);
+        date.setUTCFullYear(selectedYear, month, day);
+        date.setUTCHours(hour, minute, Math.min(second, 59), 0);
+        return date;
+    };
+    let date = dateFor(year);
+    // Two-digit years denote the most recent matching year no more than 50 years ahead.
+    if (legacy && date > future) { year -= 100; date = dateFor(year); }
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) return undefined;
+    return date.getTime() + (second === 60 ? 1000 : 0);
+}
+
+export function retryAfter(headers) {
+    const raw = headers.get('retry-after');
+    if (raw === null) return undefined;
+    if (/^\d+$/.test(raw)) {
+        const milliseconds = Number(raw) * 1000;
+        return Number.isFinite(milliseconds) ? milliseconds : undefined;
+    }
+    const now = Date.now();
+    const date = httpDate(raw, now);
+    return date === undefined ? undefined : Math.max(0, date - now);
 }
 
 async function readJson(response, maxBytes, budget) {
@@ -123,7 +161,18 @@ export class JsonResponseTransport {
             for (let retry = 0; ; retry++) {
                 budget.throwIfAborted();
                 attempts++;
-                const response = await withSignal(dispatch(serialized, budget.signal), budget.signal);
+                let response;
+                try { response = await withSignal(dispatch(serialized, budget.signal), budget.signal); }
+                catch (error) {
+                    // Binding exceptions may provide structured own data, never inspect messages/getters.
+                    const descriptors = error && typeof error === 'object' ? Object.getOwnPropertyDescriptors(error) : {};
+                    const status = descriptors.status?.value;
+                    const internalCode = descriptors.internalCode?.value;
+                    if (this.#errorDecoder && Number.isInteger(status) && status >= 400 && status <= 599 &&
+                        Number.isSafeInteger(internalCode) && internalCode >= 0) {
+                        response = Response.json({ internalCode }, { status });
+                    } else throw error;
+                }
                 check(response instanceof Response, 'Provider must return a Response.', 'INVALID_RESPONSE');
                 const extra = this.#responseMetadata?.(response) ?? {};
                 lastRequestId = sanitizeId(extra.requestId ?? response.headers.get('x-request-id') ??
@@ -135,7 +184,14 @@ export class JsonResponseTransport {
                     ...(lastGatewayLogId ? { gatewayLogId: lastGatewayLogId } : {}),
                 };
                 if (response.ok) {
-                    const data = await readJson(response, this.#options.maxResponseBytes, budget);
+                    let data;
+                    try { data = await readJson(response, this.#options.maxResponseBytes, budget); }
+                    catch (error) {
+                        if (error instanceof DecisionError) throw new DecisionError(error.message,
+                            { ...error.toJSON(), status: response.status, ...meta,
+                                source: error.code === 'RESPONSE_TOO_LARGE' ? 'client' : 'provider' });
+                        throw error;
+                    }
                     budget.throwIfAborted();
                     meta.durationMs = Math.round((performance.now() - started) * 1000) / 1000;
                     return { data, meta };
@@ -143,15 +199,25 @@ export class JsonResponseTransport {
                 let data;
                 if (this.#errorDecoder) {
                     try { data = await readJson(response, this.#options.maxResponseBytes, budget); }
-                    catch (error) { if (error.code !== 'INVALID_RESPONSE') throw error; }
+                    catch {
+                        // A rejection remains authoritative when its body is malformed,
+                        // oversized or interrupted. Cancellation/deadlines still win.
+                        budget.throwIfAborted();
+                    }
                 } else response.body?.cancel().catch(() => {});
                 const error = this.#errorDecoder?.(data, response.status, meta) ??
                     new DecisionError(`Provider returned HTTP ${response.status}.`, {
-                        code: 'HTTP_ERROR', status: response.status, ...meta,
+                        code: 'HTTP_ERROR', status: response.status, source: 'provider', ...meta,
                     });
                 budget.throwIfAborted();
-                if (!RETRY_STATUSES.has(response.status) || retry >= this.#options.maxRetries) throw error;
-                const delay = retryDelay(response.headers, retry);
+                error.retryable ??= RETRY_STATUSES.has(response.status);
+                const hint = retryAfter(response.headers);
+                if (hint !== undefined) error.retryAfterMs = hint;
+                for (const key of ['upstreamErrorCode', 'upstreamErrorType']) {
+                    if (error[key] !== undefined) error[key] = sanitizeId(error[key], this.#secrets);
+                }
+                if (!error.retryable || retry >= this.#options.maxRetries) throw error;
+                const delay = hint === undefined ? Math.min(8000, 250 * 2 ** retry) * (0.5 + Math.random()) : hint;
                 if (delay >= budget.remainingMs) throw new DecisionError('Retry delay exceeds the remaining request deadline.', {
                     ...error.toJSON(), code: 'RETRY_BUDGET_EXCEEDED',
                 });
@@ -164,6 +230,7 @@ export class JsonResponseTransport {
             if (budget.timedOut) throw new DecisionError('Provider request deadline exceeded.', { code: 'TIMEOUT', ...diagnostics });
             if (error instanceof DecisionError) {
                 error.attempts ??= attempts;
+                error.source ??= 'client';
                 if (lastRequestId) error.requestId ??= lastRequestId;
                 if (lastGatewayLogId) error.gatewayLogId ??= lastGatewayLogId;
                 throw error;

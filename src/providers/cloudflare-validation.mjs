@@ -23,7 +23,9 @@ export function cloudflareError(data, status, meta) {
     const upstreamCode = Number.isSafeInteger(value) && value >= 0 ? value : undefined;
     const [code, message] = CODES.get(upstreamCode) ?? STATUSES.get(status) ??
         ['HTTP_ERROR', 'Cloudflare rejected the inference request.'];
-    return new DecisionError(message, { code, status, ...meta,
+    return new DecisionError(message, { code, status, ...meta, source: 'provider',
+        retryable: !['ALLOCATION_EXCEEDED', 'AUTHENTICATION_ERROR', 'PERMISSION_DENIED', 'REQUEST_TOO_LARGE'].includes(code) &&
+            (code === 'CAPACITY_EXCEEDED' || code === 'RATE_LIMITED' || [502, 503, 504, 529].includes(status)),
         ...(upstreamCode === undefined ? {} : { upstreamCode }) });
 }
 

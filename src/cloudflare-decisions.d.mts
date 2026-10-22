@@ -41,25 +41,32 @@ export interface CloudflareDecisionResponse {
     readonly usage: CloudflareDecisionUsage;
 }
 export interface CloudflareGatewayOptions {
-    /** Nonblank printable ASCII Gateway name, at most 64 characters. */
+    /** Nonblank printable ASCII Gateway name. */
     readonly id: string;
     readonly cacheKey?: string;
-    /** Integer seconds from 60 through 2,592,000 (30 days). */
+    /** Nonnegative integer seconds; the service validates its cache policy. */
     readonly cacheTtl?: number;
     readonly skipCache?: boolean;
     readonly collectLog?: boolean;
-    /** At most five JSON primitive entries; caller-supplied cf.* keys are reserved. */
+    /** JSON primitive entries; caller-supplied cf.* keys are reserved. */
     readonly metadata?: Readonly<Record<string, string | number | boolean | null>>;
     readonly requestTimeoutMs?: number;
-    readonly retries?: { readonly maxAttempts?: 1 | 2 | 3 | 4 | 5; readonly retryDelayMs?: number;
+    readonly retries?: { readonly maxAttempts?: number; readonly retryDelayMs?: number;
         readonly backoff?: 'constant' | 'linear' | 'exponential' };
 }
 export interface CloudflareAIBinding {
     run(model: '@cf/cloudflare/clef' | '@cf/cloudflare/clef-flash' | '@cf/cloudflare/clef-omni',
         input: Omit<CloudflareDecisionRequest, 'model' | 'options'> & { readonly model: 'clef' | 'clef-flash' | 'clef-omni' },
         options?: { readonly signal?: AbortSignal; readonly returnRawResponse?: boolean;
-            readonly rejectIfBusy?: boolean; readonly gateway?: CloudflareGatewayOptions }): Promise<unknown>;
+            readonly rejectIfBusy?: boolean; readonly gateway?: CloudflareBindingGatewayOptions }): Promise<unknown>;
 }
+
+/** Known Workers binding ABI. Provider configuration remains forwardable to the service. */
+export type CloudflareBindingGatewayOptions = Omit<CloudflareGatewayOptions, 'retries'> & {
+    readonly retries?: Omit<NonNullable<CloudflareGatewayOptions['retries']>, 'maxAttempts'> & {
+        readonly maxAttempts?: 1 | 2 | 3 | 4 | 5;
+    };
+};
 type CommonOptions = {
     model?: CloudflareDecisionModel;
     /** Defaults to false. Enabling it requires binding transport and no retries. */

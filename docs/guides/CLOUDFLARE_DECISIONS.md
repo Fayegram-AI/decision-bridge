@@ -16,8 +16,7 @@ short selectors and full forms.
 Questions and media consume context before text state; the service truncates
 remaining text state to fit. Requests whose questions/media exhaust context can
 fail. Byte checks cannot guarantee token fit or detect remote truncation.
-Clef's serving improvements and Clef-flash's lower pricing apply upstream without
-client configuration. Consult the official [model pages](#official-references)
+Consult the official [model pages](#official-references)
 for current pricing and availability; the bridge does not discover account access.
 
 ## Supported inference paths
@@ -108,7 +107,7 @@ extensions and the bridge's separate total deadline.
 
 ## Embedded images and limits
 
-Clef accepts up to four embedded PNG, JPEG, or WebP images. Native `images` entries
+Clef accepts embedded PNG, JPEG, or WebP images; the service owns count admission. Native `images` entries
 can be base64 data URLs or `{ content_type, base64 }` objects. Remote URLs are
 rejected. Common ordered input places all images before all text:
 
@@ -130,24 +129,15 @@ Text parts concatenate exactly, without inserted separators. Image detail can be
 omitted, `null`, or `auto`; explicit `low`, `high`, and `original` are unsupported.
 Safety identifiers are unsupported by this provider.
 
-| Boundary | Limit |
-| --- | --- |
-| Questions per request | 1–64 |
-| Question IDs | 1–100 ASCII letters, digits, `_`, `.`, or `-` |
-| Choice options | 2–255 |
-| Score levels | 2–10, ordered lowest first, indexed from zero |
-| Images | At most four |
-| Decoded image size | 4 MiB each; 8 MiB combined |
-| Image dimensions | Positive dimensions; at most 16 million pixels each |
-| Serialized request | Clef/Clef-flash: at most 13 MiB; Omni: 36 MiB by default, configurable through 64 MiB |
+Preflight validates supported representations, canonical base64, positive image
+dimensions and container structure. Service question/media counts, decoded sizes,
+dimensions, duration and context ceilings are not enforced locally. Header
+inspection is not full decoding; upstream admission and decoding remain authoritative.
 
-Preflight checks supported formats, base64 syntax, headers, dimensions, and size.
-Header inspection is not full image decoding; the service can reject corrupt image data.
-Limits include execution options and binding envelope overhead. Omni's 36 MiB
-default is a bridge policy allowing base64 expansion of the permitted decoded
-media; its published schema specifies no whole-request byte ceiling. The effective
-request model selects the budget, including per-call overrides. An explicit
-`maxRequestBytes` remains a caller ceiling and is never enlarged by selecting Omni.
+Client request budgets default to 13 MiB for Clef/Clef-flash and 36 MiB for Omni.
+An explicit `maxRequestBytes` overrides either default through the shared 64 MiB
+client ceiling. Binding envelope overhead counts toward that budget. Response
+budgets remain separate. No automatic resizing, splitting or truncation occurs.
 
 Cloudflare's four-decimal probability precision receives a count-aware sum
 allowance: the larger of 0.001 and half a decimal unit per option, plus floating-point
@@ -204,19 +194,10 @@ audio/video parts accept only `type` and `dataUrl`; remote URLs, paths, image
 detail, and caller-provided durations are rejected. Other providers and the older
 Clef models reject audio/video before dispatch.
 
-| Media | Count | Decoded size per item | Duration per item |
-| --- | ---: | ---: | ---: |
-| Audio | 4 | 8 MiB | 300 seconds |
-| Video | 2 | 16 MiB | 60 seconds |
-
-Audio and video together are limited to 16 MiB decoded. Image limits above remain
-separate. Bounded inspectors validate canonical base64, MIME/header consistency,
-and container structure, and reject excessive duration when PCM/float WAV,
-ordinary MP3 frames, MP4 metadata, or WebM metadata establishes it reliably.
-Full decoding, codec validity, and duration that cannot be established locally
-(including compressed WAV, free-format MP3, or missing container duration) remain
-service validation. The bridge performs no transcription, transcoding, frame
-extraction, or streaming, and adds no runtime media dependency.
+Inspectors validate canonical base64, MIME/header consistency and supported
+container structure. Service count, decoded-size and duration limits are handled
+as upstream errors. The bridge performs no transcription, transcoding, frame
+extraction or streaming, and adds no runtime media dependency.
 
 Cloudflare samples video at two frames per second. Video soundtracks are processed
 only when **every supplied video has a soundtrack**. Common results use
@@ -302,23 +283,20 @@ binding sends Gateway settings in the third `ai.run()` argument.
 
 | Setting | Accepted value |
 | --- | --- |
-| `id` | Required nonblank printable ASCII string, 1–64 characters |
-| `cacheKey` | Optional nonblank printable ASCII string, 1–200 characters |
-| `cacheTtl` | Integer seconds, 60–2,592,000 (30 days) |
+| `id` | Required nonblank printable ASCII string |
+| `cacheKey` | Optional nonblank printable ASCII string |
+| `cacheTtl` | Nonnegative integer seconds; service cache policy applies upstream |
 | `skipCache`, `collectLog` | Optional booleans |
-| `metadata` | At most five entries with JSON primitive values; caller-supplied `cf.*` keys are reserved |
+| `metadata` | JSON primitive values; caller-supplied `cf.*` keys are reserved |
 | `requestTimeoutMs` | Positive integer milliseconds, up to 2,147,483,647 |
-| `retries.maxAttempts` | 1–5; defaults to 1 when Gateway is configured |
-| `retries.retryDelayMs` | 0–60,000 milliseconds |
+| `retries.maxAttempts` | Positive integer; defaults to 1 when Gateway is configured |
+| `retries.retryDelayMs` | Nonnegative integer milliseconds |
 | `retries.backoff` | `constant`, `linear`, or `exponential` |
 
 The shared validator rejects invalid Gateway settings with `CONFIGURATION_ERROR`
-before dispatch. Metadata is preserved unchanged: the bridge rejects entries
-that [Cloudflare would ignore or remove](https://developers.cloudflare.com/ai-gateway/observability/custom-metadata/)
-instead of silently dropping them. Cloudflare's [cache TTL documentation](https://developers.cloudflare.com/ai-gateway/features/caching/)
-describes the upper limit as one month; its [official numeric reference](https://github.com/cloudflare/skills/blob/0cb6116228ad153126f474dce1dfbd05f7944604/skills/cloudflare/references/ai-gateway/README.md)
-specifies 2,592,000 seconds (30 days). Cache TTL and first-response timeout have
-separate validation bounds.
+before dispatch. Metadata is preserved unchanged. Reserved `cf.*` keys and
+non-primitive values are rejected; service entry-count and cache admission
+limits remain upstream. The adapter does not infer Gateway acceptance.
 
 Gateway timeout covers time to the first response; the bridge's total deadline
 continues to bound the call. Gateway logging/caching follows the explicit options

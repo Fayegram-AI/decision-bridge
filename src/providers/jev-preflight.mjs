@@ -41,6 +41,7 @@ export function prepareJevDecision(input, options = {}) {
     const dangerZone = jevDangerZone(options.dangerZone);
     assertCapabilities(request, builtInCapabilities('jev', request.model, { dangerZone }));
     const native = { ...request, ...(assets === undefined ? {} : { assets }) };
+    serializeRequestBody(native, jevRequestLimit(options.maxRequestBytes));
     const imageCount = validateJevAssets(native);
     if (imageCount) check(dangerZone.images, 'Enable Jev dangerZone.images to send images.', 'UNSUPPORTED_CAPABILITY');
     if (Object.values(request.questions).some(question => question.type === 'box')) {

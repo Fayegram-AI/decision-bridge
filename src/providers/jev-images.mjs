@@ -11,16 +11,13 @@ function inspectImage(asset) {
         (asset.type === undefined || asset.type === 'image') && ['png', 'jpg', 'jpeg'].includes(asset.format),
     'Jev JSON image assets require PNG/JPEG format and data_base64.');
     const size = base64ByteLength(asset.data_base64);
-    check(size <= 16 * 1024 * 1024, 'Jev images must be within 16 MiB each.', 'REQUEST_TOO_LARGE');
     const decoded = atob(asset.data_base64);
     // A string iterator makes Uint8Array.from allocate an intermediate element
     // list. Copy directly into one bounded byte buffer for multi-MiB images.
     const bytes = new Uint8Array(decoded.length);
     for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
     const [width, height] = imageDimensions(bytes, asset.format === 'png' ? 'image/png' : 'image/jpeg');
-    check(width >= 256 && width <= 1568 && height >= 256 && height <= 1568 &&
-        width * height >= 78400 && width * height <= 2458624,
-    'Jev image dimensions must be 256–1568 pixels with an area of 78400–2458624 pixels.');
+    check(width > 0 && height > 0, 'Images require positive dimensions.');
     if (asset.format === 'png') {
         const view = new DataView(bytes.buffer);
         for (let offset = 8; offset < bytes.length;) {
@@ -37,7 +34,6 @@ function inspectImage(asset) {
 
 /** Apply TypeSafe's JSON nesting boundary and collect only replaceable values. */
 function stringValues(value, output, depth = 0) {
-    check(depth <= 64, 'Jev state, instructions, and criteria must not exceed 64 nested levels.');
     if (typeof value === 'string') output.push(value);
     else if (value !== null && typeof value === 'object') {
         for (const child of Object.values(value)) stringValues(child, output, depth + 1);
@@ -78,11 +74,9 @@ export function validateJevAssets(request) {
         check(referenceBytes <= 65536, 'Jev asset references exceed 65536 UTF-8 bytes.', 'REQUEST_TOO_LARGE');
     }
     const used = usedReferences(strings, references);
-    let imageBytes = 0;
     for (const reference of references) {
         check(used.has(reference), 'Every Jev asset must be used by reference substitution in a string value.');
-        imageBytes += inspectImage(assets[reference]);
-        check(imageBytes <= 32 * 1024 * 1024, 'Jev images exceed 32 MiB total.', 'REQUEST_TOO_LARGE');
+        inspectImage(assets[reference]);
     }
     // Server re-encoding, expanded references, full image decoding and token limits
     // remain authoritative; original file sizes cannot predict those exactly.

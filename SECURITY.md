@@ -5,8 +5,11 @@
 Keep keys in the process environment or an explicitly loaded local environment
 file. Never place them in request JSON, committed profiles, command-line arguments,
 or shared logs. The package contains no key, telemetry client, or background job.
-By design it sends the supplied state and question definitions to the selected
-provider when evaluation is explicitly requested. Review data-sharing requirements
+It sends supplied decision evidence/question definitions or extraction evidence/
+fields to the selected provider when the operation is explicitly requested.
+Conversation/tool history is also request data. Remote HTTP(S) image references
+are forwarded to OpenAI without being fetched by the SDK; the provider handles
+their retrieval. Review data-sharing requirements
 before sending private repository content or documents.
 Optional Cloudflare Gateway routing can cache requests/responses or collect logs
 according to explicit options and the Gateway's configuration. Review that
@@ -32,8 +35,9 @@ verbose HTTP logger that prints Authorization or x-api-key headers.
 ## Input and output
 
 Strict plain-JSON checks reject accessors, cycles, non-finite numbers, lossy objects,
-and unknown fields. Bytes, nesting, nodes, retries, concurrency, and waiting time
-are bounded. These checks do not establish decision accuracy or resist every
+and unknown request fields. Clairic additionally preserves safe native response
+fields, including predictive JSON and truncation. Bytes, nesting, nodes, retries,
+concurrency, and waiting time are bounded. These checks do not establish decision accuracy or resist every
 adversarial semantic input. Question instructions are trusted configuration;
 state is untrusted evidence. Prompt separation is a mitigation, not a guarantee.
 
@@ -51,6 +55,13 @@ the bridge can stop awaiting a non-cooperative promise, not terminate arbitrary
 code or undo side effects. A provider timeout or cancellation does not prove remote
 inference stopped before billing.
 
+The Live controller attaches to a connection supplied by the application. That
+application owns authentication, audio, connection setup and reconnection. The
+controller sends Decisions commands and consumes parsed notifications; disposing
+it releases its listeners/waits without closing the application connection or
+undoing actions. Decisions with unmatched or stale correlation require application
+policy; receipt of a decision is not proof that an action completed.
+
 ## Dependencies and CI
 
 There are zero runtime dependencies. This reduces dependency surface but is not a
@@ -63,13 +74,9 @@ commits under your organization's policy before using CI in a privileged setting
 
 ## Reporting
 
-For a hosted public repository, use its **Security** tab and **Report a
-vulnerability** to submit a private report. The repository owner must enable
-private vulnerability reporting when making the repository public, before
-announcing the release; this source tree has no dedicated security inbox or other
-private contact channel. If the reporting button is absent, ask the maintainer
-for a private contact method without
-including vulnerability details in a public issue.
+Use the repository's **Security** tab and **Report a vulnerability** to submit a
+private report. If the reporting button is unavailable, ask the maintainer for a
+private contact method without including vulnerability details in a public issue.
 
 Include the affected version, impact, and a minimal redacted reproduction. Do
 not publish credentials, confidential inputs, or exploit details in an issue.

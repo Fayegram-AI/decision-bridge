@@ -81,7 +81,7 @@ test('experimental flags are validated and snapshotted at construction', () => {
     for (const dangerZone of [null, [], { images: 1 }, { longContext: 'true' }, { typo: true }]) {
         assert.throws(() => providerFor({ dangerZone }), { code: 'CONFIGURATION_ERROR' });
     }
-    assert.throws(() => providerFor({ maxRequestBytes: 33554433 }), { code: 'CONFIGURATION_ERROR' });
+    assert.throws(() => providerFor({ maxRequestBytes: 67108865 }), { code: 'CONFIGURATION_ERROR' });
 });
 
 test('image and box preflight rejects unsupported use without dispatch', async () => {
@@ -102,14 +102,13 @@ test('image and box preflight rejects unsupported use without dispatch', async (
     assert.equal(calls, 0);
 });
 
-test('native assets enforce reference, JSON, size, image and box boundaries offline', async () => {
+test('native assets enforce reference, safe JSON, image format and box structure offline', async () => {
     const cases = [
         request => { request.assets = null; },
         request => { request.assets['test-photo-reference'].part = 'file'; },
         request => { request.assets['test-photo-reference'].format = 'webp'; },
         request => { request.assets['test-photo-reference'].data_base64 = 'bad'; },
         request => { request.assets['test-photo-reference'].data_base64 = Buffer.from('invalid').toString('base64'); },
-        request => { request.assets['test-photo-reference'].data_base64 = png(256, 256).toString('base64'); },
         request => { request.assets['test-photo-reference'].data_base64 = png(280, 280, true).toString('base64'); },
         request => { request.state = 'Unreferenced'; },
         request => { request.state = { 'test-photo-reference': 'Keys are not references' }; },
@@ -117,7 +116,7 @@ test('native assets enforce reference, JSON, size, image and box boundaries offl
         request => { request.questions.target.criteria = {}; },
         request => {
             let nested = 'test-photo-reference';
-            for (let i = 0; i < 65; i++) nested = { nested };
+            for (let i = 0; i < 101; i++) nested = { nested };
             request.state = nested;
         },
     ];

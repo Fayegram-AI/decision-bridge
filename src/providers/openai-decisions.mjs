@@ -8,6 +8,7 @@ import { validateDecisionResponse } from './decisions-validation.mjs';
 import { decodeCommonDecision } from './decisions-codec.mjs';
 import { preflightCommonDecision, prepareCommonDecision, prepareDecision } from './decisions-preflight.mjs';
 import { OPENAI_DEFAULT_MODEL } from './openai-profile.mjs';
+import { openaiError } from './openai-errors.mjs';
 
 /** Native Decisions transport. Common and dedicated access share a single codec. */
 export class OpenAIDecisionsProvider {
@@ -26,7 +27,7 @@ export class OpenAIDecisionsProvider {
         const key = validateApiKey(supplied, 'OPENAI_API_KEY');
         check(typeof model === 'string' && model.trim(), 'model must be nonempty.', 'CONFIGURATION_ERROR');
         this.defaultModel = model.trim();
-        this.#transport = new JsonTransport({ ...transportOptions, maxRetries, baseURL: endpoint.baseURL,
+        this.#transport = new JsonTransport({ ...transportOptions, maxRetries, errorDecoder: openaiError, baseURL: endpoint.baseURL,
             headers: { authorization: `Bearer ${key}` }, secrets: [key] });
         this.#maxRequestBytes = transportOptions.maxRequestBytes;
     }

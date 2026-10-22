@@ -5,32 +5,24 @@ import { preflightCloudflareDecision, preflightCommonCloudflareDecision } from '
 import { CLOUDFLARE_REQUEST_LIMIT } from '../src/providers/cloudflare-profile.mjs';
 import { fixture, image, native } from './cloudflare-fixtures.mjs';
 
-test('question count, id syntax, choices and score levels enforce hosted boundaries before dispatch', async () => {
+test('structural question checks remain while service counts are forwarded', async () => {
     const { bridge, requests } = fixture();
-    const tooMany = Object.fromEntries(Array.from({ length: 65 }, (_, i) => ['q' + i, noul('True?')]));
-    for (const questions of [
-        tooMany, { 'contains space': noul('True?') }, { ['q'.repeat(101)]: noul('True?') },
-        { q: choice('Pick.', { only: null }) },
-        { q: choice('Pick.', Array.from({ length: 256 }, (_, i) => ({ value: String(i) }))) },
-        { q: scoreLevels('Rate.', Array.from({ length: 11 }, (_, i) => ({ label: String(i) }))) },
-    ]) {
+    const many = Object.fromEntries(Array.from({ length: 65 }, (_, i) => ['q' + i, noul('True?')]));
+    await bridge.evaluate({ state: '', questions: many });
+    await bridge.evaluate({ state: '', questions: { q: choice('Pick.', Array.from({ length: 256 }, (_, i) => ({ value: String(i) }))) } });
+    await bridge.evaluate({ state: '', questions: { q: scoreLevels('Rate.', Array.from({ length: 11 }, (_, i) => ({ label: String(i) }))) } });
+    for (const questions of [{ 'contains space': noul('True?') }, { q: choice('Pick.', { only: null }) }]) {
         assert.throws(() => bridge.validate({ state: '', questions }));
-        await assert.rejects(bridge.evaluate({ state: '', questions }));
     }
-    await assert.rejects(evaluateBatch(bridge, [native, { state: '', questions: tooMany }]));
-    assert.equal(requests.length, 0);
-    assert.equal(Object.keys(bridge.validate({ state: '', questions: Object.fromEntries(
-        Array.from({ length: 64 }, (_, i) => ['q.' + i, noul('True?')])) }).questions).length, 64);
-    bridge.validate({ state: '', questions: { ['q'.repeat(100)]: noul('True?') } });
+    bridge.validate({ state: '', questions: { ['q'.repeat(101)]: noul('True?') } });
+    assert.equal(requests.length, 3);
 });
-
 test('unsupported common capabilities and ordered layout are rejected', () => {
     const { bridge } = fixture();
     for (const request of [
         { ...native, model: 'unknown' }, { ...native, safetyIdentifier: null },
         { questions: native.questions, input: [{ type: 'text', text: '' }, { type: 'image', dataUrl: image }] },
         { questions: native.questions, input: [{ type: 'image', dataUrl: image, detail: 'original' }] },
-        { questions: native.questions, input: Array.from({ length: 5 }, () => ({ type: 'image', dataUrl: image })) },
     ]) assert.throws(() => bridge.validate(request), { code: 'UNSUPPORTED_CAPABILITY' });
     for (const detail of [null, 'auto']) bridge.validate({
         questions: native.questions, input: [{ type: 'image', dataUrl: image, detail }],
@@ -59,18 +51,14 @@ function png(width, height, size = 33) {
     return 'data:image/png;base64,' + bytes.toString('base64');
 }
 
-test('image header dimensions and decoded byte limits are independent of encoded JSON size', () => {
-    preflightCloudflareDecision({ ...native, images: [png(4000, 4000)] });
-    assert.throws(() => preflightCloudflareDecision({ ...native, images: [png(4001, 4000)] }), { code: 'VALIDATION_ERROR' });
+test('image containers remain valid while service size and dimension limits remain upstream', () => {
+    preflightCloudflareDecision({ ...native, images: [png(4001, 4000)] });
     assert.throws(() => preflightCloudflareDecision({ ...native, images: [png(0, 1)] }), { code: 'VALIDATION_ERROR' });
-    const each = png(1, 1, 4 * 1024 * 1024);
-    preflightCloudflareDecision({ ...native, images: [each, each] });
-    assert.throws(() => preflightCloudflareDecision({ ...native, images: [png(1, 1, 4 * 1024 * 1024 + 1)] }),
-        { code: 'REQUEST_TOO_LARGE' });
-    assert.throws(() => preflightCloudflareDecision({ ...native, images: [each, each, image] }),
+    const large = png(1, 1, 4 * 1024 * 1024 + 1);
+    preflightCloudflareDecision({ ...native, images: [large] });
+    assert.throws(() => preflightCloudflareDecision({ ...native, images: [large] }, { maxRequestBytes: 100 }),
         { code: 'REQUEST_TOO_LARGE' });
 });
-
 test('JPEG and each WebP header family are inspected without a Node image dependency', () => {
     const jpeg = Buffer.from([255,216,255,192,0,11,8,0,2,0,3,1,1,17,0,255,217]);
     preflightCloudflareDecision({ ...native, images: ['data:image/jpeg;base64,' + jpeg.toString('base64')] });
@@ -107,7 +95,7 @@ test('invalid constructor and Gateway combinations are rejected before any call'
         { gateway: { id: 'existing', retries: null } },
         { gateway: { id: 'existing', retries: { maxAttempts: null } } }, { transport: 'binding', ai: { run() {} }, apiKey: 'key' },
         { rejectIfBusy: true, maxRetries: 1 }, { rejectIfBusy: true, gateway: { id: 'existing', retries: { maxAttempts: 2 } } },
-        { gateway: { id: 'bad\nheader' } }, { gateway: { id: 'existing', retries: { retryDelayMs: 60001 } } },
+        { gateway: { id: 'bad\nheader' } }, { gateway: { id: 'existing', retries: { retryDelayMs: -1 } } },
         { gateway: { id: 'existing', metadata: { nested: {} } } }, { accountId: '../escape' },
         { accountId: 'valid', unknown: true },
     ]) assert.throws(() => createProvider({ type: 'cloudflare-decisions', accountId: 'fixture', apiKey: 'key', ...options }),
@@ -117,30 +105,17 @@ test('invalid constructor and Gateway combinations are rejected before any call'
     assert.equal(requests.length, 0);
 });
 
-test('Gateway service limits reject invalid configuration before REST or binding dispatch', () => {
-    let calls = 0;
-    const invalid = [
-        { id: 'g'.repeat(65) },
-        ...[0, 1, 59, 60.5, 2592001, 2147483647].map(cacheTtl => ({ id: 'existing', cacheTtl })),
-        { id: 'existing', metadata: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 } },
-        { id: 'existing', metadata: { 'cf.user_id': 'caller' } },
-        { id: 'existing', metadata: { 'cf.': true } },
-    ];
+test('Gateway structure is checked while service ceilings are forwarded', () => {
     for (const transport of ['rest', 'binding']) {
-        const options = transport === 'rest' ? { accountId: 'fixture', apiKey: 'key', fetchImpl() { calls++; } }
-            : { transport, ai: { run() { calls++; } } };
-        for (const gateway of invalid) {
-            assert.throws(() => createProvider({ type: 'cloudflare-decisions', ...options, gateway }),
-                { code: 'CONFIGURATION_ERROR' });
-            assert.throws(() => preflightCloudflareDecision(native, { transport, gateway }),
-                { code: 'CONFIGURATION_ERROR' });
-            assert.throws(() => preflightCommonCloudflareDecision(native, { transport, gateway }),
-                { code: 'CONFIGURATION_ERROR' });
+        const gateway = { id: 'g'.repeat(65), cacheTtl: 2592001,
+            metadata: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 }, retries: { maxAttempts: 6, retryDelayMs: 60001 } };
+        preflightCloudflareDecision(native, { transport, gateway });
+        for (const invalid of [{ id: 'bad\nheader' }, { id: 'g', cacheTtl: -1 },
+            { id: 'g', metadata: { 'cf.user': true } }, { id: 'g', metadata: { nested: {} } }]) {
+            assert.throws(() => preflightCloudflareDecision(native, { transport, gateway: invalid }), { code: 'CONFIGURATION_ERROR' });
         }
     }
-    assert.equal(calls, 0);
 });
-
 test('explicit null native defaults and preflight transport fail before inference', async () => {
     const { provider, requests } = fixture();
     for (const input of [{ ...native, model: null }, { ...native, options: null }]) {

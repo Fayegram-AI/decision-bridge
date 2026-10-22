@@ -1,81 +1,24 @@
 import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
-import { isTextWithinLimit, validateImage } from '../input.mjs';
 import { builtInCapabilities } from '../capabilities.mjs';
 import { OPENAI_DEFAULT_MODEL } from './openai-profile.mjs';
+import { fields, validateCacheOptions, validateDecisionInput, validateDecisionQuestions } from './decisions-input.mjs';
 
-const own = (value, key) => Object.hasOwn(value, key);
-function fields(value, allowed, required, label, code = 'VALIDATION_ERROR') {
-    check(isRecord(value) && Object.keys(value).every(key => allowed.includes(key)) &&
-        required.every(key => own(value, key)), `Invalid ${label} fields.`, code);
-}
-function text(value, label, max = 1048576) {
-    check(isTextWithinLimit(value, max), `Invalid ${label}.`);
-}
-
-/** Validate native fields while retaining the selected model for preparation and metadata. */
+/** Structural preflight; service counts and context limits remain server-owned. */
 export function validateDecisionRequest(input, defaultModel = OPENAI_DEFAULT_MODEL) {
     const request = cloneJson(input, 'native decision request');
-    fields(request, ['input', 'model', 'questions', 'safety_identifier'], ['input', 'questions'], 'decision request');
-    const model = request.model ?? defaultModel;
+    fields(request, ['input', 'model', 'questions', 'safety_identifier', 'prompt_cache_key', 'prompt_cache_options'],
+        ['input', 'questions'], 'decision request');
+    const model = Object.hasOwn(request, 'model') ? request.model : defaultModel;
     check(typeof model === 'string' && model.trim().length > 0, 'model must be nonempty.');
     check(builtInCapabilities('openai-decisions', model).supported,
         'Selected provider/model does not support this model.', 'UNSUPPORTED_CAPABILITY');
-    if (own(request, 'model')) text(request.model, 'model');
-    if (own(request, 'safety_identifier') && request.safety_identifier !== null) text(request.safety_identifier, 'safety_identifier', 128);
-    let images = 0;
-    if (typeof request.input === 'string') text(request.input, 'input', 10485760);
-    else {
-        check(Array.isArray(request.input) && request.input.length > 0, 'input must be text or nonempty user messages.');
-        for (const message of request.input) {
-            fields(message, ['role', 'content', 'type'], ['role', 'content'], 'input message');
-            check(message.role === 'user' && (!own(message, 'type') || message.type === 'message'),
-                'Only user input messages are supported.');
-            if (typeof message.content === 'string') text(message.content, 'message content', 10485760);
-            else {
-                check(Array.isArray(message.content) && message.content.length > 0, 'Message content must contain ordered parts.');
-                for (const part of message.content) {
-                    if (part?.type === 'input_text') {
-                        fields(part, ['type', 'text'], ['type', 'text'], 'text part');
-                        text(part.text, 'input text', 10485760);
-                    } else {
-                        fields(part, ['type', 'image_url', 'detail'], ['type', 'image_url'], 'image part');
-                        check(part.type === 'input_image', 'Unsupported input part.');
-                        validateImage(part.image_url, part.detail);
-                        images++;
-                    }
-                }
-            }
-        }
+    for (const key of ['safety_identifier', 'prompt_cache_key']) {
+        check(request[key] === undefined || request[key] === null || typeof request[key] === 'string', key + ' must be text or null.');
     }
-    check(images <= 128, 'At most 128 images are supported.', 'UNSUPPORTED_CAPABILITY');
-    check(Array.isArray(request.questions) && request.questions.length > 0, 'questions must be a nonempty array.');
-    for (const q of request.questions) {
-        check(isRecord(q) && ['predicate', 'choice', 'score'].includes(q.type), 'Unsupported native question type.');
-        const extra = q.type === 'choice' ? ['choices'] : q.type === 'score' ? ['levels'] : [];
-        fields(q, ['type', 'name', 'instructions', ...extra], ['type', 'instructions', ...extra], 'question');
-        text(q.instructions, 'instructions');
-        if (own(q, 'name')) text(q.name, 'question name');
-        if (q.type === 'choice') {
-            check(Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.length <= 255,
-                'choices must contain 2 to 255 options.');
-            const values = new Set();
-            for (const option of q.choices) {
-                fields(option, ['value', 'description'], ['value'], 'choice option');
-                check(typeof option.value === 'string' || typeof option.value === 'boolean', 'Choice values must be strings or booleans.');
-                check(!values.has(option.value), 'Choice values must be distinct.');
-                values.add(option.value);
-                if (own(option, 'description')) text(option.description, 'choice description');
-            }
-        } else if (q.type === 'score') {
-            check(Array.isArray(q.levels) && q.levels.length > 0, 'levels must be nonempty.');
-            for (const level of q.levels) {
-                fields(level, ['label', 'description'], ['label'], 'score level');
-                text(level.label, 'score label');
-                if (own(level, 'description')) text(level.description, 'score description');
-            }
-        }
-    }
+    validateCacheOptions(request.prompt_cache_options);
+    validateDecisionInput(request.input);
+    validateDecisionQuestions(request.questions);
     return freezeJson({ ...request, model });
 }
 
@@ -94,11 +37,36 @@ function validateUsage(usage) {
 }
 
 /** Refusals are failures even when valid sibling answers exist. No partial success. */
-export function validateDecisionResponse(input, request) {
+export function validateDecisionResponse(input, request, { allowRefusals = false } = {}) {
     const data = cloneJson(input, 'native decision response', 'INVALID_RESPONSE');
     fields(data, ['model', 'answers', 'usage'], ['model', 'answers', 'usage'], 'decision response', 'INVALID_RESPONSE');
     invalid(typeof data.model === 'string' && data.model.trim().length > 0, 'Missing reported model.');
     validateUsage(data.usage);
+    // Live can deliver a native result before its configuration is observed.
+    // Validate its self-contained distribution without inventing request correlation.
+    if (!request) {
+        invalid(Array.isArray(data.answers) && data.answers.length > 0, 'Missing decision answers.');
+        request = { questions: data.answers.map(answer => {
+            invalid(isRecord(answer) && (answer.name === null || typeof answer.name === 'string'), 'Invalid answer name.');
+            invalid(['predicate', 'choice', 'score', 'refusal'].includes(answer.type), 'Invalid answer type.');
+            const question = { type: answer.type, ...(answer.name === null ? {} : { name: answer.name }) };
+            if (answer.type === 'choice' || answer.type === 'score') {
+                invalid(Array.isArray(answer.probabilities) && answer.probabilities.length > 0, 'Missing decision distribution.');
+                if (answer.type === 'choice') question.choices = answer.probabilities.map(item => {
+                    invalid(isRecord(item) && ['string', 'boolean'].includes(typeof item.value), 'Invalid choice value.');
+                    return { value: item.value };
+                });
+                else {
+                    const sorted = [...answer.probabilities].sort((a, b) => a?.value - b?.value);
+                    question.levels = sorted.map((item, index) => {
+                        invalid(isRecord(item) && item.value === index && typeof item.label === 'string', 'Invalid score level.');
+                        return { label: item.label };
+                    });
+                }
+            }
+            return question;
+        }) };
+    }
     invalid(Array.isArray(data.answers) && data.answers.length === request.questions.length, 'Decision answer count mismatch.');
     const refusedQuestions = [];
     for (let index = 0; index < data.answers.length; index++) {
@@ -144,7 +112,7 @@ export function validateDecisionResponse(input, request) {
             answer.score <= supplied.length - 1 && Math.abs(answer.score - mean) <= 0.02 * supplied.length,
         'Decision score is inconsistent with its rubric.');
     }
-    if (refusedQuestions.length) throw new DecisionError('The model refused one or more decision questions.', {
+    if (refusedQuestions.length && !allowRefusals) throw new DecisionError('The model refused one or more decision questions.', {
         code: 'MODEL_REFUSAL', refusedQuestions, usage: data.usage,
     });
     return freezeJson(data);

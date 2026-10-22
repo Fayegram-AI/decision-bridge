@@ -18,59 +18,30 @@ function fixture(options = {}) {
     return { provider, bridge: createBridge({ provider }), requests };
 }
 
-test('OpenAI choice limits apply to common and native requests before batch dispatch', async () => {
+test('choice structures are checked while service option ceilings remain upstream', async () => {
     const { provider, bridge, requests } = fixture();
-    assert.equal(bridge.getCapabilities().maxChoiceOptions, 255);
-    for (const count of [2, 255]) {
+    assert.equal(bridge.getCapabilities().maxChoiceOptions, null);
+    for (const count of [2, 255, 256]) {
         const options = Array.from({ length: count }, (_, i) => ({ value: String(i) }));
-        const typed = { state: '', questions: { q: choice('Pick.', options) } };
-        const mapped = { state: '', questions: { q: choice('Pick.',
-            Object.fromEntries(options.map(({ value }) => [value, null]))) } };
-        for (const request of [typed, mapped]) {
-            assert.equal((await bridge.evaluate(request)).answers.q.choice, '0');
-        }
-        const { decision } = await provider.createDecision({ input: '', questions: [
-            { type: 'choice', instructions: 'Pick.', choices: options },
-        ] });
-        assert.equal(decision.answers[0].probabilities.length, count);
+        const result = await bridge.evaluate({ state: '', questions: { q: choice('Pick.', options) } });
+        assert.equal(result.answers.q.choice, '0');
+        await provider.createDecision({ input: '', questions: [{ type: 'choice', instructions: '', choices: options }] });
     }
-    assert.equal(requests.length, 6);
-    requests.length = 0;
-    for (const count of [0, 1, 256]) {
-        const options = Array.from({ length: count }, (_, i) => ({ value: String(i) }));
-        await assert.rejects(provider.createDecision({ input: '', questions: [
-            { type: 'choice', instructions: 'Pick.', choices: options },
-        ] }), { code: 'VALIDATION_ERROR' });
-        if (!count) continue;
-        for (const typed of [false, true]) {
-            const request = { state: '', questions: { q: { type: 'choice', instructions: 'Pick.',
-                ...(typed ? { options } : { criteria: Object.fromEntries(options.map(({ value }) => [value, null])) }),
-            } } };
-            const code = typed && count === 256 ? 'UNSUPPORTED_CAPABILITY' : 'VALIDATION_ERROR';
-            assert.throws(() => bridge.validate(request), { code });
-            await assert.rejects(evaluateBatch(bridge, [common, request]), { code });
-        }
-    }
-    assert.equal(requests.length, 0);
+    const before = requests.length;
+    for (const count of [0, 1]) await assert.rejects(provider.createDecision({ input: '', questions: [
+        { type: 'choice', instructions: '', choices: Array.from({ length: count }, (_, i) => ({ value: String(i) })) },
+    ] }), { code: 'VALIDATION_ERROR' });
+    assert.equal(requests.length, before);
 });
-
-test('common preflight checks encoded native field limits before any batch dispatch', async () => {
+test('common preflight preserves large fields instead of predicting service admission', async () => {
     const { bridge, requests } = fixture();
-    const oversized = 'x'.repeat(1048577);
-    const inputs = [
-        { ...common, questions: { q: noul(oversized) } },
-        { ...common, questions: { [oversized]: noul('True?') } },
-        { ...common, questions: { q: noul({ evidence: '\\'.repeat(600000) }) } },
-        { ...common, questions: { q: scoreLevels('Rate.', [{ label: oversized }, { label: 'Other' }]) } },
-    ];
-    for (const input of inputs) {
-        validateRequest(input, 'gpt-6-luna');
-        assert.throws(() => bridge.validate(input), { code: 'VALIDATION_ERROR' });
-        await assert.rejects(evaluateBatch(bridge, [common, input]), { code: 'VALIDATION_ERROR' });
-    }
-    assert.equal(requests.length, 0);
+    const instructions = 'x'.repeat(1048577);
+    const input = { ...common, questions: { q: noul(instructions) } };
+    bridge.validate(input);
+    const results = await evaluateBatch(bridge, [common, input]);
+    assert(results.every(row => row.ok));
+    assert.equal(requests[1].questions[0].instructions, instructions);
 });
-
 test('preflight checks UTF-8 wire bytes including model and envelope before batch dispatch', async () => {
     const { bridge, provider, requests } = fixture({ maxRequestBytes: 250 });
     const input = { ...common, state: 'é'.repeat(100) };

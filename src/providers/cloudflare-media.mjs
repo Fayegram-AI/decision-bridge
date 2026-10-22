@@ -1,21 +1,19 @@
 import { requireCondition as check } from '../errors.mjs';
 import { embeddedDataUrl, base64ByteLength } from '../embedded.mjs';
 import { isRecord } from '../validation.mjs';
-import { mediaBytes, checkMediaDuration } from './media-binary.mjs';
+import { mediaBytes } from './media-binary.mjs';
 import { inspectWav, inspectMp3 } from './cloudflare-audio.mjs';
 import { inspectMp4, inspectWebm } from './cloudflare-video.mjs';
 
 const INSPECTORS = { 'audio/wav': inspectWav, 'audio/x-wav': inspectWav, 'audio/mpeg': inspectMp3,
     'audio/mp3': inspectMp3, 'video/mp4': inspectMp4, 'video/webm': inspectWebm };
-const MIB = 1024 * 1024;
 
-/** Counts/decoded sizes are checked before container inspection; no runtime codec dependency. */
+/** Inspect supported containers; admission counts, sizes and duration are server-owned. */
 export function validateCloudflareMedia(request) {
-    let total = 0;
-    for (const [field, kind, count, bytes, seconds] of [['audio', 'audio', 4, 8 * MIB, 300], ['videos', 'video', 2, 16 * MIB, 60]]) {
+    for (const [field, kind] of [['audio', 'audio'], ['videos', 'video']]) {
         if (!Object.hasOwn(request, field)) continue;
         const items = request[field];
-        check(Array.isArray(items) && items.length <= count, 'Cloudflare media count exceeds its limit.');
+        check(Array.isArray(items), 'Cloudflare media must be an array.');
         for (const item of items) {
             let media;
             if (typeof item === 'string') media = embeddedDataUrl(item, kind);
@@ -27,10 +25,7 @@ export function validateCloudflareMedia(request) {
             }
             check(media.format.startsWith(kind + '/') && Object.hasOwn(INSPECTORS, media.format),
                 'Cloudflare audio/video format is unsupported.', 'UNSUPPORTED_CAPABILITY');
-            check(media.size <= bytes, 'Cloudflare media exceeds its decoded byte limit.', 'REQUEST_TOO_LARGE');
-            total += media.size;
-            check(total <= 16 * MIB, 'Cloudflare audio/video exceeds 16 MiB combined.', 'REQUEST_TOO_LARGE');
-            checkMediaDuration(INSPECTORS[media.format](mediaBytes(media.payload, media.size)), seconds);
+            INSPECTORS[media.format](mediaBytes(media.payload, media.size));
         }
     }
 }

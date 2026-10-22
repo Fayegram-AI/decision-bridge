@@ -64,25 +64,19 @@ test('choice policy rejects malformed typed entries and accessors without invoki
     ] }, { minProbability: 0.5, abstainOptions: ['true'] }).status, 'selected');
 });
 
-test('safety identifiers use Unicode character limits in both entry points', async () => {
+test('safety identifiers preserve Unicode while admission lengths remain upstream', async () => {
     const { bridge, provider, requests } = fixture();
-    const identifier = '\u{1F600}'.repeat(128);
+    const identifier = '\u{1F600}'.repeat(129);
     await bridge.evaluate({ ...common, safetyIdentifier: identifier });
     await provider.createDecision({ ...native, safety_identifier: identifier });
     assert.equal(requests[0].safety_identifier, identifier);
     assert.equal(requests[1].safety_identifier, identifier);
-    assert.throws(() => bridge.validate({ ...common, safetyIdentifier: identifier + 'x' }), { code: 'VALIDATION_ERROR' });
-    await assert.rejects(provider.createDecision({ ...native, safety_identifier: identifier + 'x' }), { code: 'VALIDATION_ERROR' });
-    assert.equal(requests.length, 2);
+    assert.throws(() => bridge.validate({ ...common, safetyIdentifier: 1 }), { code: 'VALIDATION_ERROR' });
 });
-
-test('native instruction limits count Unicode characters while preserving the wire text', async () => {
+test('large native instructions preserve Unicode within the configured wire budget', async () => {
     const { provider, requests } = fixture();
-    const instructions = '\u{1F600}'.repeat(1048576);
+    const instructions = '\u{1F600}'.repeat(1048577);
     await provider.createDecision({ ...native, questions: [{ type: 'predicate', instructions }] });
     assert.equal(requests[0].questions[0].instructions, instructions);
-    await assert.rejects(provider.createDecision({ ...native, questions: [
-        { type: 'predicate', instructions: instructions + 'x' },
-    ] }), { code: 'VALIDATION_ERROR' });
     assert.equal(requests.length, 1);
 });

@@ -41,7 +41,9 @@ Internal transport helpers are not stable public exports. Delegate a maintained
 preset for a protocol already supported, or implement and test your own transport.
 
 Capability omissions retain the legacy shared-state and question profile. Audio
-and video additions default to false/zero. Declare richer forms only when their
+and video additions default to false/zero; conversation, tool history, remote
+images and prompt caching default to false. Explicit quantitative custom limits
+are enforced; `null` leaves that admission limit to the service. Declare richer forms only when their
 encoding and validation are implemented. The bridge runs preflight again after
 preparation hooks. Unknown usage is null; no provider should invent token counts,
 confidence, or calibration. Generative native-provenance claims are rejected.
@@ -68,8 +70,8 @@ relative to that file; flag paths
 resolve relative to the working directory. Explicit modules execute trusted code;
 this extension point is not a sandbox. No module is discovered automatically.
 
-`init` creates an honest service implementation placeholder when no implementation
-is selected. When given an existing module, it references that module without
+`init` creates a provider module with an unimplemented service call when no
+implementation is selected. When given an existing module, it references that module without
 loading or overwriting it. Offline `validate` never imports custom modules or
 requires credentials; it reports structure-only validation for unknown protocols.
 `bridge.validate()` on an instantiated provider includes capabilities and preflight.

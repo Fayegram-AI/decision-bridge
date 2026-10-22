@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Decision Bridge configuration",
-    "description": "Explicit schemaVersion 1 configuration. Runtime preflight also enforces URL, credential and provider limits.",
+    "description": "Explicit schemaVersion 1 configuration. Runtime validation checks adapter structure and client resource budgets; service limits remain authoritative upstream.",
     "oneOf": [
         {
             "type": "object",
@@ -31,7 +31,7 @@
                 "maxRequestBytes": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 33554432
+                    "maximum": 67108864
                 },
                 "maxResponseBytes": {
                     "$ref": "#/$defs/bytes"
@@ -407,6 +407,89 @@
                 "provider",
                 "module"
             ]
+        },
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "$schema": {
+                    "$ref": "#/$defs/text"
+                },
+                "schemaVersion": {
+                    "const": 1
+                },
+                "model": {
+                    "enum": [
+                        "clairic",
+                        "@cf/cloudflare/clairic"
+                    ]
+                },
+                "apiKeyEnv": {
+                    "$ref": "#/$defs/keyEnv"
+                },
+                "timeoutMs": {
+                    "$ref": "#/$defs/timeout"
+                },
+                "baseURL": {
+                    "$ref": "#/$defs/text"
+                },
+                "maxRetries": {
+                    "$ref": "#/$defs/retries"
+                },
+                "maxRequestBytes": {
+                    "$ref": "#/$defs/bytes"
+                },
+                "maxResponseBytes": {
+                    "$ref": "#/$defs/bytes"
+                },
+                "provider": {
+                    "const": "cloudflare-extraction"
+                },
+                "accountId": {
+                    "$ref": "#/$defs/text"
+                },
+                "rejectIfBusy": {
+                    "$ref": "#/$defs/boolean"
+                },
+                "gateway": {
+                    "$ref": "#/$defs/gateway"
+                }
+            },
+            "required": [
+                "provider"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "rejectIfBusy": {
+                                "const": true
+                            }
+                        },
+                        "required": [
+                            "rejectIfBusy"
+                        ]
+                    },
+                    "then": {
+                        "properties": {
+                            "maxRetries": {
+                                "const": 0
+                            },
+                            "gateway": {
+                                "properties": {
+                                    "retries": {
+                                        "properties": {
+                                            "maxAttempts": {
+                                                "const": 1
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
         }
     ],
     "$defs": {
@@ -496,19 +579,16 @@
                 "id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64,
                     "pattern": "^[\\x20-\\x7e]*\\S[\\x20-\\x7e]*$"
                 },
                 "cacheKey": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 200,
                     "pattern": "^[\\x20-\\x7e]*\\S[\\x20-\\x7e]*$"
                 },
                 "cacheTtl": {
                     "type": "integer",
-                    "minimum": 60,
-                    "maximum": 2592000
+                    "minimum": 0
                 },
                 "skipCache": {
                     "type": "boolean"
@@ -523,7 +603,6 @@
                 },
                 "metadata": {
                     "type": "object",
-                    "maxProperties": 5,
                     "propertyNames": {
                         "not": {
                             "pattern": "^cf\\."
@@ -544,13 +623,11 @@
                     "properties": {
                         "maxAttempts": {
                             "type": "integer",
-                            "minimum": 1,
-                            "maximum": 5
+                            "minimum": 1
                         },
                         "retryDelayMs": {
                             "type": "integer",
-                            "minimum": 0,
-                            "maximum": 60000
+                            "minimum": 0
                         },
                         "backoff": {
                             "enum": [

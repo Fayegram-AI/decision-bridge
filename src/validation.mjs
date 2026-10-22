@@ -1,5 +1,6 @@
 import { requireCondition as check } from './errors.mjs';
-import { isTextWithinLimit, validateOrderedInput } from './input.mjs';
+import { validateOrderedInput } from './input.mjs';
+import { validateCacheOptions, validateCacheBreakpoint, validateDecisionInput } from './providers/decisions-input.mjs';
 import { validateProbabilitySum, validateResultOptions } from './probabilities.mjs';
 
 const own = (value, key) => Object.hasOwn(value, key);
@@ -81,14 +82,25 @@ function allowedKeys(value, expected, label, code = 'VALIDATION_ERROR') {
 export function validateRequest(input, defaultModel) {
   const request = cloneJson(input, 'request');
   check(isRecord(request), 'request must be an object.');
-  allowedKeys(request, ['state', 'input', 'questions', 'model', 'safetyIdentifier'], 'request');
-  check(own(request, 'state') !== own(request, 'input'), 'Provide exactly one of state or input.');
+  allowedKeys(request, ['state', 'input', 'conversation', 'questions', 'model', 'safetyIdentifier',
+    'promptCacheKey', 'promptCacheOptions'], 'request');
+  check(['state', 'input', 'conversation'].filter(key => own(request, key)).length === 1,
+    'Provide exactly one of state, input or conversation.');
   if (own(request, 'state')) check(request.state !== null && isEntry(request.state),
     'state must be text, a JSON object, or an array.');
-  else validateOrderedInput(request.input);
+  else if (own(request, 'conversation')) {
+    check(Array.isArray(request.conversation), 'conversation must be an ordered item array.');
+    validateDecisionInput(request.conversation);
+  } else {
+    validateOrderedInput(request.input);
+    for (const part of request.input) validateCacheBreakpoint(part.promptCacheBreakpoint);
+  }
+  if (own(request, 'promptCacheKey')) check(request.promptCacheKey === null || typeof request.promptCacheKey === 'string',
+    'promptCacheKey must be text or null.');
+  validateCacheOptions(request.promptCacheOptions);
   if (own(request, 'safetyIdentifier')) check(request.safetyIdentifier === null ||
-    isTextWithinLimit(request.safetyIdentifier, 128),
-  'safetyIdentifier must be a string up to 128 characters or null.');
+    typeof request.safetyIdentifier === 'string',
+  'safetyIdentifier must be a string or null.');
   if (own(request, 'model')) check(nonempty(request.model), 'model must be a nonempty string when provided.');
     const model = own(request, 'model') ? request.model : defaultModel;
   check(nonempty(model), 'model must be a nonempty string.');
@@ -125,14 +137,14 @@ export function validateRequest(input, defaultModel) {
         if (own(level, 'description')) check(level.description !== null && isEntry(level.description), 'Invalid level description.');
       }
     } else if (q.type === 'choice') {
-      check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0 && Object.keys(q.criteria).length <= 255,
-        'choice requires a criteria map with 1 to 255 options.');
+      check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0,
+        'choice requires a nonempty criteria map.');
       for (const [label, description] of Object.entries(q.criteria)) {
         check(nonempty(label) && isEntry(description), 'choice criteria require labels and text, structured JSON, or null descriptions.');
       }
     } else if (q.type === 'score') {
-      check(Array.isArray(q.criteria) && q.criteria.length >= 2 && q.criteria.length <= 10,
-        'score requires 2 to 10 ordered criteria.');
+      check(Array.isArray(q.criteria) && q.criteria.length >= 2,
+        'score requires at least two ordered criteria.');
       check(q.criteria.every(value => value !== null && isEntry(value)),
         'score descriptions must be text or structured JSON, not null.');
     } else if (own(q, 'criteria')) {
@@ -173,9 +185,9 @@ export function validateResult(input, questions, options = {}) {
       q.options.every(option => isRecord(option)), 'Typed choice requires nonempty option objects.');
     if (q.type === 'score' && own(q, 'levels')) check(Array.isArray(q.levels) && q.levels.length >= 2 &&
       q.levels.every(level => isRecord(level) && typeof level.label === 'string'), 'Labelled score requires valid levels.');
-    if (q.type === 'choice' && !own(q, 'options')) check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0 &&
-      Object.keys(q.criteria).length <= 255, 'choice requires 1 to 255 criteria.');
-    if (q.type === 'score' && !own(q, 'levels')) check(Array.isArray(q.criteria) && q.criteria.length >= 2 && q.criteria.length <= 10, 'score requires 2–10 levels.');
+    if (q.type === 'choice' && !own(q, 'options')) check(isRecord(q.criteria) && Object.keys(q.criteria).length > 0,
+      'choice requires nonempty criteria.');
+    if (q.type === 'score' && !own(q, 'levels')) check(Array.isArray(q.criteria) && q.criteria.length >= 2, 'score requires at least two levels.');
     const answer = result.answers[id];
     check(isRecord(answer) && answer.type === q.type, 'Answer type must match its question.', 'INVALID_RESPONSE');
     allowedKeys(answer, q.type === 'box' ? ['type', 'box', 'confidence'] : q.type === 'noul' ? ['type', 'noul'] : q.type === 'choice'
@@ -202,7 +214,7 @@ export function validateResult(input, questions, options = {}) {
     if (q.type === 'choice') {
       check(typeof answer.choice === 'string' && labels.includes(answer.choice), 'choice must be a supplied option.', 'INVALID_RESPONSE');
       const selected = answer.probabilities[answer.choice];
-      check(selected + 1e-6 >= Math.max(...Object.values(answer.probabilities)),
+      check(selected + 1e-6 >= Object.values(answer.probabilities).reduce((max, value) => Math.max(max, value), 0),
         'choice must select a highest-probability option.', 'INVALID_RESPONSE');
     } else {
       exactKeys(answer.legend, labels, 'legend', 'INVALID_RESPONSE');

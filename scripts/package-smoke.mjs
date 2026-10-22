@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import { decisionsScenario, cloudflareScenario } from './package/native-scenarios.mjs';
 import { jevScenario } from './package/jev-scenario.mjs';
 import { customScenario, browserScenario, consumerTypes } from './package/custom-scenarios.mjs';
+import { expansionScenario, expansionTypes } from './package/expansion-scenarios.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const temporary = mkdtempSync(join(tmpdir(), 'decision package '));
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('DECISION_') &&
@@ -73,11 +74,12 @@ console.log('Installed SDK imports and evaluates a local test fixture.');\n`;
     ['jev-smoke.mjs', jevScenario(name)],
     ['custom-smoke.mjs', customScenario(name)],
     ['browser-smoke.mjs', browserScenario(name)],
+    ['expansion-smoke.mjs', expansionScenario(name)],
   ]) {
     writeFileSync(join(consumer, file), source);
     console.log(run(process.execPath, [file], consumer).trim());
   }
-  writeFileSync(join(consumer, 'types.mts'), consumerTypes(name));
+  writeFileSync(join(consumer, 'types.mts'), consumerTypes(name) + expansionTypes(name));
   writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({
     compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext',
       lib: ['ES2022', 'DOM'], strict: true, noEmit: true, skipLibCheck: false }, files: ['types.mts'],

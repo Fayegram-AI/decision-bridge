@@ -2,6 +2,25 @@
 
 Notable user-facing changes by version.
 
+## 0.1.3
+
+- Expand OpenAI Decisions with conversation/tool history, remote images and
+  prompt caching, including common input, extensions and schema version 5.
+- Add Clairic extraction over REST and Workers bindings, with nine field types,
+  native predictive metadata and extraction CLI commands.
+- Add an existing-connection Live Decisions controller and offline protocol
+  validation/replay tools through a dedicated package export.
+- Leave service quotas and admission ceilings upstream; preserve explicit client
+  resource budgets and improve safe errors and error-aware retries.
+- Preserve requested Clairic model aliases in batch diagnostics and parse valid
+  retry hints without losing HTTP status or safe IDs when an error body fails.
+- Harden Live configuration/history correlation, transcript ordering, item
+  acknowledgements, observer isolation, cancellation and connection cleanup.
+  Offline event validation and replay retain their respective input/server error
+  contracts.
+- Document the expanded SDK and CLI APIs, extraction and Live operations, and
+  client resource controls.
+
 ## 0.1.2
 
 - Add opt-in Jev images, typed bounding boxes, native JSON assets, and long context

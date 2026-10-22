@@ -13,12 +13,14 @@ import { isModule } from './config-validation.mjs';
 import { loadConfig, configuredProvider } from './config.mjs';
 import { assertDistinctFiles, createWriter, readJson, readJsonLines } from './io.mjs';
 import { mapOrdered } from './ordered.mjs';
+import { validateExtractionRequest } from '../extraction/index.mjs';
+import { runLiveCli } from './live.mjs';
 
 const SAMPLE_PATH = fileURLToPath(new URL('../../examples/request.json', import.meta.url));
 const BOOLS = ['help', 'version', 'pretty', 'compact', 'no-auth', 'force', 'native', 'reject-if-busy', 'no-reject-if-busy',
     'jev-images', 'no-jev-images', 'jev-long-context', 'no-jev-long-context'];
 const STRINGS = ['config', 'env-file', 'provider', 'preset', 'model', 'base-url', 'api-key-env', 'timeout-ms',
-  'retries', 'max-tokens', 'response-format', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id'];
+  'retries', 'max-tokens', 'response-format', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind'];
 const FIELD_MAP = { preset: 'preset', provider: 'provider', model: 'model', 'base-url': 'baseURL', 'api-key-env': 'apiKeyEnv',
   'timeout-ms': 'timeoutMs', retries: 'maxRetries', 'max-tokens': 'maxTokens',
   'response-format': 'responseFormat', 'token-parameter': 'tokenParameter', 'provider-module': 'module', 'account-id': 'accountId' };
@@ -32,6 +34,10 @@ Usage:
   decision-bridge schema [request.json | -] [options]      (offline generative schema)
   decision-bridge models [options]
   decision-bridge batch requests.jsonl [--concurrency 4] [options]
+  decision-bridge extraction run|validate|batch request-file [options]
+  decision-bridge extraction init [directory] [options]
+  decision-bridge live validate FILE --kind config|command|event   (offline)
+  decision-bridge live replay FILE.jsonl                         (offline)
 
 Command aliases: decision, faye-decision
 
@@ -49,7 +55,7 @@ Options:
   --api-key-env NAME        Read credential from this environment variable
   --no-auth                 Local OpenAI-compatible endpoint only
   --timeout-ms N            End-to-end evaluation/provider deadline
-  --retries N               HTTP retries, 0–10; Decisions default 0, others 2
+  --retries N               HTTP retries, 0–10; OpenAI/Cloudflare default 0, Jev 2
   --native                  Selected decision provider native format (init/evaluate/validate/batch)
   --jev-images              Enable experimental Jev images and box questions
   --no-jev-images           Explicitly disable Jev images
@@ -70,7 +76,8 @@ Options:
   --pretty / --compact      JSON layout; default pretty (batch is always JSONL)
   --help, -h / --version, -v
 
-Without an input file, evaluate/validate/schema use the bundled sample.
+Without an input file, decision evaluate/validate/schema use the bundled sample.
+Extraction and Live operations require an explicit input file or stdin.
 No credentials, file reads, or network calls are needed for help/version.
 All API calls are explicit; evaluate/models/batch may access paid services.
 Exit codes: 0 success; 1 provider/partial-batch failure; 2 input/config/IO;
@@ -123,7 +130,7 @@ function overridesFor(values) {
 
 const INPUT_CODES = new Set(['USAGE_ERROR', 'CONFIGURATION_ERROR', 'VALIDATION_ERROR', 'UNSUPPORTED_CAPABILITY', 'IO_ERROR', 'INPUT_TOO_LARGE', 'REQUEST_TOO_LARGE']);
 export function exitCode(error) {
-  return error?.code === 'ABORTED' ? 130 : INPUT_CODES.has(error?.code) ? 2 : 1;
+  return error?.code === 'ABORTED' ? 130 : error?.source === 'provider' ? 1 : INPUT_CODES.has(error?.code) ? 2 : 1;
 }
 
 function scrub(value, env, explicitSecret) {
@@ -152,14 +159,21 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
   if (signal?.aborted) cancelled();
   signal?.addEventListener('abort', cancelled, { once: true });
   try {
-    const { values, positionals } = argumentsFor(argv);
+    const { values, positionals: originalPositionals } = argumentsFor(argv);
+    const namespace = ['extraction', 'live'].includes(originalPositionals[0]) ? originalPositionals[0] : undefined;
+    const positionals = namespace ? originalPositionals.slice(1) : originalPositionals;
     if (values.help || (positionals.length === 0 && !values.version)) { stdout.write(HELP); return 0; }
     if (values.version) { stdout.write(VERSION + '\n'); return 0; }
-    const aliases = { eval: 'evaluate', ask: 'evaluate' };
+    if (namespace === 'live') return await runLiveCli(positionals, values,
+      { stdin, stdout, cwd, signal: internal.signal });
+    const extracting = namespace === 'extraction';
+    const aliases = { eval: 'evaluate', ask: 'evaluate', ...(extracting ? { run: 'evaluate' } : {}) };
     const command = aliases[positionals[0]] ?? positionals[0];
     if (command === 'help') { stdout.write(HELP); return 0; }
     if (internal.signal.aborted) throw abortError();
     check(['evaluate', 'validate', 'schema', 'models', 'init', 'batch'].includes(command), 'Unknown command. Run --help.', 'USAGE_ERROR');
+    check(!extracting || ['evaluate', 'validate', 'init', 'batch'].includes(command), 'Unsupported extraction command.', 'USAGE_ERROR');
+    check(values.kind === undefined, '--kind applies only to live validation.', 'USAGE_ERROR');
     check(positionals.length <= (command === 'models' ? 1 : 2), 'Too many positional arguments.', 'USAGE_ERROR');
     check(!(values.input && positionals[1]), 'Supply either --input or a positional file, not both.', 'USAGE_ERROR');
     check(!(values.pretty && values.compact), 'Choose --pretty or --compact, not both.', 'USAGE_ERROR');
@@ -176,8 +190,13 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
         'concurrency must be from 1 to 64.', 'USAGE_ERROR');
     }
     const loaded = await loadConfig({ configPath: values.config, envFile: values['env-file'],
-      overrides: overridesFor(values), cwd, env, allowIncomplete: command === 'init' });
-    const profile = decisionProfile(loaded.config.provider);
+      overrides: overridesFor(values), cwd, env, allowIncomplete: command === 'init',
+      defaultProvider: extracting ? 'cloudflare-extraction' : 'jev' });
+    check(extracting === (loaded.config.provider === 'cloudflare-extraction'), 'Selected provider does not match the command operation.', 'CONFIGURATION_ERROR');
+    const profile = extracting ? { common: validateExtractionRequest, inputLimit: 64 * 1024 * 1024,
+      options: config => Object.fromEntries(['model', 'maxRequestBytes', 'maxRetries', 'rejectIfBusy', 'gateway']
+        .filter(key => config[key] !== undefined).map(key => [key, config[key]])) } : decisionProfile(loaded.config.provider);
+    check(!extracting || !values.native, 'Extraction already uses its native field schema.', 'USAGE_ERROR');
     check(!values.native || (profile && ['init', 'evaluate', 'validate', 'batch'].includes(command)),
       '--native requires a decision provider and init/evaluate/validate/batch.', 'USAGE_ERROR');
     check(!values.native || command === 'init' || values.input || positionals[1],
@@ -187,12 +206,14 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
     activeEnv = loaded.env;
     explicitSecret = loaded.config.apiKeyEnv ? activeEnv[loaded.config.apiKeyEnv] : undefined;
     const inputPath = values.input ?? positionals[1] ?? SAMPLE_PATH;
+    check(!extracting || command === 'init' || values.input || positionals[1], 'Extraction requires an explicit input file or -.', 'USAGE_ERROR');
     if (values.output && values.output !== '-' && inputPath !== '-') {
       await assertDistinctFiles(inputPath, values.output, cwd);
     }
     writer = await createWriter({ output: values.output, force: values.force, stdout, cwd, signal: internal.signal });
     const writeJson = value => writer.write(JSON.stringify(value, null, values.compact ? 0 : 2) + '\n');
-    const context = { stdin, cwd, signal: internal.signal, maxInputBytes: profile?.inputLimit };
+    const context = { stdin, cwd, signal: internal.signal,
+      maxInputBytes: Math.max(profile?.inputLimit ?? 8 * 1024 * 1024, loaded.config.maxRequestBytes ?? 0) };
     const withModel = input => {
       if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
       // Apply the configured fallback independently of a custom factory's default.
@@ -200,7 +221,7 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
       const model = values.model ?? (isModule(loaded.config) && !Object.hasOwn(input, 'model')
         ? loaded.config.model : undefined);
       const request = model === undefined ? input : { ...input, model };
-      if (values.native && (values['reject-if-busy'] || values['no-reject-if-busy'])) {
+      if ((values.native || extracting) && (values['reject-if-busy'] || values['no-reject-if-busy'])) {
         check(request.options === undefined || (request.options !== null && typeof request.options === 'object' &&
           !Array.isArray(request.options)), 'Native execution options must be an object.');
         return { ...request, options: { ...request.options, rejectIfBusy: !!values['reject-if-busy'] } };
@@ -224,7 +245,8 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
       const buildResponseSchema = command === 'schema'
         ? (await import('../custom/generative/schema.mjs')).buildResponseSchema : undefined;
       await writeJson(command === 'schema' ? buildResponseSchema(request.questions)
-        : { valid: true, validationScope: isModule(loaded.config) ? 'structure' : 'provider', questionCount: Object.keys(request.questions).length, model: selectedModel,
+        : { valid: true, operation: extracting ? 'extraction' : 'decision', validationScope: isModule(loaded.config) ? 'structure' : 'provider',
+          ...(extracting ? { fieldCount: Object.keys(request.fields).length } : { questionCount: Object.keys(request.questions).length }), model: selectedModel,
           ...(profile?.resolveModel ? { resolvedModel: profile.resolveModel(request.model) } : {}),
           ...(values.native ? { native: true } : {}) });
     } else {
@@ -237,8 +259,9 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
         validateInput(request);
       }
       const provider = await configuredProvider(loaded, { signal: internal.signal });
-      const bridge = createBridge({ provider, timeoutMs: loaded.config.timeoutMs ?? 60000 });
+      const bridge = extracting ? undefined : createBridge({ provider, timeoutMs: loaded.config.timeoutMs ?? 60000 });
       async function evaluateInput(input) {
+        if (extracting) return provider.extract(input, { signal: internal.signal });
         if (!values.native) return bridge.evaluate(input, { signal: internal.signal });
         const budget = deadline(loaded.config.timeoutMs ?? 60000, internal.signal);
         try {

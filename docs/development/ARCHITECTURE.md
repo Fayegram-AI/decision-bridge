@@ -17,12 +17,12 @@ and Jev default before constructing the SDK bridge.
 
 ```text
 Application / CLI
-  state or ordered input + question definitions + optional model
+  state, ordered input or conversation + question definitions + optional model
         |
         v
   request snapshot, common validation, capabilities, provider preflight
         |
-  ordered prepareState or prepareInput extensions + revalidation
+  ordered prepareState, prepareInput or prepareConversation extensions + revalidation
         |
   Provider.evaluate (explicit decision/generative kind)
         +-- Jev: native systemone
@@ -83,6 +83,10 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/providers/` | API orchestration, model profiles, preflight, codecs, bounded image/audio/video inspection, and transports |
 | `src/providers/openai-profile.mjs`, `src/providers/decisions-preflight.mjs` | Release-owned OpenAI selection, capabilities, and preparation of selected and outgoing requests |
 | `src/providers/jev-profile.mjs`, `src/providers/jev-preflight.mjs`, `src/providers/jev-images.mjs` | Jev experimental policy, common/native assets, and image preflight |
+| `src/providers/decisions-input.mjs`, `src/providers/decisions-codec.mjs` | Decisions item/cache validation and lossless common/native encoding |
+| `src/providers/cloudflare-transport.mjs` | Shared decision/extraction REST and binding authentication, dispatch and diagnostics |
+| `src/extraction/` | Clairic native field/request/response validation, provider, ordered batches and declarations |
+| `src/live/` | Live protocol validation, bounded correlation state, supplied-connection controller and declarations |
 | `src/embedded.mjs` | Shared embedded data URL and canonical base64 checks |
 | `src/transport.mjs`, `src/response-transport.mjs` | Credential destinations, bounded bodies, safe errors, retries |
 | `src/async.mjs` | Deadlines and cancellation races |
@@ -110,14 +114,24 @@ policy helper does not infer it from the answer or its metadata.
 
 ## Reliability and configuration
 
+Built-in validators check structure, representation, adapter capabilities and
+response integrity. They leave service-owned question/media counts, text/context
+ceilings, quotas and RPM/TPM upstream. Custom quantitative capability limits remain
+part of those providers' contracts. Client byte budgets, JSON safeguards,
+cancellation and deadlines remain local controls.
+
 Provider deadlines include dispatch, configured retries, backoff, and bounded body
 reading. The bridge deadline additionally covers validation, preparation, provider
 waiting, and result processing. Expired synchronous work cannot dispatch a call.
 Cancellation bounds waiting for custom promises; custom code must honor signals
 to release its own resources. Observations use a separate bounded budget.
 
-Retries cover selected explicit transient responses. Ambiguous failures and failed
-observers do not trigger another inference. CLI atomic files protect previous
+Retries cover selected explicit transient responses, with machine-code
+classification preventing billing/allocation retries. OpenAI Decisions and
+Clairic default to zero retries. Valid Retry-After hints share the total deadline;
+attempt counts describe adapter dispatches, not hidden Gateway retries.
+Malformed rejection bodies retain known safe HTTP diagnostics. Ambiguous failures
+and failed observers do not trigger another inference. CLI atomic files protect previous
 output but cannot undo remote work or emitted stdout.
 
 JSON configuration is explicit. Custom ESM executes only when selected. Custom
@@ -135,7 +149,20 @@ mutable request limit or response identifiers. Header/container inspection is
 bounded and does not perform full media decoding.
 
 The SDK does not host models or provide a server API, persistent state, autonomous
-actions, streaming, transcription, transcoding, frame extraction,
+actions, HTTP decision streaming, audio transcription, transcoding, frame extraction,
 provider-side asynchronous batch jobs, platform
 management, automatic model search, or automatic provider failover. SDK arrays and
 CLI JSONL batches provide bounded client-side concurrency.
+
+Extraction owns its request/result contract and uses shared Cloudflare dispatch.
+Its inference options remain in model input; binding execution options use the
+third `ai.run` argument. Native nulls, empty lists, predictive JSON and truncation
+are preserved in an immutable `{ extraction, meta }` envelope.
+Live owns protocol validation, a bounded pure correlation reducer and a supplied-
+connection controller. Offline replay uses that same reducer. Their dedicated
+exports do not widen the existing decision/generative provider contract.
+Live configuration changes activate on acknowledgement. Source snapshots and
+observed per-direction transcript order support correlation; unavailable evidence
+stays unmatched. Manual evaluation and commentary return submission receipts;
+completed decisions arrive through subscriptions, preserving native refusals.
+The application owns authentication, audio, connection setup and reconnection.

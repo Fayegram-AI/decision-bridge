@@ -2,13 +2,18 @@
 
 ## Native decisions as the application contract
 
-Use shared state or ordered input and independent typed questions as the public
+Use shared state, ordered input or conversation and independent typed questions as the public
 contract. The bridge owns orchestration; providers own their model API protocols.
 This gives applications a stable decision interface and makes customization
 explicit at each call. Native decision models are the main package scope;
 generative protocols are opt-in custom strategies with their own public subpath.
 Every provider declares its decision/generative kind. Consequence: not every model can satisfy this contract
 reliably; compatibility and quality must be tested separately.
+
+Extraction and Live are dedicated operations. Clairic keeps its native fields
+and predictive response envelope; Live attaches commands and events to an
+application-owned connection. Each has its own API and result contract, separate
+from the bridge's `evaluate` interface.
 
 ## ESM JavaScript with declarations and no runtime dependencies
 
@@ -30,12 +35,25 @@ calibration or correctness.
 
 ## Fail explicitly instead of silently repairing or falling back
 
-Reject invalid JSON, extra fields, wrong labels, distributions outside the provider
-precision allowance, explicit output truncation, and refusals. Require explicit
+Decision calls reject invalid JSON, unsupported request fields, wrong labels,
+distributions outside the provider precision allowance, malformed results and
+refusals; generative paths also reject explicit output truncation. Require explicit
 output modes and models. Services may truncate input without reporting it; local
 byte limits do not guarantee token fit. Consequence:
 some calls fail that a permissive wrapper might guess at, but failures remain
 observable and cannot silently change budgets or decision policies.
+
+Clairic preserves additional safe native JSON and its truncation flag. Live
+preserves native refusal events and marks ambiguous correlation as unmatched.
+Those operation contracts avoid inventing success or discarding native evidence.
+
+## Service admission and client resources
+
+The server owns quotas, rate limits, service counts, context admission and media
+ceilings. Report rejection through safe structured errors; do not estimate tokens,
+track account allocations, split requests or schedule service capacity. Local
+byte/JSON safeguards, cancellation, deadlines and caller-selected concurrency
+bound client resources. Custom-provider quantitative contracts remain explicit.
 
 ## Trusted extensions and explicit configuration
 

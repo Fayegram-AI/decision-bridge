@@ -8,6 +8,18 @@ const rest = (fetchImpl, options = {}) => new CloudflareDecisionsProvider({
     accountId: 'fixture-account', apiKey: 'fixture-secret', fetchImpl, ...options,
 });
 
+test('permanent Cloudflare internal errors override transient HTTP retry status', async () => {
+    for (const [upstreamCode, code] of [[5018, 'PERMISSION_DENIED'], [3006, 'REQUEST_TOO_LARGE'], [3036, 'ALLOCATION_EXCEEDED']]) {
+        let calls = 0;
+        const provider = rest(async () => {
+            calls++;
+            return json({ errors: [{ code: upstreamCode }] }, 503);
+        }, { maxRetries: 1 });
+        await assert.rejects(provider.createDecision(native), { code, status: 503, upstreamCode, retryable: false });
+        assert.equal(calls, 1);
+    }
+});
+
 test('all REST models omit disabled execution options for common and native requests', async () => {
     for (const model of ['clef', 'clef-flash', 'clef-omni']) {
         const requests = [];
@@ -105,7 +117,7 @@ test('explicit retries honor the deadline and zero remains the default', async (
     const result = await provider.createDecision(native);
     assert.equal(result.meta.attempts, 2);
     await assert.rejects(rest(async () => json({ errors: [{ code: 3040 }] }, 429, { 'retry-after': '60' }),
-        { timeoutMs: 100, maxRetries: 1 }).createDecision(native), { code: 'RETRY_BUDGET_EXCEEDED', upstreamCode: 3040 });
+        { timeoutMs: 1000, maxRetries: 1 }).createDecision(native), { code: 'RETRY_BUDGET_EXCEEDED', upstreamCode: 3040 });
 });
 
 test('Gateway configuration is snapshotted and mapped to documented REST headers', async () => {

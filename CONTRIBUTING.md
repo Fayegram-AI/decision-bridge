@@ -20,9 +20,11 @@ configuration-schema validator from the lockfile. See the
 Start with the [architecture](docs/development/ARCHITECTURE.md),
 [design rationale](docs/development/DESIGN.md), and
 [repository layout](docs/development/REPOSITORY_LAYOUT.md).
-Preserve the provider-independent contract of `state` or ordered `input` plus
-`questions`, and explicit probability provenance. Add focused regression tests for bug fixes and wire-level
-tests for protocol changes. Fixtures must not contain credentials or live-account
+Preserve the provider-independent contract of exactly one of `state`, ordered
+`input` or `conversation`, plus `questions`, and explicit probability provenance.
+Extraction and Live use dedicated operation contracts. Keep service admission
+limits upstream and client resource controls explicit. Add focused regression
+tests for bug fixes and wire-level tests for protocol changes. Fixtures must not contain credentials or live-account
 data; label synthetic responses as synthetic.
 
 ## Make and verify a change

@@ -9,10 +9,13 @@ const description = value => value === undefined || value === null ? {} : { desc
 export function encodeCommonDecision(request) {
     check(!request.input?.some(part => !['text', 'image'].includes(part.type)),
         'OpenAI Decisions does not support audio or video input.', 'UNSUPPORTED_CAPABILITY');
-    const input = own(request, 'state') ? encodeText(request.state) : [{ role: 'user', content: request.input.map(part =>
-        part.type === 'text' ? { type: 'input_text', text: part.text } : {
-            type: 'input_image', image_url: part.dataUrl, ...(own(part, 'detail') ? { detail: part.detail } : {}),
-        }) }];
+    const cache = part => own(part, 'promptCacheBreakpoint') ? { prompt_cache_breakpoint: part.promptCacheBreakpoint } : {};
+    const input = own(request, 'state') ? encodeText(request.state) : own(request, 'conversation') ? request.conversation
+        : [{ role: 'user', content: request.input.map(part => part.type === 'text'
+            ? { type: 'input_text', text: part.text, ...cache(part) } : {
+                type: 'input_image', image_url: part.dataUrl ?? part.url, ...cache(part),
+                ...(own(part, 'detail') ? { detail: part.detail } : {}),
+            }) }];
     const questions = Object.entries(request.questions).map(([name, q]) => {
         const base = { name, instructions: encodeText(q.instructions) };
         if (q.type === 'noul') {
@@ -29,7 +32,9 @@ export function encodeCommonDecision(request) {
             : q.criteria.map((entry, index) => ({ label: String(index), description: encodeText(entry) })) };
     });
     return { model: request.model, input, questions,
-        ...(own(request, 'safetyIdentifier') ? { safety_identifier: request.safetyIdentifier } : {}) };
+        ...(own(request, 'safetyIdentifier') ? { safety_identifier: request.safetyIdentifier } : {}),
+        ...(own(request, 'promptCacheKey') ? { prompt_cache_key: request.promptCacheKey } : {}),
+        ...(own(request, 'promptCacheOptions') ? { prompt_cache_options: request.promptCacheOptions } : {}) };
 }
 
 export function decodeCommonDecision(decision, request, meta) {

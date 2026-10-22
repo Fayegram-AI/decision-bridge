@@ -40,7 +40,7 @@ async function checks() {
     bridge.getCapabilities().images;
     // @ts-expect-error Ordered input and state are mutually exclusive.
     bridge.evaluate({ state: '', input: [{ type: 'text', text: '' }], questions: { q: noul('True?') } });
-    // @ts-expect-error Native input accepts user roles only.
+    // System messages are supported by the expanded native conversation contract.
     provider.createDecision({ input: [{ role: 'system', content: '' }], questions: [] });
     // @ts-expect-error Unsupported native generation setting.
     createProvider({ type: 'openai-decisions', maxTokens: 10 });

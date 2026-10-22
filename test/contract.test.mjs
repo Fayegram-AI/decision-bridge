@@ -217,16 +217,12 @@ test('choice policy rejects lossy abstention arrays without invoking accessors',
     assert.equal(reads, 0);
 });
 
-test('choice permits the native 255-option boundary and rejects 256 before dispatch', () => {
-  const criteria = Object.fromEntries(Array.from({ length: 255 }, (_, i) => [`option-${i}`, null]));
-  assert.equal(Object.keys(validateRequest({ model: 'fixture-model', state: '', questions: { pick: {
-    type: 'choice', instructions: 'Choose.', criteria,
-  } } }).questions.pick.criteria).length, 255);
-  assert.throws(() => validateRequest({ model: 'fixture-model', state: '', questions: { pick: {
-    type: 'choice', instructions: 'Choose.', criteria: { ...criteria, extra: null },
-  } } }), { code: 'VALIDATION_ERROR' });
+test('common choice maps do not enforce a service option ceiling', () => {
+    const criteria = Object.fromEntries(Array.from({ length: 256 }, (_, i) => ['option-' + i, null]));
+    assert.equal(Object.keys(validateRequest({ model: 'fixture-model', state: '', questions: { pick: {
+        type: 'choice', instructions: 'Choose.', criteria,
+    } } }).questions.pick.criteria).length, 256);
 });
-
 for (const q of [
   { type: 'score', instructions: 'Rate.', criteria: ['Low', null] },
   { type: 'noul', instructions: 'True?', criteria: null },
@@ -237,10 +233,10 @@ for (const q of [
   });
 }
 
-test('standalone result validation rejects an oversized choice space before argmax', () => {
+test('standalone result validation still rejects malformed large choice responses', () => {
   const criteria = Object.fromEntries(Array.from({ length: 256 }, (_, i) => [String(i), null]));
   const result = { model: 'fixture', answers: { q: { type: 'choice' } }, usage: { input_tokens: 0, output_tokens: 0 } };
-  assert.throws(() => validateResult(result, { q: { type: 'choice', criteria } }), { code: 'VALIDATION_ERROR' });
+  assert.throws(() => validateResult(result, { q: { type: 'choice', criteria } }), { code: 'INVALID_RESPONSE' });
 });
 
 for (const options of [null, { natvie: true }, { native: 'false' }, { native: 0 }, { native: 1 }]) {
