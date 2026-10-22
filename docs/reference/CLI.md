@@ -1,7 +1,11 @@
 # Command runner reference
 
-The optional command runner evaluates files using the same bridge available in
-the SDK. For application integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
+The optional command runner evaluates decision files, runs Clairic extraction,
+and validates or replays Live protocol records offline. For application
+integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
+
+The extraction and Live commands require **0.1.3 or later**; see
+[version availability](../README.md#version-availability).
 
 After [installing the package](../guides/GETTING_STARTED.md#install-into-your-application)
 in your project, run:
@@ -17,8 +21,10 @@ it with `node bin/decision.mjs` from a source checkout. `decision` and
 `faye-decision` are equivalent aliases with the same commands and options.
 `--help` and `--version` do not access credentials or services.
 
-The CLI defaults to Jev. Flags override `DECISION_*` environment settings, which
-override an explicit config file and then built-in defaults. It constructs an
+Decision commands default to Jev. The extraction namespace defaults to
+`cloudflare-extraction` only when no provider was selected. Flags override
+`DECISION_*` environment settings, which override an explicit config file and
+then built-in defaults. It constructs an
 explicit provider for the SDK; `createBridge` itself has no implicit selection.
 Choose a supported native model from the
 [model selector inventory](../../README.md#model-selectors).
@@ -50,6 +56,12 @@ there is no CLI binding selector. Gateway settings route the selected REST reque
 | `schema [FILE\|-]` | Print the generative response schema for these questions; local only |
 | `models` | List the configured provider's models; may be paginated |
 | `batch FILE\|-` | Stream JSONL inputs and ordered JSONL result/error records |
+| `extraction run FILE\|-` | One native extraction; returns `{ extraction, meta }` |
+| `extraction validate FILE\|-` | Offline structural and client-budget validation |
+| `extraction batch FILE\|-` | Ordered extraction JSONL results and per-row errors |
+| `extraction init [DIRECTORY]` | Create an extraction profile, request, schema and credential template |
+| `live validate FILE\|- --kind config\|command\|event` | Offline Live structure validation |
+| `live replay FILE\|-` | Offline JSONL protocol replay; no connection is opened |
 
 Jev supports both common and `--native` requests for evaluation, validation,
 initialization, and ordered batches. Experimental images/boxes require
@@ -57,9 +69,11 @@ initialization, and ordered batches. Experimental images/boxes require
 JSON configuration). Use `--no-jev-images` and `--no-jev-long-context` to
 override enabled settings. See the [Jev guide](../guides/JEV.md).
 
-No input filename on `evaluate`, `validate`, or `schema` selects the bundled sample,
+No input filename on decision `evaluate`, `validate`, or `schema` selects the bundled sample,
 not stdin. Use `-` explicitly for stdin. Empty invocation prints help. Configuration
 and credential errors do not cause fallback to another backend.
+Extraction and Live file operations require an explicit filename or `-`.
+Extraction rejects `--native` because its request already uses native fields.
 
 ```bash
 cat request.json | decision-bridge evaluate - --env-file .env --compact
@@ -94,7 +108,7 @@ later configuration changes to control selection.
 | --- | --- |
 | `--config FILE` | Explicit JSON configuration; never autodiscovered |
 | `--env-file FILE` | Load an explicit environment file without changing the parent shell |
-| `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `custom-decision`, `custom-generative` |
+| `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `cloudflare-extraction` (extraction namespace), `custom-decision`, `custom-generative` |
 | `--preset NAME` | custom-generative preset: `openai-compatible`, `openrouter`, or `anthropic`; exclusive with module |
 | `--native` | Explicit native Decisions input/output; init/evaluate/validate/batch only |
 | `--jev-images`, `--no-jev-images` | Enable/disable experimental Jev images and boxes |
@@ -103,7 +117,7 @@ later configuration changes to control selection.
 | `--base-url URL` | Custom endpoint; requires explicit credential selection |
 | `--api-key-env NAME` | Environment variable name, never the key itself |
 | `--account-id ID` | Cloudflare REST account ID |
-| `--reject-if-busy`, `--no-reject-if-busy` | Explicit Cloudflare native-request override. Enabling fails local REST preflight with `UNSUPPORTED_CAPABILITY`; disabling permits ordinary inference. See the [REST limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) |
+| `--reject-if-busy`, `--no-reject-if-busy` | Override Cloudflare request/provider busy settings. Enabling fails Clef REST preflight; Clairic forwards the setting. See the [Clef REST limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) |
 | `--gateway-id ID` | Existing Cloudflare Gateway; richer settings in config |
 | `--no-auth` | Only for a loopback OpenAI-compatible endpoint |
 | `--timeout-ms N` | HTTP and bridge deadline for each evaluation/listing |
@@ -117,6 +131,7 @@ later configuration changes to control selection.
 | `--force` | Replace existing output; valid only with `--output` |
 | `--concurrency N` | Batch in-flight limit 1–64; default 4 |
 | `--pretty`, `--compact` | JSON formatting; pretty by default; batches always JSONL |
+| `--kind config\|command\|event` | Required by `live validate`; rejected by other commands |
 | `--help`, `-h`, `--version`, `-v` | Informational commands |
 
 Unknown or duplicate flags fail. Provider-inapplicable flags fail instead of being
@@ -138,6 +153,10 @@ includes `validationScope: 'provider'` for known native/preset profiles or
 `'structure'` for a custom module. Structure validation cannot verify an unknown
 module's capabilities or protocol. `schema` is an offline generative-output tool;
 it does not add generative support to a native provider.
+Decision validation reports `operation: 'decision'` and `questionCount`;
+extraction reports `operation: 'extraction'` and `fieldCount`. Neither authenticates
+an account or claims server admission. Live validation reports its `kind` and
+`validationScope: 'structure'`.
 
 A batch emits one compact record per nonblank input line:
 
@@ -181,14 +200,16 @@ delivery needs separate validation.
 ## I/O and resource limits
 
 Single JSON input normally uses **8 MiB**. JSONL normally uses **8 MiB per line,
-64 MiB total**. Jev permits **32 MiB** for a single JSON input or JSONL record,
+64 MiB total**. Jev defaults to **32 MiB** for a single JSON input or JSONL record,
 then checks serialized requests against its configured ceiling (32 MiB by default).
+An explicit larger client request budget raises the input reader budget through 64 MiB.
 Config:
 **1 MiB**. Environment file: **64 KiB**. Provider request and response default to
 8 MiB each, configurable to at most 64 MiB. Cloudflare reads single JSON inputs
 and individual JSONL records within 64 MiB, then applies model-specific serialized
-request validation: Clef/Clef-flash default/cap 13 MiB; Omni default 36 MiB,
-configurable through 64 MiB. Explicit smaller ceilings remain in force. Request
+request validation: Clef/Clef-flash default 13 MiB, configurable through 64 MiB; Omni default 36 MiB,
+configurable through 64 MiB; Clairic defaults to 8 MiB, configurable through 64 MiB.
+Explicit smaller ceilings remain in force. Request
 model overrides and mixed-model JSONL batches use each effective model's budget.
 The 64 MiB JSONL total remains. These are client limits, not a promise
 that every remote model has an equivalent context window.
@@ -222,3 +243,20 @@ Already-cancelled CLI work does not initialize a project or create an output fil
 File writers check cancellation before writes and before submitting the atomic
 commit. A commit already submitted to the operating system cannot be undone;
 cancellation does not roll back a completed write or remote inference billing.
+
+## Offline Live tools
+
+Live tools load no provider configuration, environment files or credentials and
+open no connection. They accept input/output and formatting flags; `--kind` is
+required only for validation. Replay always emits compact JSONL.
+
+Replay input records are `{ direction: 'client' | 'server', event }`. Each row
+produces `{ line, ok, event }` or `{ line, ok: false, error }` using the same
+correlation state as the SDK controller. Malformed rows remain explicit errors
+and later rows are processed. A closed session ends that replay lifecycle;
+subsequent protocol rows fail with `CONNECTION_CLOSED`.
+
+Malformed event-file validation reports `VALIDATION_ERROR` and exits 2. Malformed
+server replay rows retain `INVALID_RESPONSE`; any failed row makes replay exit 1.
+See the [Live guide](../guides/LIVE_DECISIONS.md) for correlation guarantees and
+the [extraction guide](../guides/EXTRACTION.md) for native extraction requests.

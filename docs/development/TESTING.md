@@ -16,7 +16,7 @@ Source and installed-consumer type checks use the same local compiler.
 | `npm test` | SDK, CLI, provider, and file/transport behavior using fixtures and loopback servers |
 | `npm run test:coverage` | The functional suite with production source/bin coverage floors |
 | `npm run typecheck` | Positive and expected-negative TypeScript API contracts |
-| `npm run test:package` | Pack, offline install, root/custom exports and types, browser-safe imports, presets/modules, contents and docs |
+| `npm run test:package` | Pack, offline install, root/custom/extraction/Live exports and types, browser-safe imports, presets/modules, contents and docs |
 | `npm run build` | Retain a versioned npm tarball after checking its offline installation |
 | `npm run verify` | Source checks, tests, type contracts, and package smoke check |
 
@@ -44,6 +44,11 @@ as evidence that every environment passed.
 - `result-validation.test.mjs`: provider-selected precision and policy-hook boundaries.
 - `decisions*.test.mjs`: native/common OpenAI codecs, selectors and model identities, boundaries, preflight, CLI, and smoke-helper fixtures.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
+- `jev*.test.mjs`: native/common assets, reference substitution, boxes, opt-ins, nullable usage and CLI behavior.
+- `capability-expansion.test.mjs`: conversation/tool history, remote images, cache controls, extension revalidation, service-limit ownership and safe rejection diagnostics.
+- `extraction.test.mjs`: all nine Clairic field families, native JSON preservation, REST/binding options, batch preflight and model-selection diagnostics.
+- `live.test.mjs`: commands/acknowledgements, configuration history, transcript ordering, unmatched/stale/duplicate results, observer isolation and lifecycle cleanup.
+- `expansion-cli.test.mjs`: extraction commands/configuration, offline Live validation/replay, per-row errors and provider-switch isolation.
 - `custom-providers.test.mjs`, `custom-config.test.mjs`: classified SDK paths, provenance, presets/modules, schema and initialization.
 - `generative-helpers.test.mjs`: exported prompt/normalization helper contracts and unsupported input rejection.
 - `config.test.mjs`: file/environment/flag precedence and provider transitions.
@@ -54,6 +59,7 @@ as evidence that every environment passed.
 - `types.mts`, `providers.types.mts`, `custom.types.mts`: public type inference and rejected API usage.
 - `decisions.types.mts`, `cloudflare.types.mts`: richer questions, native APIs, and precision settings.
 - `cloudflare-worker.types.mts`: compatibility with official Workers binding declarations.
+- `expansion.types.mts`: conversation/cache inputs, extraction value inference, unions, batches and Live transport/notification contracts.
 
 Node's reported test count includes each row of a parameterized input table. It
 is not a count of independent features; retain separate rows when they protect
@@ -84,6 +90,23 @@ selection, and browser execution without Node globals. Use `npm run verify` for
 the complete integration check. A selector mapping change must be verified against
 the target model's protocol and capabilities; local fixtures alone do not establish
 compatibility with a newly selected upstream model.
+
+### Capability expansion coverage
+
+For changes across expanded OpenAI input, Clairic or Live, use the existing
+functional fixtures and declaration checks. A focused source-root command is:
+
+```text
+node --test test/capability-expansion.test.mjs test/extraction.test.mjs test/live.test.mjs test/expansion-cli.test.mjs
+npm run typecheck
+```
+
+REST doubles and binding doubles verify inference/execution option separation and
+safe upstream errors. Live uses a supplied in-memory connection adapter and the
+same state reducer as offline replay. No test intentionally exhausts service
+quotas or treats accepted local structure as hosted admission. Installed-package
+checks exercise the dedicated exports, CLI tools, declarations and SDK imports
+without Node globals.
 
 ## Optional authenticated provider smoke check
 
@@ -132,13 +155,18 @@ Header/dimension preflight does not fully decode images, so live image fixtures
 must also contain valid encoded image data.
 Omni fixtures must contain genuinely decodable WAV/MP3 and MP4/WebM media for
 hosted tests. Local authored container fixtures verify inspection and protocol
-behavior without claiming codec validity. Include grouped modalities, duration
-and size boundaries, effective-model overrides, request bodies above 13 MiB,
+behavior without claiming codec validity. Cover grouped modalities, container
+validity, configured client byte budgets, effective-model overrides, request bodies above 13 MiB,
 and explicit smaller ceilings. Gateway caching/logging should be disabled for
 test payloads, and each bounded run should have a request and total time budget.
 
 The SDK, CLI, and ordinary checks do not create Workers or Gateways. Provisioning
 and cleanup belong to the application's separately authorized environment setup.
+The smoke helper does not qualify Clairic or a GPT-Live connection. When a specific
+wire-contract uncertainty requires hosted verification, use the intended
+application-owned runtime/connection and a bounded, explicitly authorized case.
+Offline fixtures remain sufficient for routine development and CI; record hosted
+behavior only when that exact path was exercised.
 
 ## Package verification
 

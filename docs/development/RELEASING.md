@@ -30,8 +30,10 @@ node scripts/package-smoke.mjs --tarball release/fayegram-ai-decision-bridge-VER
 Check public documentation against the implementation, including supported API
 shapes, examples, limits, errors, and service compatibility notes. Inspect the MIT
 copyright notice and package contents. Complete hosted checks relevant to changed
-features using an authorized account/runtime;
-fixture and declaration checks do not establish hosted binding/Gateway behavior.
+features only when needed to resolve a specific wire-contract uncertainty, using
+an explicitly authorized account/runtime. Offline fixtures are sufficient for
+routine development and CI; fixture and declaration checks do not establish
+hosted binding/Gateway/Live behavior. Report the actual verification scope.
 Keep completed verification evidence separate from maintained consumer guidance.
 These content and verification checks do not depend on publication account setup.
 
@@ -49,7 +51,9 @@ name and registry are `@fayegram-ai/decision-bridge` and the public npm registry
 Coordinate the GitHub source release and publication of the verified tarball to
 npm as one release. The source release commit and archive must contain the same
 intended files, including README and documentation. A packed or uploaded archive
-is a snapshot: subsequent source edits do not change its contents.
+is a snapshot: subsequent source edits do not change its contents. Finalize the
+changelog and version-availability notices before building. If packaged files
+change afterward, rebuild and verify the archive before publication.
 
 The tracked `.npmrc` routes this scope to npm in this checkout without changing
 the user's npm configuration. Keep credentials in the user configuration, never

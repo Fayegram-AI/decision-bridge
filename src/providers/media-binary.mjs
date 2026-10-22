@@ -42,10 +42,3 @@ export function mediaBytes(payload, size) {
         },
     };
 }
-
-/** Container metadata can reject an overlong clip; full decoding remains upstream. */
-export function checkMediaDuration(duration, limit) {
-    if (duration === undefined) return;
-    mediaCheck(Number.isFinite(duration) && duration >= 0);
-    check(duration <= limit + 1e-9, 'Embedded media exceeds the duration limit.');
-}

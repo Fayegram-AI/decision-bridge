@@ -30,7 +30,8 @@ async function boundedFile(path, maxBytes, label) {
 }
 
 /** Explicit file only. Flags > DECISION_* environment > file > defaults. */
-export async function loadConfig({ configPath, envFile, overrides = {}, cwd = process.cwd(), env = process.env, allowIncomplete = false } = {}) {
+export async function loadConfig({ configPath, envFile, overrides = {}, cwd = process.cwd(), env = process.env, allowIncomplete = false,
+  defaultProvider = 'jev' } = {}) {
   const effectiveEnv = { ...env };
   if (envFile) {
     const text = await boundedFile(resolve(cwd, envFile), 65536, 'environment file');
@@ -88,11 +89,12 @@ export async function loadConfig({ configPath, envFile, overrides = {}, cwd = pr
       ...(layer.gateway === undefined ? {} : { gateway: { ...next.gateway, ...layer.gateway } }) };
   }
   const config = validateConfig(mergeProviderLayer(mergeProviderLayer(
-    { schemaVersion: 1, provider: 'jev', ...fileConfig }, environment), overrides, cwd), { complete: !allowIncomplete });
+    { schemaVersion: 1, provider: defaultProvider, ...fileConfig }, environment), overrides, cwd), { complete: !allowIncomplete });
   if (config.provider === 'jev' && config.model === undefined && effectiveEnv.JEV_MODEL?.trim()) {
     config.model = effectiveEnv.JEV_MODEL.trim();
   }
   if (config.provider === 'openai-decisions' && config.model === undefined) config.model = OPENAI_DEFAULT_MODEL;
   if (config.provider === 'cloudflare-decisions' && config.model === undefined) config.model = 'clef';
+  if (config.provider === 'cloudflare-extraction' && config.model === undefined) config.model = 'clairic';
   return { config, env: effectiveEnv, moduleBase };
 }

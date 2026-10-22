@@ -29,16 +29,17 @@ is native-only. Generative presets use `createGenerativeProvider` from the
 `@fayegram-ai/decision-bridge/config.schema.json` and in
 [schemas/decision.config.schema.json](../../schemas/decision.config.schema.json).
 It checks profile structure; runtime preflight additionally checks endpoint,
-credential, capability, and model-specific limits.
+credential, capability, and serialized client-byte budgets.
 Cloudflare CLI configuration always selects REST. Inject a Workers AI binding
-through the SDK's `CloudflareDecisionsProvider` constructor instead of a JSON
-profile. Gateway configuration is optional for either SDK transport and for CLI REST.
+through the SDK's `CloudflareDecisionsProvider` or `CloudflareExtractionProvider`
+constructor instead of a JSON profile. Gateway configuration is optional for
+either SDK transport and for CLI REST.
 
 | Field | Values / scope |
 | --- | --- |
 | `$schema` | Optional nonempty schema reference for editors |
 | `schemaVersion` | 1; optional, but generated profiles include it |
-| `provider` | `jev` default, `openai-decisions`, `cloudflare-decisions`, `custom-decision`, `custom-generative` |
+| `provider` | `jev` default for decision commands, `openai-decisions`, `cloudflare-decisions`, `cloudflare-extraction` for extraction commands, `custom-decision`, `custom-generative` |
 | `preset` | `custom-generative` only: `openai-compatible`, `openrouter`, `anthropic`; mutually exclusive with module |
 | `model` | Nonempty model selector or supported upstream ID; built-in native providers have defaults; required for generative evaluation unless the request supplies it |
 | `baseURL` | HTTPS API base; loopback may use HTTP |
@@ -46,9 +47,9 @@ profile. Gateway configuration is optional for either SDK transport and for CLI 
 | `noAuth` | Boolean; true only for loopback OpenAI-compatible endpoints |
 | `timeoutMs` | Positive integer up to 2,147,483,647 milliseconds |
 | `maxRetries` | Integer 0–10; OpenAI/Cloudflare default 0; Jev and generative presets default 2 |
-| `maxRequestBytes`, `maxResponseBytes` | Positive integer through 64 MiB; default 8 MiB. Jev requests default/cap 32 MiB. Cloudflare requests: Clef/Clef-flash default/cap 13 MiB; Omni default 36 MiB, configurable through 64 MiB |
+| `maxRequestBytes`, `maxResponseBytes` | Positive integer through 64 MiB; default 8 MiB, including Clairic. Jev requests default 32 MiB. Clef/Clef-flash requests default 13 MiB; Omni 36 MiB. Explicit request budgets can select through 64 MiB for every built-in provider |
 | `accountId` | Cloudflare REST account ID; otherwise `CLOUDFLARE_ACCOUNT_ID` |
-| `rejectIfBusy` | Cloudflare boolean; default false, incompatible with retries. Effective true fails REST preflight with `UNSUPPORTED_CAPABILITY`; see the [binding support and REST limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) |
+| `rejectIfBusy` | Cloudflare boolean; default false, incompatible with retries. Effective true fails Clef REST preflight with `UNSUPPORTED_CAPABILITY`; Clairic forwards the setting for server acceptance/rejection. See the [Clef limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) and [extraction options](../guides/EXTRACTION.md#images-binding-and-gateway) |
 | `gateway` | Cloudflare Gateway object; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) |
 | `dangerZone` | Jev-only `{ images?: boolean, longContext?: boolean }`; both default false; see the [Jev guide](../guides/JEV.md) |
 | `maxTokens` | Generative output budget, 1–1,048,576; default 4096 |
@@ -59,8 +60,8 @@ profile. Gateway configuration is optional for either SDK transport and for CLI 
 | `options` | Custom factory's JSON options, e.g. its own baseURL |
 
 Upper numeric limits validate client configuration, not vendor model capabilities.
-Jev requests default to and are capped at 32 MiB; a smaller `maxRequestBytes`
-lowers that ceiling. `DECISION_JEV_IMAGES` and `DECISION_JEV_LONG_CONTEXT`
+Jev requests default to a 32 MiB client budget; an explicit `maxRequestBytes`
+can select a budget through 64 MiB. `DECISION_JEV_IMAGES` and `DECISION_JEV_LONG_CONTEXT`
 accept `true` or `false`; their CLI overrides are `--jev-images`,
 `--no-jev-images`, `--jev-long-context`, and `--no-jev-long-context`.
 Cloudflare selects its byte budget from the effective request model, including
@@ -173,3 +174,25 @@ presets, and separate custom decision/generative modules. Use
 with `--provider-module FILE`. The module flag does not infer classification. Replace placeholder model identifiers
 with IDs returned by the intended account/server. Profiles intentionally contain
 no real key or claim that one model is available to every user.
+
+## Extraction and Live configuration
+
+The `extraction` namespace supplies provider `cloudflare-extraction` only when
+flags, environment and an explicit file have selected no provider. Its default
+model is `clairic`; `@cf/cloudflare/clairic` is also accepted. An explicit
+incompatible provider is rejected. Provider switching follows the same isolation
+rules above, including transitions between Clef and Clairic. The configuration
+schema stays at version 1.
+
+OpenAI prompt-cache controls and Clairic inference settings (`include_quantiles`,
+`return_state_text`) belong in request JSON. Extraction busy-mode flags override
+the request's `options.rejectIfBusy`; otherwise that request value overrides the
+provider setting. See [extraction](../guides/EXTRACTION.md).
+
+Live SDK configuration is passed directly to `createLiveDecisions` with a supplied
+transport. Offline `live validate` and `live replay` do not load provider profiles,
+credentials or environment files. See [Live Decisions](../guides/LIVE_DECISIONS.md).
+
+Offline validation checks structure and client resource budgets. Service quotas,
+context/media admission and Gateway limits remain upstream; the SDK and CLI do
+not estimate tokens or enforce RPM/TPM.

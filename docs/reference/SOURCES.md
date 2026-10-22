@@ -22,6 +22,8 @@ reference does not imply that authenticated inference was run against its servic
 | OpenAI structured output modes | https://platform.openai.com/docs/guides/structured-outputs |
 | OpenAI native Decisions guide | https://developers.openai.com/api/docs/guides/decisions |
 | OpenAI Decisions request/response contract | https://developers.openai.com/api/reference/resources/decisions/methods/create |
+| OpenAI Live Decisions guide | https://developers.openai.com/api/docs/guides/decisions-voice |
+| OpenAI Live protocol | https://developers.openai.com/api/reference/resources/live/primary-websocket |
 | OpenRouter structured output and routing | https://openrouter.ai/docs/guides/features/structured-outputs |
 | Anthropic Messages, tools, usage, and stop reasons | https://platform.claude.com/docs/en/api/messages/create |
 | GitHub checkout action | https://github.com/actions/checkout |
@@ -47,6 +49,11 @@ separate operational check.
 - [Workers AI errors](https://developers.cloudflare.com/workers-ai/platform/errors/)
 - [Cloudflare-owned model implementation](https://huggingface.co/Cloudflare/clef-flash/blob/main/joint_schema_model.py), including output precision
 - [Cloudflare-owned Omni implementation](https://huggingface.co/Cloudflare/clef-omni/blob/main/joint_schema_model.py), including grouped media and output precision
+
+## Cloudflare extraction
+
+- [Extraction concepts](https://developers.cloudflare.com/workers-ai/concepts/extraction-models/)
+- [Clairic schema snapshot](https://github.com/cloudflare/cloudflare-docs/blob/a5cc2cba1a31b8bd95eda69dad151e6cd307ac7b/src/content/workers-ai-models/clairic.json), the pinned basis for established native fields; underspecified predictive JSON remains preserved
 
 ## Package and repository release
 

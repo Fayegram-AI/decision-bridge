@@ -4,6 +4,7 @@ import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { deadline, withSignal, abortError } from '../async.mjs';
 import { providerContract } from '../provider-contract.mjs';
 import { createProvider } from '../providers/index.mjs';
+import { CloudflareExtractionProvider } from '../extraction/index.mjs';
 import { validateConfig, isModule, KEY_ENVS } from './config-validation.mjs';
 
 /** Executable modules are loaded only by explicit inference/model-list commands. */
@@ -52,7 +53,7 @@ export async function configuredProvider(loaded, { signal } = {}) {
         const { createGenerativeProvider } = await import('../custom/generative/index.mjs');
         return createGenerativeProvider({ type: config.preset, ...options });
     }
-    if (type === 'cloudflare-decisions') options.accountId = config.accountId ??
+    if (['cloudflare-decisions', 'cloudflare-extraction'].includes(type)) options.accountId = config.accountId ??
         (config.baseURL === undefined ? loaded.env.CLOUDFLARE_ACCOUNT_ID : undefined) ?? '';
-    return createProvider({ type, ...options });
+    return type === 'cloudflare-extraction' ? new CloudflareExtractionProvider(options) : createProvider({ type, ...options });
 }

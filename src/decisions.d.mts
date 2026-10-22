@@ -1,12 +1,34 @@
 /** Native OpenAI Decisions types, separate from the common bridge contract. */
 export type NativeDecisionInputPart =
-    | { readonly type: 'input_text'; readonly text: string }
+    | { readonly type: 'input_text'; readonly text: string; readonly prompt_cache_breakpoint?: DecisionCacheBreakpoint | null }
     | { readonly type: 'input_image'; readonly image_url: string;
-        readonly detail?: 'low' | 'high' | 'auto' | 'original' | null };
-export interface NativeDecisionMessage {
+        readonly detail?: 'low' | 'high' | 'auto' | 'original' | null;
+        readonly prompt_cache_breakpoint?: DecisionCacheBreakpoint | null };
+export interface DecisionCacheBreakpoint { readonly mode: 'explicit'; }
+export interface DecisionCacheOptions { readonly mode?: 'implicit' | 'explicit' | null; readonly ttl?: '30m'; }
+export type NativeDecisionMessage = {
     readonly role: 'user'; readonly type?: 'message';
     readonly content: string | readonly NativeDecisionInputPart[];
+    readonly phase?: 'commentary' | 'final_answer' | null;
+} | {
+    readonly role: 'developer' | 'system'; readonly type?: 'message';
+    readonly content: string | readonly Extract<NativeDecisionInputPart, { readonly type: 'input_text' }>[];
+    readonly phase?: 'commentary' | 'final_answer' | null;
+} | {
+    readonly role: 'assistant'; readonly type?: 'message';
+    readonly content: string | readonly ({ readonly type: 'output_text'; readonly text: string }
+        | { readonly type: 'refusal'; readonly refusal: string })[];
+    readonly phase?: 'commentary' | 'final_answer' | null;
+};
+interface ToolItem {
+    readonly call_id: string; readonly id?: string | null;
+    readonly status?: 'in_progress' | 'completed' | 'incomplete' | null;
 }
+export type NativeDecisionInputItem = NativeDecisionMessage
+    | (ToolItem & { readonly type: 'function_call'; readonly name: string; readonly arguments: string; readonly namespace?: string | null })
+    | (ToolItem & { readonly type: 'custom_tool_call'; readonly name: string; readonly input: string; readonly namespace?: string | null })
+    | (ToolItem & { readonly type: 'function_call_output' | 'custom_tool_call_output';
+        readonly output: string | readonly NativeDecisionInputPart[] });
 export type NativeDecisionQuestion =
     | { readonly type: 'predicate'; readonly name?: string; readonly instructions: string }
     | { readonly type: 'choice'; readonly name?: string; readonly instructions: string;
@@ -15,9 +37,11 @@ export type NativeDecisionQuestion =
         readonly levels: readonly { readonly label: string; readonly description?: string }[] };
 export interface NativeDecisionRequest {
     readonly model?: string;
-    readonly input: string | readonly NativeDecisionMessage[];
+    readonly input: string | readonly NativeDecisionInputItem[];
     readonly questions: readonly NativeDecisionQuestion[];
     readonly safety_identifier?: string | null;
+    readonly prompt_cache_key?: string | null;
+    readonly prompt_cache_options?: DecisionCacheOptions | null;
 }
 export type NativeDecisionAnswer =
     | { readonly type: 'predicate'; readonly name: string | null; readonly probability: number }

@@ -1,7 +1,8 @@
 # Switching models without rewriting the application
 
-The bridge's request contains `questions`, either `state` or ordered `input`, and
-optionally `model`. Ordered input and richer question types require provider capabilities.
+The bridge's request contains `questions`, exactly one of `state`, ordered `input`
+or `conversation`, and optionally `model`. Ordered input, conversation/tool history,
+remote images, cache controls and richer questions require provider capabilities.
 The provider translates it into that service's wire protocol and validates the
 response. Select a provider when constructing your SDK bridge.
 See [model selectors and provider defaults](../../README.md#model-selectors).
@@ -14,6 +15,9 @@ General-purpose models use the explicit [custom generative](CUSTOM_GENERATIVE.md
 entry point. A new decision protocol uses [custom decision](CUSTOM_DECISION.md).
 The example below demonstrates the opt-in generative path; native alternatives
 follow it.
+
+Clairic [extraction](EXTRACTION.md) and [Live Decisions](LIVE_DECISIONS.md) use
+dedicated APIs. They cannot replace a provider in an existing `createBridge` call.
 
 ## SDK: same request, different provider
 

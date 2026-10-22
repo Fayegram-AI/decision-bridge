@@ -60,14 +60,14 @@ test('unsupported providers and malformed common parts fail before inference', a
     assert.throws(() => preflightCloudflareDecision({ ...omni, audio: [dataUrl('audio/ogg', mp3())] }), { code: 'UNSUPPORTED_CAPABILITY' });
 });
 
-test('media order, count and malformed containers are rejected locally', () => {
+test('media layout and malformed containers are rejected while counts remain upstream', () => {
     const parts = [{ type: 'image', dataUrl: image }, { type: 'audio', dataUrl: media.wav },
         { type: 'video', dataUrl: media.mp4 }, { type: 'text', text: 'state' }];
     for (let i = 0; i < 3; i++) assert.throws(() => preflightCommonCloudflareDecision({ model: 'clef-omni',
         input: [parts[i + 1], parts[i]], questions: native.questions }), { code: 'UNSUPPORTED_CAPABILITY' });
     for (const [field, item, count] of [['audio', media.wav, 4], ['videos', media.mp4, 2]]) {
         preflightCloudflareDecision({ ...omni, [field]: Array(count).fill(item) });
-        assert.throws(() => preflightCloudflareDecision({ ...omni, [field]: Array(count + 1).fill(item) }));
+        preflightCloudflareDecision({ ...omni, [field]: Array(count + 1).fill(item) });
         for (const bad of ['https://example.com/clip', item.slice(0, -1), item.replace(';base64,', ','),
             { content_type: field === 'audio' ? 'audio/wav' : 'video/mp4', base64: 'AAAA' }])
             assert.throws(() => preflightCloudflareDecision({ ...omni, [field]: [bad] }));
@@ -82,43 +82,33 @@ test('media order, count and malformed containers are rejected locally', () => {
     for (const base64 of ['A===', 'AA=A', 'AB==', 'AAB=']) assert.throws(() => base64ByteLength(base64));
 });
 
-test('reliable duration is bounded while omitted video duration remains service validation', () => {
+test('media duration is preserved for server admission with valid containers', () => {
     preflightCloudflareDecision({ ...omni, audio: [dataUrl('audio/wav', wav(300, 1))],
         videos: [dataUrl('video/mp4', mp4(60)), dataUrl('video/webm', webm(60))] });
     for (const [field, format, bytes] of [['audio', 'audio/wav', wav(301, 1)], ['audio', 'audio/mpeg', mp3(11500)],
         ['videos', 'video/mp4', mp4(61)], ['videos', 'video/webm', webm(61)]])
-        assert.throws(() => preflightCloudflareDecision({ ...omni, [field]: [dataUrl(format, bytes)] }), /duration limit/);
+        preflightCloudflareDecision({ ...omni, [field]: [dataUrl(format, bytes)] });
     preflightCloudflareDecision({ ...omni, videos: [dataUrl('video/mp4', mp4(1, 0, true)), dataUrl('video/webm', webm(1, true))] });
     const vbr = Buffer.concat([mp3(1, 9), mp3(1, 14)]), payload = vbr.toString('base64');
     assert.equal(inspectMp3(mediaBytes(payload, vbr.length)), 2 * 1152 / 44100);
 });
 
-test('decoded media sizes and effective-model wire budgets are independent', async () => {
-    const maximumAudio = dataUrl('audio/wav', wav(1, 44100, 8 * MIB - wav(1, 44100).length));
-    preflightCloudflareDecision({ ...omni, audio: [maximumAudio, maximumAudio] }); // Exact 8 MiB items and 16 MiB combined.
-    preflightCloudflareDecision({ ...omni, videos: [dataUrl('video/mp4', mp4(1, 16 * MIB - mp4().length))] });
-    for (const [field, format, size] of [['audio', 'audio/wav', 8 * MIB + 1], ['videos', 'video/mp4', 16 * MIB + 1]])
-        assert.throws(() => preflightCloudflareDecision({ ...omni, [field]: [dataUrl(format, Buffer.alloc(size))] }), { code: 'REQUEST_TOO_LARGE' });
+test('configured client budgets override defaults without enforcing decoded media ceilings', async () => {
     const video = dataUrl('video/mp4', mp4(1, 9 * MIB));
-    assert.throws(() => preflightCloudflareDecision({ ...omni, videos: [video, video] }), { code: 'REQUEST_TOO_LARGE' });
-    assert.equal(cloudflareRequestLimit('clef', 64 * MIB), 13 * MIB);
+    preflightCloudflareDecision({ ...omni, videos: [video, video] });
+    assert.equal(cloudflareRequestLimit('clef', 64 * MIB), 64 * MIB);
     assert.equal(cloudflareRequestLimit('clef-omni'), 36 * MIB);
-    assert.equal(cloudflareRequestLimit('clef-omni', 64 * MIB), 64 * MIB);
     assert.equal(cloudflareRequestLimit('clef-omni', 100), 100);
     const large = { ...omni, state: 'x'.repeat(13 * MIB) };
-    const { provider, requests } = fixture();
-    await provider.createDecision(large);
-    await assert.rejects(provider.createDecision({ ...large, model: 'clef' }), { code: 'REQUEST_TOO_LARGE' });
+    const { provider, requests } = fixture({ maxRequestBytes: 64 * MIB });
+    await provider.createDecision({ ...large, model: 'clef' });
     assert.equal(requests.length, 1);
-    const limited = fixture({ maxRequestBytes: 100 }).provider;
-    await assert.rejects(limited.createDecision(large), { code: 'REQUEST_TOO_LARGE' });
+    await assert.rejects(fixture({ maxRequestBytes: 100 }).provider.createDecision(large), { code: 'REQUEST_TOO_LARGE' });
     assert.throws(() => preflightCloudflareDecision(omni, { maxRequestBytes: 64 * MIB + 1 }), { code: 'CONFIGURATION_ERROR' });
     const exact = Buffer.byteLength(JSON.stringify(preflightCloudflareDecision({ ...omni, audio: [media.wav] })));
     preflightCloudflareDecision({ ...omni, audio: [media.wav] }, { maxRequestBytes: exact });
-    assert.throws(() => preflightCloudflareDecision({ ...omni, audio: [media.wav] }, { transport: 'binding', maxRequestBytes: exact }),
-        { code: 'REQUEST_TOO_LARGE' });
+    assert.throws(() => preflightCloudflareDecision({ ...omni, audio: [media.wav] }, { transport: 'binding', maxRequestBytes: exact }), { code: 'REQUEST_TOO_LARGE' });
 });
-
 test('legacy capability profiles default to no media and Omni binding IDs remain per-response', async () => {
     const old = { supported: true, orderedInput: true, images: false, typedChoices: false, labeledScores: false,
         safetyIdentifier: false, maxImages: 0, maxChoiceOptions: 255, maxScoreLevels: 10 };

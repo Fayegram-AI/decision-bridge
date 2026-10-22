@@ -9,6 +9,9 @@ import { assertCapabilities, commonSchemaVersion, providerCapabilities } from '.
 import { validateResultOptions } from './probabilities.mjs';
 
 const elapsed = start => Math.round((performance.now() - start) * 1000) / 1000;
+const inputField = request => Object.hasOwn(request, 'state') ? 'state'
+    : Object.hasOwn(request, 'conversation') ? 'conversation' : 'input';
+const inputMethod = request => ({ state: 'prepareState', input: 'prepareInput', conversation: 'prepareConversation' })[inputField(request)];
 
 /** Stable interface. Prepare context, evaluate, validate, then observe immutable results. */
 export function createBridge(options) {
@@ -26,11 +29,11 @@ export function createBridge(options) {
     'Bridge timeouts must be positive 32-bit integers.', 'CONFIGURATION_ERROR');
   check(Array.isArray(extensions), 'extensions must be an array.', 'CONFIGURATION_ERROR');
   const registered = Array.from(extensions, extension => {
-    optionsObject(extension, ['name', 'prepareState', 'prepareInput', 'onResult'], 'Extension');
+    optionsObject(extension, ['name', 'prepareState', 'prepareInput', 'prepareConversation', 'onResult'], 'Extension');
     check(isRecord(extension) && typeof extension.name === 'string' && extension.name.trim() &&
       extension.name.length <= 100 && !/[\x00-\x1f\x7f]/.test(extension.name),
     'Each extension requires a printable name up to 100 characters.', 'CONFIGURATION_ERROR');
-    for (const method of ['prepareState', 'prepareInput', 'onResult']) check(extension[method] === undefined || typeof extension[method] === 'function',
+    for (const method of ['prepareState', 'prepareInput', 'prepareConversation', 'onResult']) check(extension[method] === undefined || typeof extension[method] === 'function',
       'Extension handlers must be functions.', 'CONFIGURATION_ERROR');
     return { ...extension };
   });
@@ -39,9 +42,9 @@ export function createBridge(options) {
   function validate(input) {
     const request = validateRequest(input, backend.defaultModel ?? '');
     assertCapabilities(request, providerCapabilities(backend, request.model));
-    const method = Object.hasOwn(request, 'state') ? 'prepareState' : 'prepareInput';
+    const method = inputMethod(request);
     for (const extension of registered) {
-      check(!(extension.prepareState || extension.prepareInput) || typeof extension[method] === 'function',
+      check(!(extension.prepareState || extension.prepareInput || extension.prepareConversation) || typeof extension[method] === 'function',
         `Preparation extension ${extension.name} cannot handle this input form.`, 'UNSUPPORTED_CAPABILITY');
     }
     freezeJson(request);
@@ -80,8 +83,8 @@ export function createBridge(options) {
           questionIds: Object.freeze(Object.keys(request.questions)), signal: budget.signal });
         for (const extension of registered) {
           budget.throwIfAborted();
-          const field = Object.hasOwn(request, 'state') ? 'state' : 'input';
-          const method = field === 'state' ? 'prepareState' : 'prepareInput';
+          const field = inputField(request);
+          const method = inputMethod(request);
           if (!extension[method]) continue;
           let prepared;
           try {

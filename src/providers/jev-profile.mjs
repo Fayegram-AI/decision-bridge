@@ -31,7 +31,7 @@ export function jevHeaders(dangerZone) {
 }
 
 export function jevRequestLimit(value = JEV_REQUEST_LIMIT) {
-    check(Number.isSafeInteger(value) && value > 0 && value <= JEV_REQUEST_LIMIT,
-        'Jev maxRequestBytes must be within 1 to 32 MiB.', 'CONFIGURATION_ERROR');
+    check(Number.isSafeInteger(value) && value > 0 && value <= 64 * 1024 * 1024,
+        'Jev maxRequestBytes must be within the client budget of 1 to 64 MiB.', 'CONFIGURATION_ERROR');
     return value;
 }

@@ -114,25 +114,18 @@ choose your own presence/confidence thresholds using representative images.
 Jev token usage may be `null`; that means unknown, never zero. Native confidence
 and all other result checks remain enforced.
 
-## Image and request limits
+## Images and client budgets
 
-- PNG or JPEG (`png`, `jpg`, `jpeg`); still images only. Animated PNG is rejected.
-- At most 16 MiB per decoded image file.
-- Each dimension is 256–1568 pixels, and area is 78,400–2,458,624 pixels.
-  A 256 × 256 image fails the area minimum.
-- Jev requests default to a 32 MiB serialized JSON ceiling. `maxRequestBytes`
-  can lower it, but cannot exceed 32 MiB. Response budgets remain independently
-  configurable, with an 8 MiB default.
-- State, each instruction, and each criterion must fit 64 nested JSON levels.
-  General bridge snapshots also retain their 200,000-node limit.
+PNG/JPEG formats, canonical base64, positive dimensions, still-image structure
+and asset reference semantics are checked locally. Service image dimensions,
+decoded/processed sizes and context admission remain upstream. The bridge does
+not resize, rotate or re-encode images. Prepare upright pixels in the application.
 
-Preflight checks base64, headers, dimensions, PNG animation, references, original
-image bytes, and serialized request bytes. Full decoding, server re-encoding,
-the 32 MiB processed-image and expanded-input limits, and token limits remain
-service checks. Client header inspection cannot predict processed sizes.
-Prepare upright pixels yourself: TypeSafe removes metadata and does not apply
-EXIF orientation. No separate image-count cap is asserted by the bridge;
-`maxImages: null` means size and context determine capacity.
+Jev requests default to a 32 MiB client serialized-JSON budget. An explicit
+`maxRequestBytes` can select a budget through 64 MiB. Responses default to 8 MiB.
+General JSON processing retains a 100-level depth and 200,000-node safeguard;
+reference-pattern safeguards bound local regex construction. These are client
+resource controls, independent of service quotas.
 
 ## CLI
 
@@ -155,7 +148,7 @@ decision-bridge batch native.jsonl --native --config decision.config.json --env-
 
 Common/native validation is offline and uses the same preflight as inference.
 `--native` works with `init`, `validate`, `evaluate`, and `batch`. Jev keeps its
-`models` command. CLI JSON/JSONL input supports requests up to 32 MiB per record;
+`models` command. CLI JSON/JSONL input defaults to 32 MiB per record and permits a larger explicit client budget through 64 MiB;
 the actual serialized request must also fit the configured provider ceiling.
 
 `--jev-images` / `--no-jev-images` and `--jev-long-context` /

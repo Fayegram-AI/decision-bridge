@@ -206,11 +206,10 @@ test('input preparations are ordered, immutable and revalidated before dispatch'
 test('malformed and unsupported native inputs fail before dispatch', async () => {
     const { provider, requests } = fixture();
     for (const input of [
-        { ...native, model: 'unknown' }, { ...native, safety_identifier: 'x'.repeat(129) },
-        { ...native, temperature: 1 }, { ...native, input: [{ role: 'system', content: '' }] },
-        { ...native, input: [{ role: 'user', content: [{ type: 'input_image', image_url: 'https://example.com/img.png' }] }] },
+        { ...native, model: 'unknown' }, { ...native, safety_identifier: false },
+        { ...native, temperature: 1 }, { ...native, input: [{ role: 'tool', content: '' }] },
+        { ...native, input: [{ role: 'user', content: [{ type: 'input_image', image_url: 'file:///private.png' }] }] },
         { ...native, input: [{ role: 'user', content: [{ type: 'input_image', image_url: image, detail: 'invalid' }] }] },
-        { ...native, input: [{ role: 'user', content: Array.from({ length: 129 }, () => ({ type: 'input_image', image_url: image })) }] },
     ]) await assert.rejects(provider.createDecision(input), error => ['VALIDATION_ERROR', 'UNSUPPORTED_CAPABILITY'].includes(error.code));
     assert.equal(requests.length, 0);
     assert.throws(() => validateRequest({ ...common, input: [{ type: 'text', text: '' }] }, 'gpt-6-luna'), { code: 'VALIDATION_ERROR' });
@@ -226,7 +225,7 @@ test('Decisions retries default to zero; explicit retry opts into another HTTP a
         const provider = new OpenAIDecisionsProvider({ apiKey: 'fixture', ...options,
             fetchImpl: async (_, init) => ++calls === 1 ? jsonResponse({ error: { message: 'private' } }, 429, { 'retry-after': '0' })
                 : jsonResponse(decisionResponse(JSON.parse(init.body))) });
-        if (!options.maxRetries) await assert.rejects(provider.createDecision(native), { code: 'HTTP_ERROR' });
+        if (!options.maxRetries) await assert.rejects(provider.createDecision(native), { code: 'RATE_LIMITED' });
         else await provider.createDecision(native);
         assert.equal(calls, options.maxRetries ? 2 : 1);
     }

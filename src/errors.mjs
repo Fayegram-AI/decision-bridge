@@ -1,6 +1,7 @@
 /** Public errors never retain raw upstream bodies, headers or original exceptions. */
 export class DecisionError extends Error {
-  constructor(message, { code = 'DECISION_ERROR', status, requestId, gatewayLogId, attempts, refusedQuestions, usage, upstreamCode } = {}) {
+  constructor(message, { code = 'DECISION_ERROR', status, requestId, gatewayLogId, attempts, refusedQuestions, usage, upstreamCode,
+    source, upstreamErrorCode, upstreamErrorType, retryAfterMs, retryable } = {}) {
     super(message);
     this.name = 'DecisionError';
     this.code = code;
@@ -11,6 +12,9 @@ export class DecisionError extends Error {
     if (refusedQuestions !== undefined) this.refusedQuestions = refusedQuestions;
     if (usage !== undefined) this.usage = usage;
     if (upstreamCode !== undefined) this.upstreamCode = upstreamCode;
+    for (const [key, value] of Object.entries({ source, upstreamErrorCode, upstreamErrorType, retryAfterMs, retryable })) {
+      if (value !== undefined) this[key] = value;
+    }
   }
 
   toJSON() {
@@ -24,6 +28,8 @@ export class DecisionError extends Error {
       ...(this.refusedQuestions === undefined ? {} : { refusedQuestions: this.refusedQuestions }),
       ...(this.usage === undefined ? {} : { usage: this.usage }),
       ...(this.upstreamCode === undefined ? {} : { upstreamCode: this.upstreamCode }),
+      ...Object.fromEntries(['source', 'upstreamErrorCode', 'upstreamErrorType', 'retryAfterMs', 'retryable']
+        .filter(key => this[key] !== undefined).map(key => [key, this[key]])),
     };
   }
 }

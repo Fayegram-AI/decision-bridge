@@ -8,7 +8,8 @@ const PROFILES = Object.freeze({
     [LUNA_MODEL]: Object.freeze({
         supported: true, orderedInput: true, images: true, typedChoices: true,
         labeledScores: true, safetyIdentifier: true,
-        maxImages: 128, maxChoiceOptions: 255, maxScoreLevels: null,
+        maxImages: null, maxChoiceOptions: null, maxScoreLevels: null,
+        conversation: true, toolHistory: true, remoteImages: true, promptCaching: true,
     }),
 });
 

@@ -22,7 +22,7 @@ compatible native Node runtime. See [testing](../development/TESTING.md).
 Open PowerShell at the cloned repository or extracted source directory:
 
 ```powershell
-cd "C:\path\to\decision-bridge-0.1.2"
+cd "C:\path\to\decision-bridge"
 node --version
 node bin/decision.mjs validate examples/request.json
 Copy-Item .env.example .env
@@ -48,7 +48,7 @@ the archive rather than reusing generated `node_modules` or executable shims.
 ## macOS / Linux
 
 ```bash
-cd "/path/to/decision-bridge-0.1.2"
+cd "/path/to/decision-bridge"
 node --version
 node bin/decision.mjs validate examples/request.json
 cp .env.example .env
@@ -73,7 +73,7 @@ Install the package with npm from your application's directory:
 npm install @fayegram-ai/decision-bridge
 ```
 
-For installation from a verified local archive, see
+For version requirements and installation from a verified local archive, see
 [getting started](GETTING_STARTED.md#install-into-your-application).
 
 Import from `@fayegram-ai/decision-bridge` in ESM JavaScript, or invoke the installed

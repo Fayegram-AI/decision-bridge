@@ -100,8 +100,7 @@ test('offline CLI rejects REST busy mode and invalid Gateway settings without cr
             assert.equal(error.status, undefined);
         }
     }
-    for (const gateway of [{ id: 'g'.repeat(65) }, { id: 'test', cacheTtl: 59 }, { id: 'test', cacheTtl: 2592001 },
-        { id: 'test', metadata: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 } },
+    for (const gateway of [{ id: 'bad\nheader' }, { id: 'test', cacheTtl: -1 }, { id: 'test', cacheTtl: 1.5 },
         { id: 'test', metadata: { 'cf.test': true } }]) {
         await writeFile(join(cwd, 'config.json'), JSON.stringify({ provider: 'cloudflare-decisions', gateway }));
         const result = await invoke(['validate', '-', '--config', 'config.json'], native, { cwd });

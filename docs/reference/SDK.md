@@ -7,6 +7,9 @@ TypeScript setup, and CommonJS dynamic import. The source-tree entry point is
 TypeScript declarations are in `src/index.d.mts`; runtime JavaScript is authoritative
 and checked independently of those declarations.
 
+This reference covers **0.1.3**. See
+[version availability](../README.md#version-availability) for earlier versions.
+
 ## Create a bridge
 
 ```javascript
@@ -48,7 +51,7 @@ guides. These are SDK options, not per-evaluation bridge options.
 | --- | --- |
 | `timeoutMs` | 30,000 ms; positive integer through 2,147,483,647; one transport budget for dispatch, retries, backoff, and response reading |
 | `maxRetries` | Additional eligible attempts, 0–10; Jev and generative presets default to 2, native OpenAI and Cloudflare to 0 |
-| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB; Jev defaults to and caps at 32 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
+| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB; Jev defaults to 32 MiB, with explicit client budgets through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
 | `maxResponseBytes` | 8 MiB; configurable from 1 byte through 64 MiB; applies while reading the response body |
 | `fetchImpl` | Optional `(url: string, init?: RequestInit) => Promise<Response>`; defaults to the runtime's `fetch` |
 
@@ -68,8 +71,9 @@ they interact; [errors](ERRORS.md#retry-policy) lists retryable statuses.
 
 ### `bridge.evaluate(request, options?)`
 
-`request` has exactly one of `state` or ordered `input`, `questions`, and optional
-`model` and `safetyIdentifier`. New forms require declared provider capabilities;
+`request` has exactly one of `state`, ordered `input` or `conversation`, plus
+`questions`. Optional fields are `model`, `safetyIdentifier`, `promptCacheKey`
+and `promptCacheOptions`. New forms require declared provider capabilities;
 see [OpenAI Decisions](../guides/OPENAI_DECISIONS.md) and
 [Cloudflare Clef](../guides/CLOUDFLARE_DECISIONS.md). The request model
 wins over the provider's configured default, which an omitted request model inherits.
@@ -81,14 +85,20 @@ resolve to upstream IDs within the provider. No default is assumed for a generat
 independent transport timeout, including Workers AI binding calls.
 
 Ordered parts are `{ type: 'text', text }`, `{ type: 'image', dataUrl, detail? }`,
-`{ type: 'audio', dataUrl }`, or `{ type: 'video', dataUrl }`. Audio/video are
-supported by Cloudflare Clef-omni and explicitly capable custom providers; other
+`{ type: 'image', url, detail? }`, `{ type: 'audio', dataUrl }`, or
+`{ type: 'video', dataUrl }`. Image `url` and `dataUrl` are exclusive. Text/image
+parts may carry `promptCacheBreakpoint`. Remote HTTP(S) images and cache controls
+require their respective capabilities and are forwarded without URL fetching or
+cache-policy selection. `conversation` uses the native Decisions input-item union;
+see [conversation and prompt caching](../guides/OPENAI_DECISIONS.md#conversation-and-prompt-caching).
+Audio/video are supported by Cloudflare Clef-omni and explicitly capable custom providers; other
 built-ins reject them before dispatch. Cloudflare requires images → audio →
-videos → text. Media use embedded data URLs, with format and size checks described
-in the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video).
+videos → text. Its media use embedded data URLs, with format and client-budget
+checks described in the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video).
 
-The bridge snapshots and freezes its input, runs sequential state or input preparation,
-invokes the provider once, validates the result, then observes an immutable result.
+The bridge snapshots and freezes its input, runs preparation hooks for the
+selected input form, invokes the provider once, validates the result, then
+observes an immutable result.
 Built-in transports can retry eligible response statuses within that invocation
 when client retries are configured.
 
@@ -151,18 +161,17 @@ must declare `boxes: true`. Jev supports it with experimental image opt-in and
 a supported model; see [Jev images and boxes](../guides/JEV.md).
 
 Builders return immutable question objects. `choice(instructions, criteria)` accepts
-a label map containing 1 to 255 options. `noul(instructions, criteria?)` accepts an
+a nonempty label map. `noul(instructions, criteria?)` accepts an
 optional criteria object,
-with only `true` and `false` keys. `score(instructions, criteria)` accepts **2–10**
+with only `true` and `false` keys. `score(instructions, criteria)` accepts at least two
 ordered levels; numeric level indices are zero-based. There is no boolean alias:
 `noul` means a probability, not a thresholded truth value.
 
 `choice(instructions, options)` accepts ordered objects with unique string or
 boolean `value` fields and optional text or structured JSON descriptions. Boolean `true` and string
 `"true"` remain distinct. `scoreLevels(instructions, levels)` accepts at least two
-ordered label/description objects. Provider preflight applies service limits:
-OpenAI Decisions and Cloudflare require 2–255 choices; Cloudflare limits scores
-to 2–10 levels, while OpenAI labelled scores have no additional client count cap.
+ordered label/description objects. Provider preflight enforces structural requirements:
+OpenAI Decisions and Cloudflare require at least two choices; maximum service counts remain upstream.
 
 ## Returned data
 
@@ -233,21 +242,26 @@ estimated token count is fabricated.
 
 Metadata can have additional JSON fields. Application logic should not assume
 unavailable metadata exists. Result objects and nested data returned by the bridge
-are immutable. Standalone validation functions return snapshots, not frozen values.
+are immutable. Standalone common `validateRequest` and `validateResult` return
+snapshots without freezing them; dedicated extraction and Live validators return
+frozen snapshots.
 
-`schemaVersion` remains 1 for legacy requests and 2 for ordered images/text or
-richer question forms. Audio/video requests use 3; requests with boxes use 4.
-This result version is separate
-from the CLI configuration schema, which remains 1.
+`schemaVersion` is selected by the highest applicable feature: 5 for conversation,
+remote-image URLs or prompt-cache controls; 4 for boxes; 3 for audio/video; 2 for
+ordered images/text, typed choices, labelled scores or a safety identifier; and
+1 for legacy requests. The CLI configuration schema remains 1. Extraction and
+Live use their dedicated native envelopes rather than a common result version.
 
 ## Extensions
 
 An extension has a unique printable `name` (maximum 100 characters), optional
-`prepareState(state, context)`, `prepareInput(input, context)`, and
+`prepareState(state, context)`, `prepareInput(input, context)`,
+`prepareConversation(items, context)`, and
 `onResult(result, context)`. Preparation extensions must support the request's
 input form; incompatible hooks fail explicitly before dispatch.
 
-Preparation returns replacement state or input, or `undefined` to leave it unchanged.
+Preparation returns replacement state, ordered input or conversation, or
+`undefined` to leave it unchanged.
 Preparation exceptions fail before inference with `EXTENSION_ERROR`; transformed
 content is revalidated, including capabilities and provider preflight. Preparation
 cannot rewrite question definitions or switch the model.
@@ -362,14 +376,14 @@ decision providers may preserve custom string labels. Generative prompt and
 normalization helpers independently validate the shared-state, legacy-question
 profile and explicitly reject unsupported request capabilities.
 Decision-kind classification alone does not require confidence or known counts;
-`validateResult({ native: true })` is a separate strict validation option used for
+`validateResult(result, questions, { native: true })` is a separate strict validation option used for
 Jev's contract. See [custom decision](../guides/CUSTOM_DECISION.md),
 [custom generative](../guides/CUSTOM_GENERATIVE.md), and the shared
 [custom contract](../guides/CUSTOM_PROVIDERS.md).
 
 ## Validation guarantees
 
-Legacy choice criteria maps allow at most 255 options, matching Jev's contract. Noul
+Legacy choice criteria maps must be nonempty. Noul
 criteria must be omitted or an object; its present true/false descriptions cannot
 be raw null. Score levels likewise cannot be raw null (nested null JSON values are
 still allowed). These invalid forms now fail before provider dispatch.
@@ -379,7 +393,10 @@ the answer. `evaluateBatch()` validates array holes as invalid requests before a
 item is dispatched, rather than spending on adjacent valid entries.
 
 The optional third argument to `validateResult()` must be a plain options object
-with optional boolean `native` and integer `probabilityDecimalPlaces` (1–15) fields.
+with optional boolean `native`, boolean `nullableUsage`, and integer
+`probabilityDecimalPlaces` (1–15) fields. Both booleans default to false.
+`nullableUsage: true` permits null token counts when native validation is enabled;
+it does not relax the native confidence requirement.
 Providers can declare a pure synchronous `getResultValidationOptions(model)` hook;
 its policy is validated before inference and is not read from response metadata.
 Returning a Promise is a configuration error; its rejection is observed without
@@ -400,3 +417,24 @@ Native provider cancellation/timeout errors preserve the last observed sanitized
 request ID and attempt count when available. The bridge may settle its own
 cancellation race before the provider returns diagnostics; do not require those
 optional fields on every `ABORTED` or `TIMEOUT` error.
+
+## Dedicated operations
+
+Import these subpaths under `@fayegram-ai/decision-bridge/`. Neither is selected
+by the root `createProvider` factory or implements the bridge's `evaluate` contract.
+
+| Export | Runtime API | Result / integration |
+| --- | --- | --- |
+| `extraction` | `CloudflareExtractionProvider`, `validateExtractionRequest`, `extractBatch` | Immutable `{ extraction, meta }`, with native values and model/transport diagnostics; [extraction guide](../guides/EXTRACTION.md) |
+| `live` | `createLiveDecisions`, `validateLiveConfiguration`, `validateLiveCommand`, `validateLiveEvent` | Commands, acknowledgements and event subscriptions over a caller-owned connection; [Live guide](../guides/LIVE_DECISIONS.md) |
+
+Both export their request, result, configuration and transport types. Extraction
+supports REST or a Workers AI binding; Live owns no authentication, audio,
+connection establishment or reconnection. See the [CLI reference](CLI.md) for
+their command namespaces.
+
+Service quotas, maximum request counts, context/media limits and Gateway
+admission remain authoritative upstream. Offline validation checks adapter
+structure and client resource budgets. SDK and CLI do not estimate tokens or
+enforce RPM/TPM. Explicit transport budgets can select up to 64 MiB, including
+Jev and all Clef models; existing default budgets are retained.

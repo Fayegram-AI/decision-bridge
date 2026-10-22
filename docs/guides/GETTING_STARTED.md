@@ -20,17 +20,21 @@ In your application's directory, install the package from npm:
 npm install @fayegram-ai/decision-bridge
 ```
 
-You can also install a verified local archive, replacing the path below. See
-[packaging and release](../development/RELEASING.md) to build and verify one from
-a source checkout:
+You can also install a verified package archive. Replace the example archive
+path with your own; see [packaging and release](../development/RELEASING.md) to
+build and verify one from a source checkout:
 
 ```bash
-npm install /path/to/fayegram-ai-decision-bridge-0.1.2.tgz
+npm install /path/to/fayegram-ai-decision-bridge-0.1.3.tgz
 ```
 
 The installed package contains the SDK, declarations, command runner, examples,
 and docs. It runs without compilation; source development scripts and tests are
 excluded.
+
+Check the installed version with `npm exec -- decision-bridge --version`.
+Use the documentation bundled with your installed package, or select the
+matching [versioned documentation](../README.md#version-availability).
 
 ## Configure credentials
 

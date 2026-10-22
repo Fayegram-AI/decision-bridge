@@ -1,5 +1,13 @@
 # Troubleshooting
 
+## An export or command from these guides is missing
+
+Run `npm exec -- decision-bridge --version` in the consuming project and compare
+it with [version availability](../README.md#version-availability). The `/extraction`
+and `/live` exports, their CLI commands, and expanded OpenAI history/cache inputs
+require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
+to install a compatible version.
+
 ## The command cannot find a key
 
 General `node bin/decision.mjs ...` calls need exported environment variables or an
@@ -80,6 +88,23 @@ input, UTF-8, limit, interruption, or filesystem failure can stop the batch. Ato
 file output is not finalized in that case; stdout can contain a completed prefix.
 Some requests may already have been sent/billed. Retrying an entire prefix can
 repeat work, so retain completed records externally when designing resumability.
+
+## Extraction or Live does not behave like bridge evaluation
+
+For Clairic, use `CloudflareExtractionProvider` from the `/extraction` export or
+the `extraction` CLI namespace with `cloudflare-extraction`. The root decision
+factory and `createBridge` do not accept extraction providers. An explicit
+provider from config or environment overrides the namespace default and must
+match the operation. A null value, empty list or `truncated: true` can be a valid
+native result; inspect it according to your application's needs.
+
+For Live, `requestDecision` and `appendCommentary` resolve on submission. Consume
+completed decisions through `subscribe`. An unmatched result indicates missing or
+ambiguous source/configuration history; a stale result refers to older observed
+transcript order. Neither is proof of a current request result. Disposal and
+connection closure cancel pending waits. Malformed offline event validation exits
+2, while failed replay rows produce exit 1 and processing continues. See
+[Live lifecycle](LIVE_DECISIONS.md#results-and-correlation).
 
 ## Type checks fail because tsc is missing
 

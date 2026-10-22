@@ -24,7 +24,7 @@ export function cloudflareModel(value = 'clef') {
 
 export function cloudflareRequestLimit(model, ceiling) {
     const profile = CLOUDFLARE_MODELS[cloudflareModel(model)];
-    return ceiling === undefined ? profile.requestBytes : Math.min(profile.maxRequestBytes, ceiling);
+    return ceiling === undefined ? profile.requestBytes : ceiling;
 }
 
 export function validateCloudflareLimits({ maxRequestBytes, maxRetries = 0,
@@ -40,10 +40,7 @@ export function validateCloudflareLimits({ maxRequestBytes, maxRetries = 0,
     return { ...(maxRequestBytes === undefined ? {} : { maxRequestBytes }), maxRetries, rejectIfBusy };
 }
 
-// Cloudflare's one-month TTL is 30 days in its official Gateway reference:
-// https://github.com/cloudflare/skills/blob/0cb6116228ad153126f474dce1dfbd05f7944604/skills/cloudflare/references/ai-gateway/README.md
-const GATEWAY_MAX_CACHE_TTL = 30 * 24 * 60 * 60;
-const headerString = (value, maxLength = 200) => typeof value === 'string' && value.trim().length > 0 &&
+const headerString = (value, maxLength = Infinity) => typeof value === 'string' && value.trim().length > 0 &&
     value.length <= maxLength && !/[^\x20-\x7e]/.test(value);
 
 /** Use the documented Workers Gateway shape for both transports. */
@@ -52,14 +49,14 @@ export function cloudflareGateway(input) {
     const gateway = cloneJson(input, 'Cloudflare gateway', 'CONFIGURATION_ERROR');
     optionsObject(gateway, ['id', 'cacheKey', 'cacheTtl', 'skipCache', 'metadata', 'collectLog',
         'requestTimeoutMs', 'retries'], 'Cloudflare gateway');
-    check(headerString(gateway.id, 64), 'Gateway id must be a printable ASCII string up to 64 characters.', 'CONFIGURATION_ERROR');
+    check(headerString(gateway.id), 'Gateway id must be a printable ASCII string without control characters.', 'CONFIGURATION_ERROR');
     if (gateway.cacheKey !== undefined) check(headerString(gateway.cacheKey),
-        'Gateway cacheKey must be a printable ASCII string up to 200 characters.', 'CONFIGURATION_ERROR');
+        'Gateway cacheKey must be a printable ASCII string without control characters.', 'CONFIGURATION_ERROR');
     for (const key of ['skipCache', 'collectLog']) check(gateway[key] === undefined || typeof gateway[key] === 'boolean',
         'Gateway cache and logging flags must be boolean.', 'CONFIGURATION_ERROR');
     check(gateway.cacheTtl === undefined || (Number.isSafeInteger(gateway.cacheTtl) &&
-        gateway.cacheTtl >= 60 && gateway.cacheTtl <= GATEWAY_MAX_CACHE_TTL),
-    'Gateway cacheTtl must be integer seconds from 60 to 2592000 (30 days).', 'CONFIGURATION_ERROR');
+        gateway.cacheTtl >= 0),
+    'Gateway cacheTtl must be nonnegative integer seconds.', 'CONFIGURATION_ERROR');
     check(gateway.requestTimeoutMs === undefined || (Number.isSafeInteger(gateway.requestTimeoutMs) &&
         gateway.requestTimeoutMs > 0 && gateway.requestTimeoutMs <= 2147483647),
     'Gateway requestTimeoutMs must be a positive 32-bit integer.', 'CONFIGURATION_ERROR');
@@ -69,18 +66,17 @@ export function cloudflareGateway(input) {
     if (gateway.metadata !== undefined) {
         // Reject predictable metadata loss instead of truncating or stripping caller data.
         const keys = Object.keys(gateway.metadata);
-        check(keys.length <= 5, 'Gateway metadata accepts at most five entries.', 'CONFIGURATION_ERROR');
         check(keys.every(key => !key.startsWith('cf.')),
             'Gateway metadata keys beginning with cf. are reserved.', 'CONFIGURATION_ERROR');
     }
     const retries = gateway.retries === undefined ? {} : gateway.retries;
     optionsObject(retries, ['maxAttempts', 'retryDelayMs', 'backoff'], 'Gateway retries');
     const maxAttempts = retries.maxAttempts === undefined ? 1 : retries.maxAttempts;
-    check(Number.isSafeInteger(maxAttempts) && maxAttempts >= 1 && maxAttempts <= 5,
-        'Gateway maxAttempts must be from 1 to 5.', 'CONFIGURATION_ERROR');
+    check(Number.isSafeInteger(maxAttempts) && maxAttempts >= 1,
+        'Gateway maxAttempts must be a positive integer.', 'CONFIGURATION_ERROR');
     check(retries.retryDelayMs === undefined || (Number.isSafeInteger(retries.retryDelayMs) &&
-        retries.retryDelayMs >= 0 && retries.retryDelayMs <= 60000),
-    'Gateway retryDelayMs must be from 0 to 60000.', 'CONFIGURATION_ERROR');
+        retries.retryDelayMs >= 0),
+    'Gateway retryDelayMs must be a nonnegative integer.', 'CONFIGURATION_ERROR');
     check(retries.backoff === undefined || ['constant', 'linear', 'exponential'].includes(retries.backoff),
         'Invalid Gateway backoff.', 'CONFIGURATION_ERROR');
     return freezeJson({ ...gateway, retries: { ...retries, maxAttempts } });

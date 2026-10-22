@@ -4,7 +4,7 @@ import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudf
 import { generationOptions } from '../custom/generative/shared.mjs';
 import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 
-export const PROVIDERS = ['jev', 'openai-decisions', 'cloudflare-decisions', 'custom-decision', 'custom-generative'];
+export const PROVIDERS = ['jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
 export const PRESETS = ['openai-compatible', 'openrouter', 'anthropic'];
 export const TRANSPORT = ['baseURL', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes'];
 export const GENERATION = ['maxTokens', 'responseFormat', 'tokenParameter', 'parameters', 'noAuth'];
@@ -13,7 +13,7 @@ export const PROVIDER_FIELDS = [...TRANSPORT, ...GENERATION, 'apiKeyEnv', 'model
 const FIELDS = new Set(['$schema', 'schemaVersion', 'provider', 'timeoutMs', ...PROVIDER_FIELDS]);
 export const NUMERIC = new Set(['timeoutMs', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes', 'maxTokens']);
 export const KEY_ENVS = { jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
-    'cloudflare-decisions': 'CLOUDFLARE_API_TOKEN', 'openai-compatible': 'OPENAI_API_KEY',
+    'cloudflare-decisions': 'CLOUDFLARE_API_TOKEN', 'cloudflare-extraction': 'CLOUDFLARE_API_TOKEN', 'openai-compatible': 'OPENAI_API_KEY',
     openrouter: 'OPENROUTER_API_KEY', anthropic: 'ANTHROPIC_API_KEY' };
 export const isModule = config => ['custom-decision', 'custom-generative'].includes(config.provider) && config.module !== undefined;
 
@@ -65,8 +65,8 @@ export function validateConfig(input, { complete = false } = {}) {
         else {
             jevRequestLimit(config.maxRequestBytes);
         }
-        if (config.provider !== 'cloudflare-decisions') check(['accountId', 'rejectIfBusy', 'gateway'].every(key => config[key] === undefined),
-            'Cloudflare settings require cloudflare-decisions.', 'CONFIGURATION_ERROR');
+        if (!['cloudflare-decisions', 'cloudflare-extraction'].includes(config.provider)) check(['accountId', 'rejectIfBusy', 'gateway'].every(key => config[key] === undefined),
+            'Cloudflare settings require a Cloudflare provider.', 'CONFIGURATION_ERROR');
         else {
             config.gateway = cloudflareGateway(config.gateway);
             if (config.gateway === undefined) delete config.gateway;

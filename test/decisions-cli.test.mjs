@@ -72,7 +72,7 @@ test('offline CLI validates OpenAI choice boundaries without credentials', async
                 : { state: '', questions: { q: { type: 'choice', instructions: 'Pick.', options } } };
             const result = await invoke(['validate', '-', '--provider', 'openai-decisions',
                 ...(isNative ? ['--native'] : [])], JSON.stringify(input));
-            if (count === 2 || count === 255) assert.equal(result.code, 0, result.stderr);
+            if (count >= 2) assert.equal(result.code, 0, result.stderr);
             else {
                 assert.equal(result.code, 2, result.stderr);
                 assert.equal(JSON.parse(result.stderr).error.code,
@@ -212,13 +212,11 @@ test('common and native JSONL batches retain independent row selectors', async t
     assert(bodies.every(body => body.model === 'gpt-6-luna'));
 });
 
-test('offline common and native validation reject encoded field and byte limits before credentials', async t => {
+test('offline common and native validation check client byte budgets before credentials', async t => {
     const cwd = await temporaryWorkspace(t);
     await writeFile(join(cwd, 'config.json'), JSON.stringify({ provider: 'openai-decisions', maxRequestBytes: 250 }));
     const oversized = 'x'.repeat(1048577);
     for (const [input, flags, expected] of [
-        [{ state: '', questions: { q: { type: 'noul', instructions: oversized } } }, [], 'VALIDATION_ERROR'],
-        [{ ...native, questions: [{ type: 'predicate', instructions: oversized }] }, ['--native'], 'VALIDATION_ERROR'],
         [{ state: 'é'.repeat(100), questions: { q: { type: 'noul', instructions: 'True?' } } }, ['--config', 'config.json'], 'REQUEST_TOO_LARGE'],
         [{ ...native, input: 'é'.repeat(100) }, ['--config', 'config.json', '--native'], 'REQUEST_TOO_LARGE'],
     ]) {

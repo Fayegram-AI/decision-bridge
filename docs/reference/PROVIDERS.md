@@ -45,26 +45,32 @@ contract. The following additional forms are checked before dispatch:
 | Provider | Ordered text / embedded images | Typed string/boolean choices | Labelled score levels | Safety identifier | Model listing |
 | --- | --- | --- | --- | --- | --- |
 | Jev | Ordered text; images with explicit opt-in | Unsupported | Unsupported | Unsupported | Supported |
-| OpenAI Decisions | Supported; up to 128 images, preserving order | Supported | Supported | Supported | Unsupported |
-| Cloudflare Clef / Clef-flash | Supported; up to four images before text | Supported | Supported; 2–10 levels | Unsupported | Unsupported |
-| Cloudflare Clef-omni | Supported; up to four images before audio/video/text | Supported | Supported; 2–10 levels | Unsupported | Unsupported |
+| OpenAI Decisions | Supported; preserving order | Supported | Supported | Supported | Unsupported |
+| Cloudflare Clef / Clef-flash | Supported; images before text | Supported | Supported; ordered levels | Unsupported | Unsupported |
+| Cloudflare Clef-omni | Supported; images before audio/video/text | Supported | Supported; ordered levels | Unsupported | Unsupported |
 | OpenAI-compatible / OpenRouter / Anthropic | Unsupported | Unsupported | Unsupported | Unsupported | Supported; service-specific catalog |
 
 `bridge.getCapabilities(model)` reports the local profile, and
 `bridge.validate(request)` checks that profile and provider preflight without
 inference. These methods do not authenticate an account or query availability.
-Legacy choice maps and score rubrics have their own limits, described in the
+Legacy choice maps and score rubrics have structural requirements, described in the
 [SDK reference](SDK.md#question-builders). Custom providers declare additional
 capabilities explicitly.
 
-Omni additionally accepts up to four audio clips and two videos. The optional
-capability fields `audio`, `videos`, `maxAudioClips`, and `maxVideos` normalize to
+Omni additionally accepts embedded audio clips and videos; service counts remain
+upstream. The optional capability fields `audio`, `videos`, `maxAudioClips`, and
+`maxVideos` normalize to
 false/zero when omitted, preserving legacy custom profiles. Cloudflare's older
 models and all other shipped providers reject audio/video before inference.
 
 Jev additionally supports `box` questions on `jev-preview` and pinned 1.14+ models
 when `dangerZone.images` is enabled. Other built-ins reject box questions.
 See the [Jev guide](../guides/JEV.md) for asset placement and experimental opt-ins.
+
+OpenAI additionally supports `conversation`, `toolHistory`, `remoteImages` and
+`promptCaching`. These optional capability flags default to false for existing
+custom providers. Built-in quantitative limits use `null` where admission is
+left to the service; explicit custom-provider limits remain enforced.
 
 Dedicated `createDecision()` access is available on Jev, OpenAI Decisions and
 Cloudflare providers. It uses each service's native request/response shape and
@@ -124,3 +130,10 @@ do not override them. This release has no silent provider failover, model search
 credential refresh, provider-side batch API, or universal quality guarantee.
 Unsupported protocols require an explicit custom decision or generative provider; unsupported server
 features require an explicitly supported mode or a different model.
+
+## Dedicated operations
+
+Clairic is a native extraction model exposed through [extraction](../guides/EXTRACTION.md).
+Its provider is not a DecisionProvider and is not accepted by createBridge.
+[Live Decisions](../guides/LIVE_DECISIONS.md) owns a connection-oriented command
+and event lifecycle through a dedicated export.

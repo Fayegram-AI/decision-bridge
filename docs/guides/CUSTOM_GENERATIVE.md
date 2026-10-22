@@ -72,8 +72,9 @@ or zero-based level indices. It checks probabilities, derives argmax/weighted
 scores and matching legends, and marks absent usage as unknown. It does not repair
 JSON, strip Markdown, or create confidence. `buildPrompt` and `normalizeGenerated`
 independently validate and snapshot the request. They require shared state and
-legacy questions, and reject ordered input, typed choices, labelled scores, and
-safety identifiers with `UNSUPPORTED_CAPABILITY`. Malformed request JSON raises
+legacy questions, and reject ordered input, conversation/tool history, remote
+images, prompt-cache controls, typed choices, labelled scores and safety
+identifiers with `UNSUPPORTED_CAPABILITY`. Malformed request JSON raises
 `VALIDATION_ERROR`; unsupported input is never silently discarded. New modules
 implement their own encoding and normalization for richer capabilities.
 
@@ -110,7 +111,8 @@ provenance and `confidenceSource: 'unavailable'`, and rejects returned native
 confidence claims or answer confidence fields. Their output is an estimate elicited
 from a model, not a native probability, logprob, or calibration guarantee.
 Presets support shared state and legacy `choice`, `noul`, and `score`; ordered
-media, typed choices, labelled scores, and safety identifiers are unsupported.
+media, conversation/tool history, remote images, prompt-cache controls, typed
+choices, labelled scores and safety identifiers are unsupported.
 A new module may declare capabilities only after implementing and validating them.
 
 ## OpenAI-compatible servers

@@ -6,6 +6,11 @@ The SDK exports browser-compatible ESM. Follow the
 optional `decision-bridge` command still requires Node.js.
 Omni's embedded audio/video validation is browser-safe and adds no runtime media
 library. Build data URLs in the application; the SDK does not fetch remote media.
+The dedicated [extraction](EXTRACTION.md) and [Live](LIVE_DECISIONS.md) exports
+also use browser-compatible APIs. Clairic REST still requires provider CORS and
+explicit credentials. Live attaches to an already established application-owned
+connection; it does not create or authenticate one. OpenAI remote-image URLs are
+forwarded to the provider without a browser-side SDK fetch.
 
 Built-in REST providers need explicitly supplied credentials in browser code;
 Node environment-variable defaults and `.env` files are not available. Cloudflare

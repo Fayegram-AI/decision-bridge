@@ -7,7 +7,7 @@ A JavaScript SDK that turns supplied information into structured decisions insid
 your application. An optional Node command runner is included for evaluating files.
 Give it a `state` (text or JSON to assess) and one or more `questions`; it returns
 validated choices, probabilities for yes/no (`noul`) questions, or rubric-based
-scores.
+scores. Capable providers also accept ordered media input or conversation history.
 For example, pass a failed test log to classify the failure and estimate whether
 a missing dependency caused it. Your application decides what to do with the result.
 
@@ -21,7 +21,7 @@ OpenRouter, and Anthropic presets. The bridge handles the shared request and res
 contract; each provider handles its API protocol and model capabilities.
 
 [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) also supports ordered text/image
-input, typed string/boolean choices, labelled scores, and dedicated native access.
+input, typed string/boolean choices, labelled scores, conversation/tool history, remote images, prompt caching, and dedicated native access.
 [Cloudflare Clef, Clef-flash, and Clef-omni](docs/guides/CLOUDFLARE_DECISIONS.md) provide
 common/native access, embedded images, typed choices, labelled scores, REST,
 Workers AI bindings, and optional AI Gateway routing. Omni additionally supports
@@ -29,7 +29,12 @@ embedded WAV/MP3 audio and MP4/WebM video, ordered images → audio → videos �
 The common API checks provider/model capabilities before dispatch; refusals are
 errors.
 
-**Version 0.1.2 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.3 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+
+These docs cover 0.1.3. For supported features by version, see
+[version availability](docs/README.md#version-availability) and the
+[changelog](CHANGELOG.md). Start with the
+[installation options](docs/guides/GETTING_STARTED.md#install-into-your-application).
 
 The npm package is
 [@fayegram-ai/decision-bridge](https://www.npmjs.com/package/@fayegram-ai/decision-bridge).
@@ -64,7 +69,7 @@ Decision Bridge release. Explicit supported model IDs can also be selected; see
 the [OpenAI model selection guide](docs/guides/OPENAI_DECISIONS.md#model-selection)
 for details. Results retain the selected value in `meta.requestedModel`,
 the outgoing ID in `meta.resolvedModel`, and the service-reported model in `model`.
-Cloudflare accepts only the three models above, in short or full form.
+The Cloudflare decision provider accepts the three decision models above, in short or full form.
 Model discovery is unsupported for OpenAI Decisions and Cloudflare.
 
 Additional decision protocols use [custom decision providers](docs/guides/CUSTOM_DECISION.md).
@@ -72,6 +77,16 @@ General-purpose models use the separate [custom generative](docs/guides/CUSTOM_G
 entry point, with `openai-compatible`, `openrouter`, or `anthropic` presets, or
 an explicit provider module. Those presets require a model ID supported by your
 configured service and have no default model or fixed model catalog.
+
+Clairic uses the dedicated [extraction API](docs/guides/EXTRACTION.md), with
+selectors `clairic` and `@cf/cloudflare/clairic` (default `clairic`). It returns
+typed values, estimates and forecasts through REST or Workers bindings.
+[Live Decisions](docs/guides/LIVE_DECISIONS.md) attaches to an application-owned
+GPT-Live connection for delegation, transcript triggers and Decision events.
+These operations have dedicated `/extraction` and `/live` package exports.
+
+Service quotas and admission limits are handled upstream. The SDK validates its
+contracts and configurable client resource budgets and returns structured errors.
 
 ## Choose a provider
 
@@ -81,7 +96,7 @@ All native providers support shared state and the common `choice`, `noul`, and
 | Provider | Additional supported features | Guide |
 | --- | --- | --- |
 | Jev | Native decisions, opt-in images, boxes, and long context through TypeSafe | [Jev guide](docs/guides/JEV.md) |
-| OpenAI Decisions | Ordered text/images, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
+| OpenAI Decisions | Ordered text/images, conversation/tool history, remote images, prompt caching, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
 | Cloudflare Clef / Clef-flash | Embedded images before text, typed choices, labelled scores, native access, Workers AI binding, optional Gateway | [Cloudflare decisions](docs/guides/CLOUDFLARE_DECISIONS.md) |
 | Cloudflare Clef-omni | The same decision and transport features, plus embedded audio/video | [Omni media and limits](docs/guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video) |
 | Custom decision service | Explicit decision provider contract | [Custom decision providers](docs/guides/CUSTOM_DECISION.md) |
@@ -254,12 +269,13 @@ test suite and development scripts.
 
 | Area | Implementation |
 | --- | --- |
-| Stable contract | Runtime-defined [questions](docs/reference/SDK.md#question-builders), structured state or ordered input, typed answers, immutable results |
+| Stable contract | Runtime-defined [questions](docs/reference/SDK.md#question-builders), state, ordered input or conversation according to capabilities, typed answers, immutable results |
 | Native providers | Jev, OpenAI Decisions, Cloudflare Clef/Clef-flash/Clef-omni |
 | Custom providers | Separate decision and generative contracts; opt-in Chat Completions, OpenRouter, and Anthropic presets |
 | SDK | Provider factory, [capability preflight](docs/reference/SDK.md#bridgegetcapabilitiesmodel-and-bridgevalidaterequest), [cancellation](docs/reference/SDK.md#cancellation-and-deadlines), and [ordered batch evaluation](docs/reference/SDK.md#sdk-batch-evaluation) |
-| Application extensions | [State/input preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
-| Node command | [Initialize, evaluate, validate, schema, models, and ordered JSONL batches](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |
+| Dedicated operations | [Clairic extraction](docs/guides/EXTRACTION.md) and [Live Decisions](docs/guides/LIVE_DECISIONS.md), with separate exports and native results |
+| Application extensions | [State/input/conversation preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
+| Node command | [Decision/extraction commands and offline Live validation/replay](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |
 | Reliability | [Transport byte limits and fetch injection](docs/reference/SDK.md#provider-transport-options), deadlines, [limited retries and safe errors](docs/reference/ERRORS.md), strict response validation, atomic output |
 | Development | Functional tests, coverage, TypeScript and Workers binding contracts, offline tarball-install checks, cross-platform CI configuration |
 

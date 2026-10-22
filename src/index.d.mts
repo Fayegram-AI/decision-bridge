@@ -3,7 +3,8 @@ import type { JevDangerZone, JevQuestions, JevDecisionRequest, JevDecisionRespon
 export type { JevDangerZone, JevImageAsset, JevQuestions, JevDecisionRequest, JevDecisionResponse, JevTransportMetadata } from './jev.d.mts';
 import type { NativeDecisionRequest, OpenAIDecisionResponse, OpenAIDecisionUsage,
     OpenAIDecisionsMetadata, OpenAIDecisionsTransportMetadata } from './decisions.d.mts';
-export type { NativeDecisionInputPart, NativeDecisionMessage, NativeDecisionQuestion, NativeDecisionRequest,
+export type { NativeDecisionInputPart, NativeDecisionInputItem, DecisionCacheBreakpoint, DecisionCacheOptions,
+    NativeDecisionMessage, NativeDecisionQuestion, NativeDecisionRequest,
     NativeDecisionAnswer, OpenAIDecisionResponse, OpenAIDecisionUsage, OpenAIDecisionsMetadata,
     OpenAIDecisionsTransportMetadata, TransportMetadata } from './decisions.d.mts';
 import type { CloudflareDecisionsOptions, CloudflareDecisionRequest, CloudflareDecisionResponse,
@@ -51,8 +52,12 @@ export type ScoreLevels = readonly [ScoreLevel, ScoreLevel, ...ScoreLevel[]];
 export interface LabeledScoreQuestion<L extends ScoreLevels = ScoreLevels> {
     readonly type: 'score'; readonly instructions: Instructions; readonly levels: L; readonly criteria?: never;
 }
-export type DecisionInputPart = { readonly type: 'text'; readonly text: string }
-    | { readonly type: 'image'; readonly dataUrl: string; readonly detail?: 'low' | 'high' | 'auto' | 'original' | null }
+export type DecisionConversationItem = import('./decisions.mjs').NativeDecisionInputItem;
+export type DecisionInputPart = { readonly type: 'text'; readonly text: string;
+        readonly promptCacheBreakpoint?: import('./decisions.mjs').DecisionCacheBreakpoint | null }
+    | ({ readonly type: 'image'; readonly detail?: 'low' | 'high' | 'auto' | 'original' | null;
+        readonly promptCacheBreakpoint?: import('./decisions.mjs').DecisionCacheBreakpoint | null }
+        & ({ readonly dataUrl: string; readonly url?: never } | { readonly url: string; readonly dataUrl?: never }))
     | { readonly type: 'audio'; readonly dataUrl: string }
     | { readonly type: 'video'; readonly dataUrl: string };
 export type OrderedInput = readonly DecisionInputPart[];
@@ -85,7 +90,11 @@ export type AnswerFor<Q extends Question> = Q extends TypedChoiceQuestion<infer 
   ? ChoiceAnswer<ChoiceLabel<keyof C>> : Q extends NoulQuestion ? NoulAnswer : Q extends BoxQuestion ? BoxAnswer : ScoreAnswer;
 export type EvaluationRequest<Q extends Questions = Questions> = {
     readonly questions: Q; readonly model?: string; readonly safetyIdentifier?: string | null;
-} & ({ readonly state: State; readonly input?: never } | { readonly input: OrderedInput; readonly state?: never });
+    readonly promptCacheKey?: string | null;
+    readonly promptCacheOptions?: import('./decisions.mjs').DecisionCacheOptions | null;
+} & ({ readonly state: State; readonly input?: never; readonly conversation?: never }
+    | { readonly input: OrderedInput; readonly state?: never; readonly conversation?: never }
+    | { readonly conversation: readonly DecisionConversationItem[]; readonly state?: never; readonly input?: never });
 export type ResolvedRequest<Q extends Questions = Questions> = EvaluationRequest<Q> & { readonly model: string };
 export interface Usage {
   /** Null means not reported, not zero tokens. */
@@ -136,6 +145,7 @@ export interface Provider {
 }
 export interface DecisionProvider extends Provider { readonly kind: 'decision'; }
 export interface Capabilities {
+    readonly conversation?: boolean; readonly toolHistory?: boolean; readonly remoteImages?: boolean; readonly promptCaching?: boolean;
     readonly boxes?: boolean;
     readonly audio?: boolean; readonly videos?: boolean;
     readonly maxAudioClips?: number | null; readonly maxVideos?: number | null;
@@ -151,6 +161,8 @@ export interface Extension {
   name: string;
   prepareState?(state: State, context: ExtensionContext): State | undefined | Promise<State | undefined>;
   prepareInput?(input: OrderedInput, context: ExtensionContext): OrderedInput | undefined | Promise<OrderedInput | undefined>;
+  prepareConversation?(conversation: readonly DecisionConversationItem[], context: ExtensionContext):
+    readonly DecisionConversationItem[] | undefined | Promise<readonly DecisionConversationItem[] | undefined>;
   /** Observer failure is isolated in meta.observerFailures; no inference is retried. */
   onResult?(result: EvaluationResult, context: ExtensionContext): void | Promise<void>;
 }
@@ -233,8 +245,10 @@ export function decideChoice<K extends string>(answer: ChoiceAnswer<K>, options:
 export function decideChoice<V extends string | boolean>(answer: TypedChoiceAnswer<V>, options: ChoicePolicyOptions<V>): ChoiceDecision<V>;
 export interface RefusedQuestion { readonly index: number; readonly name: string | null; }
 export interface ErrorDetails { code: string; message: string; status?: number; requestId?: string; gatewayLogId?: string; attempts?: number; upstreamCode?: number;
+  source?: 'client' | 'provider'; upstreamErrorCode?: string; upstreamErrorType?: string; retryAfterMs?: number; retryable?: boolean;
     refusedQuestions?: readonly RefusedQuestion[]; usage?: OpenAIDecisionUsage; }
 export class DecisionError extends Error {
+  source?: 'client' | 'provider'; upstreamErrorCode?: string; upstreamErrorType?: string; retryAfterMs?: number; retryable?: boolean;
   code: string; status?: number; requestId?: string; gatewayLogId?: string; attempts?: number; upstreamCode?: number;
   refusedQuestions?: readonly RefusedQuestion[]; usage?: OpenAIDecisionUsage;
   constructor(message: string, details?: Omit<ErrorDetails, 'code' | 'message'> & { code?: string });
