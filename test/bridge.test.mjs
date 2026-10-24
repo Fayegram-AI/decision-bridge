@@ -200,7 +200,7 @@ test('structured read-only templates can be reused without mutation', async () =
   } } });
   const result = await client.evaluate({ state: { nested: ['data'] }, questions });
   assert.equal(result.meta.probabilitySource, 'unspecified');
-  assert.equal(result.meta.bridgeVersion, '0.1.3');
+  assert.equal(result.meta.bridgeVersion, '0.1.4');
   assert.equal(Object.isFrozen(result.answers.yes), true);
 });
 

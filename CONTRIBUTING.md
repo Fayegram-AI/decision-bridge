@@ -19,13 +19,17 @@ configuration-schema validator from the lockfile. See the
 
 Start with the [architecture](docs/development/ARCHITECTURE.md),
 [design rationale](docs/development/DESIGN.md), and
-[repository layout](docs/development/REPOSITORY_LAYOUT.md).
-Preserve the provider-independent contract of exactly one of `state`, ordered
-`input` or `conversation`, plus `questions`, and explicit probability provenance.
-Extraction and Live use dedicated operation contracts. Keep service admission
-limits upstream and client resource controls explicit. Add focused regression
-tests for bug fixes and wire-level tests for protocol changes. Fixtures must not contain credentials or live-account
-data; label synthetic responses as synthetic.
+[repository layout](docs/development/REPOSITORY_LAYOUT.md). Preserve the
+provider-independent contract of exactly one of `state`, ordered `input` or
+`conversation`, plus `questions`, and explicit probability provenance. Extraction and
+Live have separate request and result formats. Let services enforce their own quotas and
+acceptance limits, while keeping SDK resource limits configurable. Add focused
+regression tests for bug fixes and tests of encoded requests and responses for protocol
+changes. Fixtures must contain no credentials or live-account data, and synthetic
+responses must be labelled. Routing must check which targets can handle a request before
+choosing one, require opt-in for generative targets, limit recovery attempts, and
+preserve metadata identifying the provider and probability source. See the
+[routing lifecycle](docs/development/ARCHITECTURE.md#routing-lifecycle).
 
 ## Make and verify a change
 

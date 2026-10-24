@@ -7,6 +7,8 @@ it with [version availability](../README.md#version-availability). The `/extract
 and `/live` exports, their CLI commands, and expanded OpenAI history/cache inputs
 require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
 to install a compatible version.
+The `/routing` export, `inspect`, routing flags, and version-2 registries require
+0.1.4. Check the version-availability page before using these with an npm install.
 
 ## The command cannot find a key
 
@@ -18,13 +20,37 @@ values win over a file; an old exported value can therefore mask a newly edited 
 
 ## My model or base URL seems ignored
 
-Unknown options are rejected, but model precedence still matters:
+For single-provider profiles, unknown options are rejected, but model precedence still matters:
 `--model > request.model > resolved config/environment model > provider default`.
 Provider changes discard
 incompatible fields inherited from a different JSON profile. Use a complete
 explicit config. A compatible base includes its version prefix, not the final
 `/chat/completions` path. Jev and the custom Anthropic preset require origins
 without a path. See [configuration](../reference/CONFIGURATION.md#precedence).
+
+Version-2 registries ignore legacy `DECISION_*` selection variables and reject
+provider/model override flags. Change the concrete route's `config` and choose it
+with `--route`. Request `model` narrows eligible targets instead of changing them.
+
+## Automatic routing has no eligible target or remains ambiguous
+
+Run `decision-bridge inspect request.json --config routes.json` to see which targets
+have complete local configuration, which do not support the request, and which still
+need checks during execution. Confirm the intended targets are enabled, have local
+credentials, match the operation and satisfy request model/capability constraints.
+`inspect` does not test account access. Cooldown exclusions can return
+`ROUTE_UNAVAILABLE` with a retry hint.
+
+One eligible route is selected locally. With several, configure a matching
+preference/priority, clarification handler, or decision selector. Deterministic
+mode requires no AI. Unattended decision-assisted mode requires a ready decision
+selector with a model and explicit `minProbability` and `minMargin`, even when
+only one execution target remains. See [selection behavior](ROUTING.md#selection-behavior).
+
+CLI clarification requires terminal stdin/stderr and a request file. Piped input,
+`--no-interactive`, and `--no-routing-prompt` use unattended selection. EOF cancels
+the prompt. A selector response must satisfy the configured thresholds; failure
+does not silently choose another route unless an applicable fallback was enabled.
 
 ## OpenAI reports a versioned model after I select default or luna
 
@@ -50,10 +76,10 @@ an approved decision. Large schemas also consume context/output budget.
 
 ## The model returns JSON but confidence is absent
 
-This is expected for generative backends. They produce elicited probabilities
-and do not report the native confidence carried by Jev, OpenAI Decisions, or
-Cloudflare choice/score answers. Read `meta.probabilitySource`. A null token
-count means the server did not report it. Neither absence should be silently
+This is expected for generative backends. Their probabilities are estimates produced in
+response to a prompt. They do not include the native confidence reported by Jev, OpenAI
+Decisions or Cloudflare choice/score answers. Read `meta.probabilitySource`. A null
+token count means the server did not report it. Neither absence should be silently
 converted to a number.
 
 ## Cloudflare needs an account ID as well as a token
@@ -76,18 +102,19 @@ execution options. See [capacity and Gateway settings](CLOUDFLARE_DECISIONS.md#c
 
 ## Evaluation succeeds but an extension failed
 
-Inspect `meta.observerFailures`. Observation occurs after inference; a failed log
-sink must not cause another model call. Preparation failures instead throw
-`EXTENSION_ERROR` before continuing to inference. Observe the separate provider,
-bridge, and observer deadlines documented in the SDK reference.
+Inspect `meta.observerFailures`. Observation occurs after inference; a failed log sink
+must not cause another model call. Preparation failures instead throw `EXTENSION_ERROR`
+before continuing to inference. Check the separate provider, bridge and observer
+timeouts in the SDK reference.
 
 ## Batch output is incomplete
 
-Per-record errors are explicit JSONL records and do not stop the CLI. A global
-input, UTF-8, limit, interruption, or filesystem failure can stop the batch. Atomic
-file output is not finalized in that case; stdout can contain a completed prefix.
-Some requests may already have been sent/billed. Retrying an entire prefix can
-repeat work, so retain completed records externally when designing resumability.
+Per-record errors are explicit JSONL records and do not stop the CLI. An input-reading
+error, invalid UTF-8, exceeded limit, interruption or filesystem error can stop the
+whole batch. An unfinished output file is not saved in that case, but stdout may already
+contain results for completed rows. Some requests may already have been sent/billed.
+Retrying an entire prefix can repeat work, so retain completed records externally when
+designing resumability.
 
 ## Extraction or Live does not behave like bridge evaluation
 

@@ -2,19 +2,18 @@
 
 ## Compatibility and verification
 
-The SDK targets Node.js **22.16 or newer** on native Windows, macOS, and Linux,
-and modern browsers through a browser application's module bundler. Its SDK
-module graph uses standard web APIs and has no third-party runtime dependencies.
-The optional command runner uses Node built-ins and remains Node-only. WSL and
-Bash are not required, and no standalone `.exe` or `.app` is provided. Direct
-browser calls also depend on [provider CORS and credential rules](BROWSER.md).
+The SDK runs on Node.js **22.16 or newer** on Windows, macOS, and Linux, and in modern
+browsers through a module bundler. It uses standard web APIs and has no third-party
+runtime dependencies. The optional command runner uses Node built-ins and remains
+Node-only. WSL and Bash are not required, and no standalone `.exe` or `.app` is
+provided. Direct browser calls also depend on
+[provider CORS and credential rules](BROWSER.md).
 
 For application integration, follow the [SDK quickstart](GETTING_STARTED.md).
 The shell-specific source commands below are for working in a source checkout.
 
-The CI matrix targets Windows, macOS, and Linux with Node 22.16 and Node 24.
-Consult run results for the exact commit and environment being evaluated;
-the matrix itself is not a completed platform check. ARM machines require a
+The CI matrix targets Windows, macOS, and Linux with Node 22.16 and Node 24. Check the
+CI results for the commit and environment you plan to use. ARM machines require a
 compatible native Node runtime. See [testing](../development/TESTING.md).
 
 ## Windows / PowerShell
@@ -94,10 +93,11 @@ executables.
 
 ## Filesystems, streams, and limits
 
-Output files use exclusive temporary files and no-clobber finalization by default.
-Some filesystems do not support hard links; such no-clobber output fails explicitly
-rather than falling back to overwriting. Unix mode 0600 is applied where supported;
-on Windows, secure the working directory using your normal Windows permissions.
+The CLI writes to a new temporary file before creating the final output, and protects
+existing files by default. This protection relies on hard links; on filesystems that do
+not support them, creating a protected output file fails. Unix mode 0600 is applied
+where supported; on Windows, secure the working directory using your normal Windows
+permissions.
 
 Input/output JSON is UTF-8. File arguments are the most portable way to avoid
 shell pipeline encoding differences. A POSIX subprocess test covers SIGINT;

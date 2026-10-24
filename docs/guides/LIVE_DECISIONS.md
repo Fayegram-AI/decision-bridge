@@ -3,10 +3,11 @@
 Requires **0.1.3 or later**. See [version availability](../README.md#version-availability)
 and [installation](GETTING_STARTED.md#install-into-your-application).
 
-`@fayegram-ai/decision-bridge/live` attaches Decisions handling to an existing
-GPT-Live connection. Your application owns authentication, audio, connection
-setup and reconnection. The controller owns Decisions commands, acknowledgements
-and conservative result correlation. It does not issue additional HTTP inference.
+Use `@fayegram-ai/decision-bridge/live` with a GPT-Live connection your application has
+opened. Your application handles authentication, audio and reconnection. The controller
+sends Decisions commands, handles acknowledgements, and matches results to their source
+events when enough information is available. It makes no additional HTTP inference
+calls.
 
 ```javascript
 import { createLiveDecisions } from '@fayegram-ai/decision-bridge/live';
@@ -83,9 +84,9 @@ Completed native decisions arrive as `type: 'decision'` notifications containing
 the full model, ordered answers and usage. Native refusal answers are preserved.
 The controller does not fabricate partial common success from a refusal.
 
-`correlation` contains `matched`, `stale`, source event ID/type, delegation ID,
-trigger ID and a configuration generation when known. Match quality describes
-available protocol evidence, not model accuracy.
+`correlation` contains `matched`, `stale`, source event ID/type, delegation ID, trigger
+ID and a configuration generation when known. Match quality describes how well a result
+can be linked to its source, not how accurate the model's answer is.
 
 - Transcript fragments are tracked in delivery order separately for input and
   output. Results can arrive out of order; older/equal source results are stale.
@@ -113,11 +114,11 @@ already knows the connection's accepted Decisions configuration.
 
 ## Resources and failures
 
-Defaults are a 30-second command deadline, 128 pending operations, 4096 retained
-history entries per correlation map, and 8 MiB command/event budgets (configurable
-through 64 MiB). These are local resource budgets, independent of server quotas.
-History eviction can make late results unmatched. No service RPM/TPM enforcement,
-automatic command replay or reconnect policy is introduced.
+By default, commands have a 30-second deadline. The controller allows 128 pending
+operations, keeps 4096 history entries per correlation map, and limits each command or
+event to 8 MiB (configurable through 64 MiB). These limits control local resource use;
+the service applies its own quotas. History eviction can make late results unmatched. No
+service RPM/TPM enforcement, automatic command replay or reconnect policy is introduced.
 
 Call options accept `signal` and `timeoutMs`. Disconnect and disposal settle
 pending operations. Invalid signal values fail with `CONFIGURATION_ERROR` before

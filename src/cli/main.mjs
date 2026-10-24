@@ -15,12 +15,14 @@ import { assertDistinctFiles, createWriter, readJson, readJsonLines } from './io
 import { mapOrdered } from './ordered.mjs';
 import { validateExtractionRequest } from '../extraction/index.mjs';
 import { runLiveCli } from './live.mjs';
+import { runRoutingCli } from './routing.mjs';
+import { routingSecrets } from './routing-config.mjs';
 
 const SAMPLE_PATH = fileURLToPath(new URL('../../examples/request.json', import.meta.url));
 const BOOLS = ['help', 'version', 'pretty', 'compact', 'no-auth', 'force', 'native', 'reject-if-busy', 'no-reject-if-busy',
-    'jev-images', 'no-jev-images', 'jev-long-context', 'no-jev-long-context'];
+    'jev-images', 'no-jev-images', 'jev-long-context', 'no-jev-long-context', 'interactive', 'no-interactive', 'no-routing-prompt'];
 const STRINGS = ['config', 'env-file', 'provider', 'preset', 'model', 'base-url', 'api-key-env', 'timeout-ms',
-  'retries', 'max-tokens', 'response-format', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind'];
+  'retries', 'max-tokens', 'response-format', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind', 'route'];
 const FIELD_MAP = { preset: 'preset', provider: 'provider', model: 'model', 'base-url': 'baseURL', 'api-key-env': 'apiKeyEnv',
   'timeout-ms': 'timeoutMs', retries: 'maxRetries', 'max-tokens': 'maxTokens',
   'response-format': 'responseFormat', 'token-parameter': 'tokenParameter', 'provider-module': 'module', 'account-id': 'accountId' };
@@ -31,6 +33,8 @@ Usage:
   decision-bridge init [directory] [--provider NAME] [--model MODEL]
   decision-bridge evaluate [request.json | -] [options]    (aliases: eval, ask)
   decision-bridge validate [request.json | -] [options]    (offline)
+  decision-bridge inspect request.json --config routes.json [--route auto] (offline)
+  decision-bridge init [directory] --route auto           (routing template)
   decision-bridge schema [request.json | -] [options]      (offline generative schema)
   decision-bridge models [options]
   decision-bridge batch requests.jsonl [--concurrency 4] [options]
@@ -47,6 +51,10 @@ Generative presets: openai-compatible, openrouter, anthropic
 
 Options:
   --config FILE             Explicit JSON configuration; never auto-discovered
+  --route ID                Select auto or a concrete route in a version-2 registry
+  --interactive             Require terminal clarification (request file required)
+  --no-interactive          Run unattended
+  --no-routing-prompt       Suppress routing clarification and its configuration exception
   --env-file FILE           Explicit .env file; existing environment takes precedence
   --provider NAME           Select backend; default jev
   --preset NAME             Preset for provider custom-generative
@@ -137,6 +145,7 @@ function scrub(value, env, explicitSecret) {
   const secrets = Object.entries(env).filter(([name, secret]) => typeof secret === 'string' &&
     secret.length >= 4 && /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name)).map(([, secret]) => secret);
   if (typeof explicitSecret === 'string' && explicitSecret) secrets.push(explicitSecret);
+  if (Array.isArray(explicitSecret)) secrets.push(...explicitSecret);
   function visit(item) {
     if (typeof item === 'string') {
       for (const secret of secrets) item = item.split(secret).join('[REDACTED]');
@@ -171,8 +180,8 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
     const command = aliases[positionals[0]] ?? positionals[0];
     if (command === 'help') { stdout.write(HELP); return 0; }
     if (internal.signal.aborted) throw abortError();
-    check(['evaluate', 'validate', 'schema', 'models', 'init', 'batch'].includes(command), 'Unknown command. Run --help.', 'USAGE_ERROR');
-    check(!extracting || ['evaluate', 'validate', 'init', 'batch'].includes(command), 'Unsupported extraction command.', 'USAGE_ERROR');
+    check(['evaluate', 'validate', 'inspect', 'schema', 'models', 'init', 'batch'].includes(command), 'Unknown command. Run --help.', 'USAGE_ERROR');
+    check(!extracting || ['evaluate', 'validate', 'inspect', 'init', 'batch'].includes(command), 'Unsupported extraction command.', 'USAGE_ERROR');
     check(values.kind === undefined, '--kind applies only to live validation.', 'USAGE_ERROR');
     check(positionals.length <= (command === 'models' ? 1 : 2), 'Too many positional arguments.', 'USAGE_ERROR');
     check(!(values.input && positionals[1]), 'Supply either --input or a positional file, not both.', 'USAGE_ERROR');
@@ -192,6 +201,14 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
     const loaded = await loadConfig({ configPath: values.config, envFile: values['env-file'],
       overrides: overridesFor(values), cwd, env, allowIncomplete: command === 'init',
       defaultProvider: extracting ? 'cloudflare-extraction' : 'jev' });
+    activeEnv = loaded.env;
+    if (loaded.config.schemaVersion === 2 || command === 'init' && values.route === 'auto') {
+      explicitSecret = loaded.config.schemaVersion === 2 ? routingSecrets(loaded) : undefined;
+      return await runRoutingCli(command, positionals, values, loaded, { stdin, stdout, stderr, cwd,
+        signal: internal.signal, extracting, scrub: value => scrub(value, activeEnv, explicitSecret) });
+    }
+    check(command !== 'inspect' && values.route === undefined && !values.interactive && !values['no-interactive'] && !values['no-routing-prompt'],
+      'Routing options and inspect require a schemaVersion: 2 configuration; use init --route auto to create one.', 'USAGE_ERROR');
     check(extracting === (loaded.config.provider === 'cloudflare-extraction'), 'Selected provider does not match the command operation.', 'CONFIGURATION_ERROR');
     const profile = extracting ? { common: validateExtractionRequest, inputLimit: 64 * 1024 * 1024,
       options: config => Object.fromEntries(['model', 'maxRequestBytes', 'maxRetries', 'rejectIfBusy', 'gateway']

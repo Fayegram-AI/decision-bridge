@@ -1,6 +1,6 @@
 # Provider contracts and compatibility
 
-## Native routes
+## Native decision providers
 
 | Provider type | Wire API | Credential | Default selector | Output strategy |
 | --- | --- | --- | --- | --- |
@@ -8,10 +8,11 @@
 | `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `default` | Native Decisions with common and dedicated access |
 | `cloudflare-decisions` | Workers AI REST model route or `AI.run` binding | `CLOUDFLARE_API_TOKEN` and account ID for REST | `clef` | Native Clef decisions with common and dedicated access |
 
-`createProvider()` and the root SDK export these three native providers only.
-Custom decision services use `defineDecisionProvider` from `custom/decision`.
-General-purpose adapters are opt-in presets in `custom/generative`; they are
-maintained, but are not native decision models. See [custom providers](../guides/CUSTOM_PROVIDERS.md).
+`createProvider()` and the root SDK export these three native providers only. Custom
+decision services use `defineDecisionProvider` from `custom/decision`. General-purpose
+models use the maintained presets in `custom/generative`. Import that entry point when
+you want to prompt a model for decisions. See
+[custom providers](../guides/CUSTOM_PROVIDERS.md).
 
 ## Supported model selection
 
@@ -26,8 +27,9 @@ Cloudflare supports `clef`, `clef-flash`, and `clef-omni`, including each full
 local preflight with `UNSUPPORTED_CAPABILITY`.
 
 Custom generative presets require an explicit available model and have no default.
-Custom decision or generative modules define their own model/capability contract.
-Local model support is separate from account permission and hosted availability.
+Custom decision or generative modules define their own model/capability contract. A
+model being supported by the SDK does not mean your account can access it or that the
+service is currently available.
 
 The interface is model-neutral, not a guarantee that every model or endpoint
 supports every strategy. A compatible URL alone is insufficient: the chosen model
@@ -78,11 +80,10 @@ bypasses bridge preparation and observation hooks.
 
 ## Native Jev
 
-The request directly contains `model`, shared `state`, and `questions`. Jev's
-`choice`, `noul`, and `score` results are preserved and strictly validated. No
-intermediate language model, skill, portal prompt, or chat conversion is used.
-`GET /v1/models` lists native models. A listed catalog can differ from valid aliases;
-`jev-latest` is the documented stable alias.
+The SDK sends `model`, shared `state` and `questions` directly to Jev's decision API. It
+validates and preserves Jev's `choice`, `noul` and `score` results. `GET /v1/models`
+lists native models. A listed catalog can differ from valid aliases; `jev-latest` is the
+documented stable alias.
 
 `jev-preview` selects the preview release. Images and longer context require
 explicit `dangerZone` settings. Common image input preserves ordering; native
@@ -114,22 +115,29 @@ Jev, OpenAI Decisions, and Clef report native outputs and confidence. Generative
 to produce probability distributions. Those estimates are not logprobs, repeated
 sampling frequencies, calibrated confidence, or proof of correctness.
 
-Generative providers derive an argmax choice and a probability-weighted score from the
-elicited distributions. They do not synthesize native confidence statistics. Both
-paths use the same application contract, but metadata records their provenance:
-`native` versus `elicited`. `meta.providerKind` separately records `decision` or
-`generative` from the provider contract. Classification does not force Jev's
-confidence/usage requirements on a custom decision service. Evaluate performance and calibration on representative
-labeled data before adopting thresholds or comparing costs/latencies.
+Generative providers choose the option with the highest returned probability and
+calculate scores as a probability-weighted average. They do not add native confidence
+values. Both provider kinds use the same result format; metadata records whether
+probabilities are `native` or `elicited`. `meta.providerKind` separately records
+`decision` or `generative` from the provider contract. Classification does not force
+Jev's confidence/usage requirements on a custom decision service. Evaluate performance
+and calibration on representative labeled data before adopting thresholds or comparing
+costs/latencies.
 
 ## Compatibility boundaries
 
 Remote context limits, JSON Schema limits, model availability, output budgets,
 pricing, and rate limits are provider/account specific. The bridge's local caps
-do not override them. This release has no silent provider failover, model search,
+do not override them. The SDK has no silent provider failover, model search,
 credential refresh, provider-side batch API, or universal quality guarantee.
 Unsupported protocols require an explicit custom decision or generative provider; unsupported server
 features require an explicitly supported mode or a different model.
+
+The [routing API](../guides/ROUTING.md) selects among configured decision or
+extraction targets after capability preflight. It supports deterministic rules,
+optional decision-model selection, and explicitly configured failover. It does
+not discover models or establish account access. Generative targets require
+`allowGenerative: true` and cannot act as decision selectors.
 
 ## Dedicated operations
 

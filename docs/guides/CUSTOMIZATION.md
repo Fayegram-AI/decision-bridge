@@ -1,10 +1,10 @@
 # Customizing decisions and extending the bridge
 
-Customization is **per request**. You supply context in `state`, ordered `input`
-or `conversation` according to provider capabilities, the judgment in
-`instructions`, and the allowed categories/rubric in `criteria`. The same bridge
-instance can evaluate unrelated tasks on successive calls. This changes the
-question sent to the existing model, not its weights or account configuration.
+Customize each request by choosing the information, questions and allowed answers. Put
+context in `state`, ordered `input` or `conversation`, using a form your provider
+supports. Describe what to assess in `instructions` and define categories or a scoring
+rubric in `criteria`. You can reuse one bridge for unrelated tasks; each call supplies
+its own questions without changing the model or account settings.
 
 ## Runtime templates
 
@@ -56,10 +56,11 @@ in their prompts, but this is not proof of prompt-injection resistance. Do not l
 untrusted input choose unrestricted instructions, URLs, credentials, or actions.
 Validation guarantees structure, not semantic correctness or authorization.
 
-Use bounded questions and well-defined categories. Add an explicit `unknown` or
-`needs_review` option when abstention is useful. Examples and domain definitions
-belong in relevant instructions/context. Store a template revision alongside your
-request/result externally; adding arbitrary top-level request fields is rejected.
+Ask focused questions and define the categories clearly. Add an `unknown` or
+`needs_review` option when the model should be able to decline a choice. Include
+examples and domain definitions in the relevant instructions or context. Store a
+template revision with your request and result in your application; arbitrary extra
+fields at the top of a request are rejected.
 
 ## Add context preparation
 
@@ -77,13 +78,13 @@ const bridge = createBridge({
 });
 ```
 
-Extensions run in registration order. They receive immutable snapshots and must
-return replacements rather than mutate input. Async retrieval can use the supplied
-context signal. No content is persisted unless your extension explicitly saves it.
-Use `prepareInput(parts, context)` for ordered input and
-`prepareConversation(items, context)` for conversation history. A preparation
-extension must implement the selected form's hook; transformed content is
-revalidated before dispatch. Observer-only extensions work with every form.
+Extensions run in registration order. They receive copies that cannot be changed, so
+return a replacement to modify the input. Use the context's signal to cancel
+asynchronous retrieval. Content is saved only if your extension saves it. Use
+`prepareInput(parts, context)` for ordered input and
+`prepareConversation(items, context)` for conversation history. A preparation extension
+must implement the selected form's hook; transformed content is revalidated before
+dispatch. Observer-only extensions work with every form.
 
 ## Observe without changing decisions
 
@@ -107,10 +108,11 @@ const bridge = createBridge({
 });
 ```
 
-Observer failure is isolated and recorded in the returned metadata. It is not a
-reason to retry inference. Observers cannot rewrite outputs. The CLI does not load
-SDK extensions from ordinary JSON configuration; add them in the application or
-an explicitly trusted provider module instead of executable auto-discovery.
+If an observer fails, the result still succeeds and its metadata records the failure.
+The bridge never retries inference because an observer fails, and observers receive
+read-only results. The CLI does not load SDK extensions from ordinary JSON
+configuration; add them in the application or an explicitly trusted provider module
+instead of executable auto-discovery.
 
 ## Application policy is a separate stage
 
@@ -143,5 +145,12 @@ Add retrieval/redaction through `prepareState`, `prepareInput` or
 `onResult`, and another protocol through the explicit [custom decision](CUSTOM_DECISION.md)
 or [custom generative](CUSTOM_GENERATIVE.md) contract. Keep routing/threshold policies
 outside the provider and cover additions with relevant regression tests. Persisted templates,
-caching, and routing can be built around the same `evaluate({ state, questions })`
-contract rather than hardcoded into every backend.
+caching, and application policies can be built around the same
+`evaluate({ state, questions })` contract.
+
+For provider selection, use the separate [routing API](ROUTING.md). Its
+`prepare(request, context)` hook receives the complete request and may replace
+questions or extraction fields before eligibility is finalized. Bridge preparation
+extensions above change only the selected input form. Routing supplies its own
+clarification and observation callbacks; provider implementations remain focused
+on their protocol and capabilities.

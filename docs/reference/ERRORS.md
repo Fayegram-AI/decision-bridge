@@ -1,13 +1,15 @@
 # Errors and recovery
 
 `DecisionError` extends `Error` and exposes `code`, optional `status`, `requestId`,
-`gatewayLogId`, `attempts`, and numeric `upstreamCode` for Cloudflare diagnostics. Optional `source`,
-`upstreamErrorCode`, `upstreamErrorType`, `retryAfterMs` and `retryable`
-distinguish client controls and upstream failures.
-OpenAI Decisions refusal errors can also carry validated `refusedQuestions` and
-`usage`. `toJSON()` and `publicError(error)` return safe structured details.
-Unknown exceptions become a generic message, not a copied stack/body. Custom
-providers deliberately constructing `DecisionError` must keep its message safe.
+`gatewayLogId`, `attempts`, and numeric `upstreamCode` for Cloudflare diagnostics.
+Optional `source`, `upstreamErrorCode`, `upstreamErrorType`, `retryAfterMs` and
+`retryable` help identify whether a failure came from local limits or the service.
+OpenAI Decisions refusal errors can also carry validated `refusedQuestions` and `usage`.
+Routed errors can carry immutable `routing` diagnostics with candidate statuses,
+selector usage, execution attempts and timings. `toJSON()` and `publicError(error)`
+return safe structured details. Unknown exceptions use a generic message; stack traces
+and raw response bodies are omitted. Custom providers deliberately constructing
+`DecisionError` must keep its message safe.
 
 | Code | Meaning and response |
 | --- | --- |
@@ -75,15 +77,40 @@ exactly-once billing guarantee. Set `maxRetries: 0` when your workflow requires
 manual retry decisions. The bridge never retries a successful request because an
 observer failed; inspect `meta.observerFailures` separately.
 
+## Routing failures and recovery
+
+The `/routing` API in 0.1.4 adds these codes:
+
+| Code | Meaning and response |
+| --- | --- |
+| `NO_ELIGIBLE_ROUTE` | No configured candidate can execute the request; inspect enabled state, readiness, capabilities and hard constraints |
+| `ROUTE_UNAVAILABLE` | A direct target is disabled, automatic targets are cooling down, or the selected target became unavailable before dispatch; inspect any `retryAfterMs` hint |
+| `ROUTING_AMBIGUOUS` | Multiple eligible targets remain without an accepted selection; configure preferences, clarification or a decision selector |
+| `ROUTING_CONTEXT_TOO_LARGE` | Selector context exceeds its configured byte ceiling; shorten `routingDescription` or configure explicit local fallback |
+| `CLARIFICATION_TIMEOUT` | Active clarification exceeded its budget; provide an answer within the budget or use unattended selection |
+
+When a routed call ends with a provider failure, the error keeps that provider error
+code. Cross-route recovery is disabled by default and must be configured through
+`auto.failover`. Before dispatch, a selected target that becomes unavailable can be
+skipped for a configured eligible fallback. After dispatch, only typed `RATE_LIMITED`
+and `CAPACITY_EXCEEDED` failures can advance to another eligible target. Generic
+HTTP/network failures, refusal, invalid responses, authentication/allocation errors and
+cancellation do not. Router-owned failover disables additional transport/Gateway
+attempts; supplied providers must declare and honor `singleDispatch: true`.
+
+Selector fallback is configured separately and requires a route that can be chosen by
+rules or priority. Both fallback paths still enforce hard request constraints. See
+[routing recovery and diagnostics](../guides/ROUTING.md#optional-recovery-and-diagnostics).
+
 ## Practical diagnosis
 
-401/403 usually requires checking key/account/model authorization with the provider;
-the client reports the actual status rather than claiming to diagnose account
-state. 404 can indicate an incorrect API base/model/route. A 429 can represent
-temporary throttling or an allocation/billing failure; inspect `code`,
-`upstreamErrorCode`, `upstreamErrorType` and `retryable`. For `INVALID_RESPONSE`, a schema-capable model
-may still emit invalid probabilities or be routed through an incompatible endpoint.
-Change configuration deliberately and retest; do not disable local validation.
+For 401 or 403, check that the key is valid and the account has permission to use the
+model. The client reports the service's status; it cannot determine your account state.
+A 404 may indicate an incorrect API base, model or route. A 429 can represent temporary
+throttling or an allocation/billing failure; inspect `code`, `upstreamErrorCode`,
+`upstreamErrorType` and `retryable`. For `INVALID_RESPONSE`, a schema-capable model may
+still emit invalid probabilities or be routed through an incompatible endpoint. Change
+configuration deliberately and retest; do not disable local validation.
 
 Enabling busy execution options for Cloudflare Clef REST fails local preflight
 with `UNSUPPORTED_CAPABILITY`, without an HTTP status, upstream code, or dispatch.

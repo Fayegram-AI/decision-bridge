@@ -1,11 +1,11 @@
 # Cloudflare Clef decisions
 
-Use `cloudflare-decisions` for hosted inference with `clef` (the default),
-`clef-flash`, or `clef-omni`. All three support common bridge requests and the
-dedicated native API. Each accepts its full `@cf/cloudflare/<model>` alias.
-The provider normalizes the endpoint identifier and the required input selector together.
-See the [model selector inventory](../../README.md#model-selectors) for supported
-short selectors and full forms.
+Use `cloudflare-decisions` for hosted inference with `clef` (the default), `clef-flash`,
+or `clef-omni`. All three support common bridge requests and the dedicated native API.
+Each accepts its full `@cf/cloudflare/<model>` alias. The provider resolves short and
+full model names to the matching endpoint and input selector. See the
+[model selector inventory](../../README.md#model-selectors) for supported short
+selectors and full forms.
 
 | Model | Hosted context, in tokens | Default client request budget | Media |
 | --- | ---: | ---: | --- |
@@ -13,11 +13,12 @@ short selectors and full forms.
 | Clef-flash | 24,576 | 13 MiB | Images |
 | Clef-omni | 64,000 | 36 MiB | Images, audio, video |
 
-Questions and media consume context before text state; the service truncates
-remaining text state to fit. Requests whose questions/media exhaust context can
-fail. Byte checks cannot guarantee token fit or detect remote truncation.
-Consult the official [model pages](#official-references)
-for current pricing and availability; the bridge does not discover account access.
+Questions and media use the model's context before text state. The service may shorten
+the remaining text to fit, or reject a request if questions and media use all available
+context. A request that fits the SDK's byte limit may still exceed the model's token
+limit; local checks cannot detect text shortened by the service. Consult the official
+[model pages](#official-references) for current pricing and availability; the bridge
+does not discover account access.
 
 ## Supported inference paths
 
@@ -129,10 +130,10 @@ Text parts concatenate exactly, without inserted separators. Image detail can be
 omitted, `null`, or `auto`; explicit `low`, `high`, and `original` are unsupported.
 Safety identifiers are unsupported by this provider.
 
-Preflight validates supported representations, canonical base64, positive image
-dimensions and container structure. Service question/media counts, decoded sizes,
-dimensions, duration and context ceilings are not enforced locally. Header
-inspection is not full decoding; upstream admission and decoding remain authoritative.
+Before sending a request, the SDK checks image representation, base64 encoding, positive
+dimensions and container structure. Cloudflare checks its limits on question and media
+counts, decoded sizes, dimensions, duration and model context. Local header checks do
+not fully decode media; Cloudflare can still reject it.
 
 Client request budgets default to 13 MiB for Clef/Clef-flash and 36 MiB for Omni.
 An explicit `maxRequestBytes` overrides either default through the shared 64 MiB
@@ -225,11 +226,11 @@ response rather than shared binding fields. Available IDs are also preserved in
 safe public errors, including response validation and body-reading failures. See the complete
 [inference handler example](../../examples/cloudflare-worker.mjs).
 
-The example covers inference integration. Route requests through your application's
-authorization and enforce an incoming HTTP body limit appropriate to the selected
-model before parsing JSON: 13 MiB for Clef/Clef-flash, or the configured Omni
-budget (36 MiB by default). SDK preflight validates the parsed decision request; it cannot bound
-the HTTP body already consumed by `request.json()` or authorize callers.
+The example handles model calls. Your application must check caller permissions and
+limit the incoming HTTP body to a size appropriate for the selected model before parsing
+JSON: 13 MiB for Clef/Clef-flash, or the configured Omni budget (36 MiB by default). SDK
+preflight validates the parsed decision request; it cannot bound the HTTP body already
+consumed by `request.json()` or authorize callers.
 
 REST is the ordinary account-ID/token API path. Workers binding and Gateway are
 optional, supported inference paths for all three models. Use your Worker's configured
@@ -336,7 +337,9 @@ Cloudflare single JSON input and individual JSONL records are read within a
 64 MiB cap, then the same model-specific SDK preflight applies. This supports
 request-level model overrides and mixed-model batches. JSONL retains its 64 MiB
 total cap. No separate media-upload flags are needed; use embedded input parts
-or native arrays in JSON. The configuration schema version remains 1. `models` is unsupported.
+or native arrays in JSON. Single-provider profiles use configuration version 1;
+[routing registries](ROUTING.md#cli-registry-configuration) use version 2 and common
+requests. `models` is unsupported.
 SDK array batching prevalidates all requests before inference; CLI JSONL batching
 validates incrementally. Neither uses Cloudflare's asynchronous batch service.
 

@@ -1,2 +1,2 @@
 /** Keep in sync with package.json; scripts/check.mjs verifies the release version. */
-export const VERSION = '0.1.3';
+export const VERSION = '0.1.4';

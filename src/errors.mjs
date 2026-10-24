@@ -1,10 +1,11 @@
 /** Public errors never retain raw upstream bodies, headers or original exceptions. */
 export class DecisionError extends Error {
   constructor(message, { code = 'DECISION_ERROR', status, requestId, gatewayLogId, attempts, refusedQuestions, usage, upstreamCode,
-    source, upstreamErrorCode, upstreamErrorType, retryAfterMs, retryable } = {}) {
+    source, upstreamErrorCode, upstreamErrorType, retryAfterMs, retryable, routing } = {}) {
     super(message);
     this.name = 'DecisionError';
     this.code = code;
+    if (routing !== undefined) this.routing = routing;
     if (status !== undefined) this.status = status;
     if (requestId !== undefined) this.requestId = requestId;
     if (gatewayLogId !== undefined) this.gatewayLogId = gatewayLogId;
@@ -21,6 +22,7 @@ export class DecisionError extends Error {
     return {
       code: this.code,
       message: this.message,
+      ...(this.routing === undefined ? {} : { routing: this.routing }),
       ...(this.status === undefined ? {} : { status: this.status }),
       ...(this.requestId === undefined ? {} : { requestId: this.requestId }),
       ...(this.gatewayLogId === undefined ? {} : { gatewayLogId: this.gatewayLogId }),

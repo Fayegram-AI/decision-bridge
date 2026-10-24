@@ -1,8 +1,8 @@
 # Custom generative providers
 
-This opt-in path elicits decisions from general-purpose models. It retains the
-maintained OpenAI-compatible, OpenRouter, and Anthropic adapters. Import them from
-`@fayegram-ai/decision-bridge/custom/generative`; the root factory accepts native
+Use this entry point to prompt general-purpose models for structured decisions. It
+includes maintained OpenAI-compatible, OpenRouter and Anthropic adapters. Import them
+from `@fayegram-ai/decision-bridge/custom/generative`; the root factory accepts native
 decision providers only.
 
 ## Use a maintained preset
@@ -106,14 +106,15 @@ language is supported.
 
 ## Result semantics
 
-These providers have `kind: 'generative'`. The bridge requires elicited probability
-provenance and `confidenceSource: 'unavailable'`, and rejects returned native
-confidence claims or answer confidence fields. Their output is an estimate elicited
-from a model, not a native probability, logprob, or calibration guarantee.
-Presets support shared state and legacy `choice`, `noul`, and `score`; ordered
-media, conversation/tool history, remote images, prompt-cache controls, typed
-choices, labelled scores and safety identifiers are unsupported.
-A new module may declare capabilities only after implementing and validating them.
+These providers have `kind: 'generative'`. Their probabilities are estimates the model
+produces in response to a prompt, labelled `elicited`. They are not native decision
+probabilities or token logprobs, and the label does not establish that they are
+calibrated. The bridge requires `confidenceSource: 'unavailable'` and rejects
+native-confidence claims or confidence fields on answers. Presets support shared state
+and legacy `choice`, `noul`, and `score`; ordered media, conversation/tool history,
+remote images, prompt-cache controls, typed choices, labelled scores and safety
+identifiers are unsupported. A new module may declare capabilities only after
+implementing and validating them.
 
 ## OpenAI-compatible servers
 
@@ -126,10 +127,12 @@ normalization are validated locally to accommodate different supported schema
 subsets. `json_object` requests JSON without schema enforcement. `text` omits the
 format field and relies on instructions plus strict local validation.
 
-There is **no auto mode**: an unsupported schema error is visible rather than
-triggering a second request with weaker enforcement. A refusal, truncated output,
+Output formats are selected explicitly. An unsupported schema error does not
+trigger a second request with weaker enforcement. A refusal, truncated output,
 malformed JSON, probability violation, or unexpected tool call is an explicit
-error. No Markdown stripping or JSON repair occurs.
+error. No Markdown stripping or JSON repair occurs. Automatic target selection
+through [routing](ROUTING.md) preserves these output-format constraints and
+requires `allowGenerative: true` for each generative target.
 
 The default token field is `max_completion_tokens`. Some compatible servers need
 `max_tokens`; set `tokenParameter` explicitly. No temperature or reasoning setting

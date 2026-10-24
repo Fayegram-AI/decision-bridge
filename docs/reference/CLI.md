@@ -4,7 +4,8 @@ The optional command runner evaluates decision files, runs Clairic extraction,
 and validates or replays Live protocol records offline. For application
 integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
 
-The extraction and Live commands require **0.1.3 or later**; see
+Routing registries and inspection require **0.1.4**. Extraction and Live commands
+require **0.1.3 or later**; see
 [version availability](../README.md#version-availability).
 
 After [installing the package](../guides/GETTING_STARTED.md#install-into-your-application)
@@ -21,14 +22,15 @@ it with `node bin/decision.mjs` from a source checkout. `decision` and
 `faye-decision` are equivalent aliases with the same commands and options.
 `--help` and `--version` do not access credentials or services.
 
-Decision commands default to Jev. The extraction namespace defaults to
-`cloudflare-extraction` only when no provider was selected. Flags override
-`DECISION_*` environment settings, which override an explicit config file and
-then built-in defaults. It constructs an
-explicit provider for the SDK; `createBridge` itself has no implicit selection.
-Choose a supported native model from the
-[model selector inventory](../../README.md#model-selectors).
-Custom generative presets require an explicit model ID.
+With a single-provider profile, decision commands default to Jev. Extraction commands
+default to `cloudflare-extraction` when no provider is selected. Flags override
+`DECISION_*` environment settings, then the named config file, then built-in defaults.
+The CLI resolves these settings before constructing a provider; SDK applications must
+select a provider when calling `createBridge`. Choose a supported native model from the
+[model selector inventory](../../README.md#model-selectors). Custom generative presets
+require an explicit model ID. Version-2 routing registries instead select configured
+targets through `defaultRoute` or `--route`; see
+[routing registries](#routing-registries).
 
 ## Commands
 
@@ -53,11 +55,13 @@ there is no CLI binding selector. Gateway settings route the selected REST reque
 | `init [DIRECTORY]` | Create config and schema, sample request, environment template, and gitignore; generate a custom module when needed; never overwrite |
 | `evaluate [FILE\|-]` | One evaluation; aliases `eval` and `ask` |
 | `validate [FILE\|-]` | Validate input locally; does not call a provider |
+| `inspect FILE\|- --config FILE` | Report version-2 routing eligibility and selection without inference |
 | `schema [FILE\|-]` | Print the generative response schema for these questions; local only |
 | `models` | List the configured provider's models; may be paginated |
 | `batch FILE\|-` | Stream JSONL inputs and ordered JSONL result/error records |
 | `extraction run FILE\|-` | One native extraction; returns `{ extraction, meta }` |
 | `extraction validate FILE\|-` | Offline structural and client-budget validation |
+| `extraction inspect FILE\|- --config FILE` | Offline inspection of extraction routes in a version-2 registry |
 | `extraction batch FILE\|-` | Ordered extraction JSONL results and per-row errors |
 | `extraction init [DIRECTORY]` | Create an extraction profile, request, schema and credential template |
 | `live validate FILE\|- --kind config\|command\|event` | Offline Live structure validation |
@@ -69,10 +73,10 @@ initialization, and ordered batches. Experimental images/boxes require
 JSON configuration). Use `--no-jev-images` and `--no-jev-long-context` to
 override enabled settings. See the [Jev guide](../guides/JEV.md).
 
-No input filename on decision `evaluate`, `validate`, or `schema` selects the bundled sample,
-not stdin. Use `-` explicitly for stdin. Empty invocation prints help. Configuration
-and credential errors do not cause fallback to another backend.
-Extraction and Live file operations require an explicit filename or `-`.
+When using a single-provider profile, omitting the input file for `evaluate`, `validate`
+or `schema` uses the bundled sample. Pass `-` to read from stdin. Empty invocation
+prints help. Configuration and credential errors do not cause fallback to another
+backend. Extraction and Live file operations require an explicit filename or `-`.
 Extraction rejects `--native` because its request already uses native fields.
 
 ```bash
@@ -92,15 +96,51 @@ decision-bridge init ./my-service --provider custom-decision
 decision-bridge init ./my-protocol --provider custom-generative
 ```
 
-Preset initialization writes a ready-to-configure profile and credential
-placeholders. An unselected custom implementation writes `provider.mjs` with an
-explicit service implementation error until you connect it. An existing
-`--provider-module` is referenced without execution or overwrite. All profiles
-include a copied JSON Schema for editor validation. See [custom providers](../guides/CUSTOM_PROVIDERS.md).
+Preset initialization writes a ready-to-configure profile and credential placeholders.
+If no custom implementation is selected, `init` writes a `provider.mjs` template. Its
+service call throws an error until you implement it. An existing `--provider-module` is
+referenced without execution or overwrite. All profiles include a copied JSON Schema for
+editor validation. See [custom providers](../guides/CUSTOM_PROVIDERS.md).
 
 OpenAI initialization writes the selected model into configuration, using `default`
 when omitted. Its generated common and native requests omit `model`, allowing
 later configuration changes to control selection.
+
+## Routing registries
+
+Auto mode (`--route auto` or a configured `defaultRoute: 'auto'`) is experimental
+in 0.1.4 for both deterministic and decision-assisted policies.
+
+Create a registry template with `init DIRECTORY --route auto`, or
+`extraction init DIRECTORY --route auto`. Load it explicitly on later commands:
+
+```bash
+decision-bridge inspect request.json --config routes.json
+decision-bridge validate request.json --config routes.json
+decision-bridge evaluate request.json --config routes.json --env-file .env
+decision-bridge evaluate request.json --config routes.json --route primary --env-file .env
+decision-bridge batch requests.jsonl --config routes.json --no-routing-prompt
+```
+
+The same commands work under `extraction`, where `run` aliases `evaluate`.
+Routed commands require a request filename or `-`; they do not use the bundled
+sample. `models`, `schema`, and `--native` are unavailable with a registry.
+Single-provider override flags are rejected, and legacy `DECISION_*` selection
+variables are ignored. Set provider/model/transport fields in each route's
+configuration. See [configuration version 2](CONFIGURATION.md#routing-registries-version-2).
+
+`inspect` and `validate` perform no inference, module imports, or prompts. The report
+includes `routes`, `eligible`, `provisional`, `validationScope` and `outcome`, plus
+missing selector settings when relevant. `validate` adds `valid: true` unless the
+outcome is known to be impossible. An unresolved or provisional report still requires
+execution-time validation.
+
+With terminal stdin and stderr and a request file, ambiguous selection can prompt
+on stderr; stdout remains JSON/JSONL. `--interactive` requires those terminal
+conditions. `--no-interactive` or `--no-routing-prompt` suppresses clarification.
+Stdin request input is unattended. EOF cancels clarification, including later
+batch rows. Choices apply to one request and never rewrite the registry.
+See the [routing guide](../guides/ROUTING.md) for policy and selector requirements.
 
 ## Flags
 
@@ -108,6 +148,9 @@ later configuration changes to control selection.
 | --- | --- |
 | `--config FILE` | Explicit JSON configuration; never autodiscovered |
 | `--env-file FILE` | Load an explicit environment file without changing the parent shell |
+| `--route ID` | Select `auto` or a concrete route in a version-2 registry; `init --route auto` creates a registry template |
+| `--interactive` | Enable terminal clarification when needed; requires terminal stdin/stderr and a request file |
+| `--no-interactive`, `--no-routing-prompt` | Suppress routing clarification and enforce unattended selector requirements |
 | `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `cloudflare-extraction` (extraction namespace), `custom-decision`, `custom-generative` |
 | `--preset NAME` | custom-generative preset: `openai-compatible`, `openrouter`, or `anthropic`; exclusive with module |
 | `--native` | Explicit native Decisions input/output; init/evaluate/validate/batch only |
@@ -120,7 +163,7 @@ later configuration changes to control selection.
 | `--reject-if-busy`, `--no-reject-if-busy` | Override Cloudflare request/provider busy settings. Enabling fails Clef REST preflight; Clairic forwards the setting. See the [Clef REST limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) |
 | `--gateway-id ID` | Existing Cloudflare Gateway; richer settings in config |
 | `--no-auth` | Only for a loopback OpenAI-compatible endpoint |
-| `--timeout-ms N` | HTTP and bridge deadline for each evaluation/listing |
+| `--timeout-ms N` | Single-provider HTTP and bridge deadline for each evaluation/listing; registry budgets belong in configuration |
 | `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare default to 0, Jev and generative presets to 2 |
 | `--max-tokens N` | Generative output budget; default 4096 |
 | `--response-format MODE` | `json_schema`, `json_object`, or `text`; compatible generative presets only |
@@ -135,8 +178,9 @@ later configuration changes to control selection.
 | `--help`, `-h`, `--version`, `-v` | Informational commands |
 
 Unknown or duplicate flags fail. Provider-inapplicable flags fail instead of being
-ignored. `--model` wins over request.model; otherwise request.model wins over the
-configured model. See [configuration](CONFIGURATION.md) for full precedence.
+ignored. In single-provider mode, `--model` wins over request.model; otherwise
+request.model wins over the configured model. Routing uses request.model as a
+target constraint. See [configuration](CONFIGURATION.md) for full precedence.
 
 ## JSON output contract
 
@@ -147,15 +191,16 @@ wrapped in a progress log or Markdown. Errors are `{ "error": { "code", "message
 Native Decisions output is `{ decision, meta }`. OpenAI refused questions fail the
 complete evaluation, with allowlisted refusal diagnostics and validated usage.
 
-Common results include `meta.providerKind` from the provider contract. Offline
-`validate` requires no credentials and never imports custom modules. Its JSON
-includes `validationScope: 'provider'` for known native/preset profiles or
-`'structure'` for a custom module. Structure validation cannot verify an unknown
-module's capabilities or protocol. `schema` is an offline generative-output tool;
-it does not add generative support to a native provider.
-Decision validation reports `operation: 'decision'` and `questionCount`;
-extraction reports `operation: 'extraction'` and `fieldCount`. Neither authenticates
-an account or claims server admission. Live validation reports its `kind` and
+Common results include `meta.providerKind` from the provider contract. Routed results
+also include `meta.routing`; routed failures can include `error.routing`. With a
+single-provider profile, offline `validate` needs no credentials and does not import
+custom modules. Its JSON includes `validationScope: 'provider'` for known native/preset
+profiles or `'structure'` for a custom module. Structure validation cannot verify an
+unknown module's capabilities or protocol. `schema` is an offline generative-output
+tool; it does not add generative support to a native provider. Decision validation
+reports `operation: 'decision'` and `questionCount`; extraction reports
+`operation: 'extraction'` and `fieldCount`. Neither checks account access or guarantees
+that the service will accept the request. Live validation reports its `kind` and
 `validationScope: 'structure'`.
 
 A batch emits one compact record per nonblank input line:
@@ -165,18 +210,18 @@ A batch emits one compact record per nonblank input line:
 {"line":2,"ok":false,"error":{"code":"VALIDATION_ERROR","message":"..."}}
 ```
 
-This is a schematic shape, not an inference example. `line` is the original
-one-based physical line number, including blank lines in the numbering. Blank
-lines produce no record. Malformed JSON on a single line is a failed record and
-processing continues. Evaluation failures likewise remain explicit records.
+The example above shows the record format. `line` is the original one-based physical
+line number, including blank lines in the numbering. Blank lines produce no record.
+Malformed JSON on a single line is a failed record and processing continues. Evaluation
+failures likewise remain explicit records.
 
-The CLI streams input with a bounded, ordered window. A completed oldest result
-is emitted even when stdin remains open and the producer has not sent another
-line; the window does not have to fill before output begins. A slow earlier request can
-hold back emission and dispatch even when later requests finish; this prioritizes
-bounded memory and stable ordering over maximum throughput. Up to `concurrency`
-requests may already be running when a failure is encountered. There is no CLI
-`stopOnError` flag; the SDK array batch API provides that policy.
+The CLI processes a limited number of rows at a time and emits results in input order.
+It writes a result as soon as that row and all earlier rows are complete, even if stdin
+is still open and no new line has arrived. A slow earlier request can hold back emission
+and dispatch even when later requests finish; this prioritizes bounded memory and stable
+ordering over maximum throughput. Up to `concurrency` requests may already be running
+when a failure is encountered. There is no CLI `stopOnError` flag; the SDK array batch
+API provides that policy.
 
 Invalid UTF-8, input-size violations, unreadable input, or interrupted execution are
 global failures. Work already sent to a provider may have been billed. Do not assume
@@ -218,14 +263,18 @@ Per-line limits exclude LF or CRLF delimiters, regardless of stream chunking.
 A final record may omit its newline; its complete bytes must still fit the limit.
 The total input limit includes delimiters.
 
-Output files are written to a same-directory exclusive temporary file with mode
-0600, synced, then committed. Existing paths are protected unless `--force` is
-explicit. A batch containing ordinary failed records still produces a complete
-JSONL file and exits 1. A global failure removes the unfinished temporary output.
-Stdout cannot be rolled back and may contain a valid prefix after interruption.
-No parent output directories are created automatically. Filesystems without hard
-link support can reject no-clobber finalization; the error is explicit. File mode
-and atomic filesystem semantics remain operating-system/filesystem dependent.
+Routing registries use a 64 MiB input ceiling for single JSON inputs and each
+JSONL record, with the same 64 MiB total JSONL limit. Each candidate's provider
+preflight then enforces its configured serialized request and media limits.
+
+The CLI writes output to a new temporary file in the destination directory, uses mode
+0600 where supported, syncs it, and then creates the final file. It protects existing
+output unless you pass `--force`. A batch containing ordinary failed records still
+produces a complete JSONL file and exits 1. A global failure removes the unfinished
+temporary output. Stdout cannot be rolled back and may contain a valid prefix after
+interruption. No parent output directories are created automatically. Filesystems
+without hard link support can reject no-clobber finalization; the error is explicit.
+File mode and atomic filesystem semantics remain operating-system/filesystem dependent.
 
 ## Input and cancellation boundaries
 

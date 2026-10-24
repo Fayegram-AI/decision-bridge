@@ -3,10 +3,10 @@
 Requires **0.1.3 or later**. See [version availability](../README.md#version-availability)
 and [installation](GETTING_STARTED.md#install-into-your-application).
 
-Import extraction from `@fayegram-ai/decision-bridge/extraction`. This operation
-returns typed values and predictive statistics, using Cloudflare Clairic through
-REST or an injected Workers AI binding. Its result is independent of the decision
-bridge's question/answer contract.
+Import `@fayegram-ai/decision-bridge/extraction` to extract typed values and predictive
+statistics with Cloudflare Clairic. Connect through REST or supply a Workers AI binding.
+Extraction has its own field definitions and result format, separate from the bridge's
+questions and answers.
 
 ```javascript
 import { CloudflareExtractionProvider } from '@fayegram-ai/decision-bridge/extraction';
@@ -43,12 +43,12 @@ identities remain separate. There is no model-discovery request.
 | `estimate` | Required numeric or ISO-date `min` and `max`; optional `step` and `scale` | Number, date string or null, plus available distribution summaries |
 | `forecast` | Prediction bounds plus optional positive `horizon` and `interval` | Native value and ordered predictive `steps`, retained as JSON |
 
-`instructions` and `null_threshold` describe individual fields. `null_threshold`
-must be greater than zero and at most one. `number` and `duration` accept boolean
-`integer` and nonnegative integer `decimals`; numeric lists also accept `decimals`.
-Grids support positive numeric steps or `month`/`year`;
-`scale` is `linear` or `log`. Forecast intervals are `step`, `minute`, `hour`,
-`day`, `week`, `month`, `quarter`, or `year`. Server ceilings remain server-owned.
+`instructions` and `null_threshold` describe individual fields. `null_threshold` must be
+greater than zero and at most one. `number` and `duration` accept boolean `integer` and
+nonnegative integer `decimals`; numeric lists also accept `decimals`. Grids support
+positive numeric steps, `month`, or `year`; `scale` is `linear` or `log`. Forecast
+intervals are `step`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, or `year`.
+The service checks its own limits.
 
 The immutable envelope is `{ extraction, meta }`. The native extraction retains
 all returned fields: values, guesses, confidence, `p_null`, spans, means,
@@ -56,10 +56,10 @@ medians, `p10`/`p90`, bounds probabilities, quantiles, forecast steps, `truncate
 optional `state_text`, and usage including optional pass counts. Unknown native
 response fields are retained after safe JSON validation.
 
-A null value can coexist with a guess and span. Typed output does not establish
-factual accuracy. The adapter does not recalculate predictions or token totals.
-Predictive substructures with an underspecified schema remain JSON values in the
-types; span offsets are preserved without assuming JavaScript slicing units.
+A null value can coexist with a guess and span. Typed output does not establish factual
+accuracy. The adapter does not recalculate predictions or token totals. Predictive
+fields whose detailed structure is not specified use JSON value types. Span offsets are
+preserved as returned; do not assume they use JavaScript string indices.
 
 ## Images, binding and Gateway
 
@@ -84,9 +84,10 @@ rejection of an execution setting is reported without dropping the setting.
 
 ## Validation, batching and errors
 
-`validateExtractionRequest(request, options?)` is credential-free offline
-validation. `provider.validate(request)` uses the configured provider settings.
-Both check structure and client resource budgets, without promising admission.
+`validateExtractionRequest(request, options?)` is credential-free offline validation.
+`provider.validate(request)` uses the configured provider settings. Both check request
+structure and configured size limits. Passing local validation does not guarantee that
+the service will accept a request.
 
 Request/response budgets default to 8 MiB each and can be configured through
 64 MiB. Requests are checked before media decoding. `extract(request, { signal })`
@@ -115,10 +116,17 @@ decision extraction batch requests.jsonl --concurrency 4 --env-file .env
 ```
 
 The namespace defaults to `cloudflare-extraction`; incompatible explicit
-providers are rejected. Configuration schema version remains 1. Use the existing
+providers are rejected. Single-provider profiles use configuration version 1. Use the existing
 Cloudflare account, credential, Gateway, timeout and retry settings. Inference
 options belong in request JSON. Validation is offline and reports `fieldCount`.
 Streaming JSONL batches can complete valid rows before a later row fails.
+
+For selection among configured Clairic targets, use `createExtractionRouter` and
+`extractRoutedBatch` from `/routing`, or a version-2 CLI registry. The
+`extraction init DIRECTORY --route auto` command creates a registry template;
+`extraction inspect FILE --config REGISTRY` reports offline eligibility.
+The extraction request and native result remain unchanged, with routing metadata
+added. See [configurable routing](ROUTING.md).
 
 See the [runnable extraction example](../../examples/extraction.mjs), the
 [official model schema](https://developers.cloudflare.com/workers-ai/models/clairic/)

@@ -6,9 +6,9 @@ evaluate request files.
 
 ## Prerequisites
 
-This guide's example uses Node.js **22.16 or newer**, npm, and a TypeSafe API key
-for the explicitly selected Jev provider. The SDK also loads in modern browsers; direct calls
-depend on the provider's CORS policy and an explicit client-safe credential. See
+The example uses Node.js **22.16 or newer**, npm, and a TypeSafe API key for Jev. The
+SDK also runs in modern browsers, where direct requests need a provider that allows your
+web origin through CORS and a credential suitable for browser use. See
 [browser integration](BROWSER.md). Other backends use their own keys; see
 [switching models](SWITCHING_MODELS.md).
 
@@ -25,7 +25,7 @@ path with your own; see [packaging and release](../development/RELEASING.md) to
 build and verify one from a source checkout:
 
 ```bash
-npm install /path/to/fayegram-ai-decision-bridge-0.1.3.tgz
+npm install /path/to/fayegram-ai-decision-bridge-0.1.4.tgz
 ```
 
 The installed package contains the SDK, declarations, command runner, examples,
@@ -98,15 +98,16 @@ using an ID available to your account. An individual request's `model` overrides
 that default. See the [SDK reference](../reference/SDK.md) for scores, result
 metadata, cancellation, batching, and extensions.
 
-Bridge construction can fail for invalid configuration or missing credentials;
-evaluation can fail for invalid input or provider errors. Both are inside the
-example's `try` block. `publicError(error)` returns a safe `code` and `message`, plus
-HTTP status, request ID, and attempt count when available. See [errors and recovery](../reference/ERRORS.md).
+Creating a bridge can fail if configuration is invalid or credentials are missing.
+Evaluating a request can fail if its input is invalid or the provider returns an error,
+so the example keeps both steps inside `try`. `publicError(error)` returns a safe `code`
+and `message`, plus HTTP status, request ID, and attempt count when available. See
+[errors and recovery](../reference/ERRORS.md).
 
-SDK selection is explicit: use `createBridge({ provider })` with a constructed
-provider or `createBridge({ jev: options })` for Jev. Empty options and omitted
-options are errors. `createProvider` also requires its `type` explicitly.
-The CLI has its own Jev default and does not change SDK selection rules.
+Select a provider with `createBridge({ provider })`, or use
+`createBridge({ jev: options })` for Jev. Calling `createBridge()` or `createBridge({})`
+without either selection is an error. `createProvider` requires a `type`. The CLI
+defaults to Jev; SDK applications choose their provider in code.
 
 ## TypeScript
 
