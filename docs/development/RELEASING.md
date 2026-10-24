@@ -20,7 +20,7 @@ checks that exact tarball in a clean offline consumer, and retains it at
 `release/fayegram-ai-decision-bridge-VERSION.tgz`. The `release/` directory is Git-ignored.
 Packing and individual verification commands have 120-second bounds; the combined
 installed-consumer verification stage has a separate 600-second bound and streams
-its progress. This accommodates CLI startup across multiple verification commands.
+its progress.
 To check that archive again, run:
 
 ```text
@@ -32,28 +32,20 @@ examples, limits, errors, and service compatibility notes. Inspect the MIT copyr
 notice and package contents. Use a hosted check only when a change leaves a specific
 question about the service protocol that fixtures cannot answer. Run it in an explicitly
 authorized account or runtime. Offline fixtures are sufficient for routine development
-and CI; fixture and declaration checks do not establish hosted binding/Gateway/Live
-behavior. Report the actual verification scope. Keep completed verification evidence
-separate from maintained consumer guidance. These content and verification checks do not
-depend on publication account setup.
+and CI. For protocol changes, document which hosted paths were checked and any
+remaining compatibility limits in the pull request.
 
 ## Confirm publication prerequisites
 
-Before publication, confirm the repository exists at the metadata destination and
-inspect CI results for the exact release commit. Make sure the hosted repository
+Before publication, inspect CI results for the release commit. Make sure the repository
 has a private vulnerability-reporting route as described in
 [SECURITY.md](../../SECURITY.md). Confirm that the npm login can publish under
 `@fayegram-ai`. Direct publication requires account 2FA or a granular token
 permitted to bypass it; see [npm's requirements](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/).
 
-Building only creates and checks the artifact; it does not publish it. The package
-name and registry are `@fayegram-ai/decision-bridge` and the public npm registry.
-Coordinate the GitHub source release and publication of the verified tarball to
-npm as one release. The source release commit and archive must contain the same
-intended files, including README and documentation. A packed or uploaded archive
-is a snapshot: subsequent source edits do not change its contents. Finalize the
-changelog and version-availability notices before building. If packaged files
-change afterward, rebuild and verify the archive before publication.
+The package name is `@fayegram-ai/decision-bridge` on the public npm registry.
+Finalize the changelog, documentation and version fields before building. If
+packaged files change afterward, rebuild and verify the archive before publication.
 
 The tracked `.npmrc` routes this scope to npm in this checkout without changing
 the user's npm configuration. Keep credentials in the user configuration, never
@@ -61,6 +53,18 @@ in the repository. Verify the target with `npm config get @fayegram-ai:registry`
 before staging or publishing. Replace `VERSION` and `STAGE_ID` below with the
 package version and the returned stage identifier. The `./` prefix identifies a
 local archive path to npm.
+
+## Publish the source release
+
+Submit release changes to `main` through a pull request. Review the changes since
+the previous release, including the changelog, version fields and package contents.
+After the checks pass, squash-merge the pull request and create the
+`decision-bridge-vVERSION` tag from the merged commit. Preserve existing release
+commits and tags.
+
+Build the release archive from that commit and attach it to the GitHub release
+with concise notes describing the changes. Publish the same verified archive to
+npm using one of the methods below.
 
 ## Stage, inspect, and approve an archive
 
@@ -99,6 +103,7 @@ For a version without a pending stage, publish the verified archive directly:
 npm publish ./release/fayegram-ai-decision-bridge-VERSION.tgz --access public --tag latest
 ```
 
-After the coordinated release, confirm that the package page
-links to the source repository and `npm install @fayegram-ai/decision-bridge` works.
+After publication, check the GitHub tag and release page, npm version and package
+links, then install the published version in a clean project. Confirm that the
+downloaded archive matches the verified build.
 Keep generated archives and verification logs outside tracked source.

@@ -4,8 +4,7 @@ Import from `@fayegram-ai/decision-bridge` in your application after package
 installation. See [getting started](../guides/GETTING_STARTED.md) for a complete
 JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source checkout,
 the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
-declarations in `src/index.d.mts`. The JavaScript implementation and declarations are
-checked separately.
+declarations in `src/index.d.mts`.
 
 This reference covers **0.1.4**, including the routing API described below.
 See [version availability](../README.md#version-availability).
@@ -210,12 +209,18 @@ of these indices; validation tolerance is `0.02 * N` (accommodating 2-decimal ro
 rubric exactly. Generative providers calculate score and legend locally. Native
 values are validated and preserved, not normalized or replaced.
 
+**Box:** `{ type: 'box', box: { top, bottom, left, right }, confidence? }`.
+Coordinates are fractions of image height or width in [0,1], measured from the
+top-left, with `top < bottom` and `left < right`. Confidence, when present, is in
+[0,1]; Jev requires it. See [Jev boxes and results](../guides/JEV.md#boxes-and-results)
+for model requirements and handling an absent target.
+
 **Usage:** `input_tokens` and `output_tokens` are nonnegative integers or null.
 Jev accepts explicitly null counts as unknown; OpenAI Decisions and Cloudflare
 require reported integer counts. OpenAI and
 Anthropic cache creation/read counts are preserved separately when provided;
-Cloudflare does not fabricate cache or total-token fields. No total price, inferred cache saving, or
-estimated token count is fabricated.
+Cloudflare forwards reported usage without estimating additional fields. The SDK
+does not calculate prices, cache savings or token estimates.
 
 **Metadata:**
 
@@ -247,9 +252,10 @@ frozen snapshots.
 `schemaVersion` is selected by the highest applicable feature: 5 for conversation,
 remote-image URLs or prompt-cache controls; 4 for boxes; 3 for audio/video; 2 for
 ordered images/text, typed choices, labelled scores or a safety identifier; and
-1 for legacy requests. CLI profiles use configuration version 1; routing registries
-use version 2. Those configuration versions are independent of result versions. Extraction and
-Live use their dedicated native envelopes rather than a common result version.
+1 for legacy requests. The separate `schemaVersion` field in
+[CLI configuration](CONFIGURATION.md) identifies a single-provider profile (`1`)
+or routing registry (`2`). Extraction and Live use their dedicated native
+envelopes rather than a common result version.
 
 ## Extensions
 
@@ -387,8 +393,8 @@ for complete policy, callback, selector, recovery and diagnostic behavior.
 - `DecisionError`, `publicError(error)`: public structured failure handling.
 
 `decideChoice` returns `status: 'selected' | 'review'`, the model's choice, selected
-probability, margin to the runner-up, and a reason. Thresholds are your policy;
-no default claims of safety or empirical calibration are implied.
+probability, margin to the runner-up, and a reason. Choose thresholds based on
+evaluation data and your application's requirements.
 Its optional `probabilityDecimalPlaces` uses the same sum validation as
 `validateResult`. Supply the precision from the provider's contract when using
 rounded distributions, such as Cloudflare's four-decimal results. Omission keeps
@@ -433,7 +439,7 @@ fail before the provider is called.
 
 `decideChoice()` rejects unknown option names and abstention labels not present in
 the answer. `evaluateBatch()` validates array holes as invalid requests before any
-item is dispatched, rather than spending on adjacent valid entries.
+item is dispatched.
 
 The optional third argument to `validateResult()` must be a plain options object
 with optional boolean `native`, boolean `nullableUsage`, and integer

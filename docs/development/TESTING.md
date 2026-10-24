@@ -25,14 +25,14 @@ and `test:package`; running coverage and build immediately after it repeats
 those checks. CI and the release guide run `check`, `test:coverage`,
 `typecheck`, and `build` once each.
 
-These commands validate code behavior and package integrity. Model-quality evaluation is
-a separate activity, not part of the test suite: these commands do not score model
-answers, measure provider speed, or use paid inference. The suite requires at least 90%
-line coverage, 80% branch coverage and 85% function coverage. Coverage does not
-establish model quality, correctness of every path, or current hosted compatibility. The
-CI configuration targets Linux, Windows, and macOS on Node 22.16 and Node 24; consult
-actual run results for a particular commit instead of treating the matrix as evidence
-that every environment passed.
+These commands check software behavior and package integrity using synthetic model
+responses, temporary workspaces and loopback HTTP servers. They need no account keys
+and make no paid model calls. Evaluate model quality and performance separately with
+representative data. Coverage requirements are 90% of lines, 80% of branches and 85%
+of functions. CI runs on Linux, Windows and
+macOS with Node 22.16 and Node 24; check its results for the commit being released.
+The subprocess SIGINT test is skipped on Windows. When changing signal handling,
+also verify cancellation from a native Windows console.
 
 ## Suite ownership
 
@@ -62,14 +62,6 @@ that every environment passed.
 - `cloudflare-worker.types.mts`: compatibility with official Workers binding declarations.
 - `expansion.types.mts`: conversation/cache inputs, extraction value inference, unions, batches and Live transport/notification contracts.
 - `routing.types.mts`: router options, decision/extraction inference, prepared schema replacement and routed batch records.
-
-Node's reported test count includes each row of a parameterized input table. It
-is not a count of independent features; retain separate rows when they protect
-different contract or protocol paths.
-
-All model responses used by ordinary tests are synthetic. HTTP integration servers
-listen on loopback. Tests do not require account keys or make paid model calls.
-Test workspaces are temporary.
 
 ### OpenAI model-selector coverage
 
@@ -171,20 +163,17 @@ request/Gateway IDs from concurrent calls. Enabling binding busy mode verifies
 option acceptance; it does not establish behavior under exhausted capacity.
 Header/dimension preflight does not fully decode images, so live image fixtures
 must also contain valid encoded image data.
-Omni fixtures must contain genuinely decodable WAV/MP3 and MP4/WebM media for
-hosted tests. Local authored container fixtures verify inspection and protocol
-behavior without claiming codec validity. Cover grouped modalities, container
+Use valid, decodable WAV/MP3 and MP4/WebM media for hosted Omni tests. The synthetic
+containers in local tests exercise header inspection and protocol handling, not
+full media decoding. Cover grouped modalities, container
 validity, configured client byte budgets, effective-model overrides, request bodies above 13 MiB,
 and explicit smaller ceilings. Gateway caching/logging should be disabled for
 test payloads, and each bounded run should have a request and total time budget.
 
-The SDK, CLI, and ordinary checks do not create Workers or Gateways. Provisioning and
-cleanup belong to the application's separately authorized environment setup. The smoke
-helper does not test Clairic or a GPT-Live connection. When a specific wire-contract
-uncertainty requires hosted verification, use the intended application-owned
-runtime/connection and a bounded, explicitly authorized case. Offline fixtures remain
-sufficient for routine development and CI; record hosted behavior only when that exact
-path was exercised.
+Set up test Workers and Gateways separately; the SDK, CLI and test suite do not
+create or remove them. The smoke helper does not cover Clairic or GPT-Live.
+Test those integrations in your application's runtime or connection, with explicit
+request and time limits. Use offline fixtures for routine development and CI.
 
 ## Package verification
 

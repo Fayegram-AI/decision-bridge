@@ -1,7 +1,9 @@
 # Configuration and credentials
 
-CLI configuration supports version-1 single-provider profiles and version-2
-routing registries. Registries require 0.1.4; see [version availability](../README.md#version-availability).
+Use a single-provider profile to configure one backend, or a routing registry to
+define named targets and a selection policy. Profiles use `schemaVersion: 1`
+(optional); registries require `schemaVersion: 2` and Decision Bridge 0.1.4.
+See [version availability](../README.md#version-availability).
 
 ## Single-provider profiles (version 1)
 
@@ -17,9 +19,9 @@ routing registries. Registries require 0.1.4; see [version availability](../READ
 }
 ```
 
-Load it with `--config path/to/decision.config.json`. The CLI never scans a working
-directory for executable configuration. It does not read `.env` implicitly; use
-`--env-file .env`. Runtime SDK configuration uses constructor options instead.
+Load it with `--config path/to/decision.config.json` and load credentials with
+`--env-file .env`. Both files must be named explicitly. SDK applications configure
+providers through constructor options.
 
 Jev is the CLI's built-in provider default. In SDK code, `createBridge` requires
 an explicit `provider` or `jev` selection, and `createProvider` requires `type`.
@@ -69,8 +71,8 @@ can select a budget through 64 MiB. `DECISION_JEV_IMAGES` and
 `--jev-images`, `--no-jev-images`, `--jev-long-context`, and `--no-jev-long-context`.
 Cloudflare selects its byte budget from the effective request model, including per-call
 overrides. An explicit smaller `maxRequestBytes` remains the ceiling; selecting Omni
-cannot enlarge it. Omni's default is a bridge policy, not a documented whole-request
-service guarantee. Provider-specific unused fields are rejected. In a module profile,
+cannot enlarge it. This is a client resource limit; service limits apply separately.
+Provider-specific unused fields are rejected. In a module profile,
 transport and generation settings belong inside `options`; the custom factory owns them.
 Top-level `timeoutMs` still bounds the bridge. The module may implement its own
 networking.
@@ -78,11 +80,11 @@ networking.
 `parameters` cannot override model, messages, system instructions, schemas, tools,
 streaming, token-limit fields, or credentials. Legacy `functions` and
 `function_call` controls are also reserved. Unrecognized model-specific
-parameters may be rejected by the server; they are not silently dropped by us.
+parameters may be rejected by the server; the SDK does not silently drop them.
 
 ## Precedence
 
-For version-1 provider/configuration settings:
+For single-provider settings:
 
 ```text
 CLI flags > DECISION_* environment variables > explicit JSON file > defaults
@@ -113,7 +115,7 @@ Native OpenAI Decisions defaults to `default` and accepts `luna` or explicit
 OpenAI accepts transport settings
 and rejects generative output settings. Its default retry count is zero. Cloudflare Clef defaults to `clef`, uses
 account/token credentials, rejects generation settings, and also defaults to zero retries.
-A `DECISION_MODEL` or file model takes precedence over that convenience.
+A `DECISION_MODEL` or file model takes precedence over `JEV_MODEL`.
 Custom generative presets and modules do not inherit a
 Jev model. Offline validation of a generative/module request without a model reports
 `model: null`; evaluation requires a request model or provider default.
@@ -158,7 +160,7 @@ configuration are unavailable; an enabled required automatic candidate with miss
 configuration fails execution for its operation. These checks use local configuration;
 they do not contact a service or verify account access.
 
-Version 2 ignores legacy `DECISION_*` provider/model settings and rejects the
+Routing registries ignore `DECISION_*` provider/model settings and reject the
 single-provider override flags, including `--model`, `--provider`, `--timeout-ms`
 and transport overrides. Edit a route's configuration and choose it with `--route`.
 Request `model` narrows compatible targets; it cannot replace a route's model.
@@ -166,15 +168,15 @@ Each route still resolves `apiKeyEnv`, or its provider's default credential vari
 from the process environment and explicit `--env-file`. Existing environment values
 win. Custom module paths remain relative to the configuration file.
 
-The shipped JSON Schema covers both versions. Runtime checks also enforce route
-references, operation compatibility and cross-field policy constraints. SDK
+The shipped JSON Schema covers both configuration formats. Runtime checks also
+enforce route references, operation compatibility and cross-field policy constraints. SDK
 registries use `config.type` instead of CLI `config.provider`, require explicit
 credentials in native descriptors, and can also accept providers or factories.
 
 ## Recognized environment variables
 
-The `DECISION_*` selection variables below apply to version-1 profiles. Provider
-credential variables also supply version-2 concrete routes as described above.
+The `DECISION_*` selection variables below apply to single-provider profiles.
+Provider credential variables also supply configured routes as described above.
 
 | Variable | Purpose |
 | --- | --- |
@@ -220,8 +222,8 @@ See [examples/configs/](../../examples/configs/) for native profiles, generative
 presets, and separate custom decision/generative modules. Use
 `--provider custom-generative --preset NAME` for a preset, or select a custom kind
 with `--provider-module FILE`. The module flag does not infer classification. Replace placeholder model identifiers
-with IDs returned by the intended account/server. Profiles intentionally contain
-no real key or claim that one model is available to every user.
+with IDs available to your account or server. Profiles reference environment
+variables for credentials.
 
 ## Extraction and Live configuration
 
@@ -230,7 +232,7 @@ flags, environment and an explicit file have selected no provider. Its default
 model is `clairic`; `@cf/cloudflare/clairic` is also accepted. An explicit
 incompatible provider is rejected. Provider switching follows the same isolation
 rules above, including transitions between Clef and Clairic. Single-provider
-extraction profiles use version 1. Version-2 registries select configured
+extraction profiles use `schemaVersion: 1`. Routing registries select configured
 extraction routes through `defaultRoute` or `--route`.
 
 OpenAI prompt-cache controls and Clairic inference settings (`include_quantiles`,

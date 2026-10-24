@@ -33,7 +33,7 @@ and raw response bodies are omitted. Custom providers deliberately constructing
 | `TIMEOUT` | Provider, bridge, preparation, or listing deadline exceeded |
 | `ABORTED` | Caller cancelled; remote work might already have been billed |
 | `INVALID_RESPONSE` | Non-byte response chunks, wrong envelope, or invalid UTF-8/JSON/schema/distribution/usage; do not trust partial answers |
-| `MODEL_REFUSAL` | Provider explicitly declined the evaluation; no fabricated result |
+| `MODEL_REFUSAL` | Provider declined the evaluation; no result is returned |
 | `TRUNCATED_OUTPUT` | Output/context budget exhausted; revise budget/input explicitly |
 | `EXTENSION_ERROR` | Preparation failed; inference was not issued after that failure |
 | `PROVIDER_ERROR` | Sanitized custom-provider exception |
@@ -68,7 +68,7 @@ remaining budget fails instead of violating the server's requested wait.
 When an HTTP rejection body is malformed, too large, or interrupted, the known
 status, safe request/Gateway IDs and valid `Retry-After` remain available. If the
 body cannot be decoded, classification and retry eligibility use the status
-alone; no missing upstream code is invented. Caller cancellation and the total
+alone; unavailable upstream codes are omitted. Caller cancellation and the total
 deadline still take precedence over this fallback.
 
 Authentication failures, invalid output, model refusal, and

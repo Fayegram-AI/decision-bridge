@@ -60,9 +60,8 @@ node bin/decision.mjs models --env-file .env
 node bin/decision.mjs evaluate examples/request.json --env-file .env
 ```
 
-Use a currently maintained, compatible Node release according to your organization’s
-runtime policy; the minimum here describes this package's API requirements, not a
-security recommendation to remain on an old patch release.
+Use a maintained Node.js release with current security patches and follow your
+organization's runtime policy.
 
 ## Install in another project
 
@@ -99,9 +98,7 @@ not support them, creating a protected output file fails. Unix mode 0600 is appl
 where supported; on Windows, secure the working directory using your normal Windows
 permissions.
 
-Input/output JSON is UTF-8. File arguments are the most portable way to avoid
-shell pipeline encoding differences. A POSIX subprocess test covers SIGINT;
-Windows console signal delivery still needs native validation.
+Input/output JSON is UTF-8. File arguments avoid shell pipeline encoding differences.
 Cancellation can stop waiting and close a blocked CLI output pipe, but cannot undo
 an API request that already ran or force arbitrary custom-provider resources to
 terminate. See [CLI I/O](../reference/CLI.md).

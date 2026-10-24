@@ -31,8 +31,8 @@ capabilities; omitting them selects the original shared-state format.
 
 Return `{ model, answers, usage, meta? }`. Preserve native values and reported
 usage; use null for unknown token counts. Confidence is optional in the common
-contract and must not be invented. Classification alone does not apply the stricter
-Jev confidence/count validation mode to another service. Declare probability
+contract; include it only when the service reports it. Classification alone does
+not apply Jev's stricter confidence/count validation to another service. Declare probability
 provenance explicitly when known; the default is `unspecified`.
 
 ## CLI module
@@ -42,7 +42,7 @@ npm exec -- decision-bridge init ./my-service --provider custom-decision
 ```
 
 This writes a configuration, schema, request, environment placeholders, and a
-`provider.mjs` edit point. The module exports `createProvider(options)` and must
+`provider.mjs` template. The module exports `createProvider(options)` and must
 return a decision-kind provider. Connect it to your service before evaluation.
 A runnable Jev delegation example is at
 [examples/custom/decision-provider.mjs](../../examples/custom/decision-provider.mjs).

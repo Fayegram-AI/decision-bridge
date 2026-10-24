@@ -1,8 +1,8 @@
 # Primary protocol sources
 
-These official protocol and platform references inform the implementation. Recheck them
-when updating versions or adding compatibility. A reference link records the
-specification used; it does not mean authenticated service calls were tested.
+Use these official protocol and platform references when updating adapters or
+adding supported features. See [testing](../development/TESTING.md) for local
+checks and optional service checks.
 
 | Subject | Official source |
 | --- | --- |
@@ -28,11 +28,6 @@ specification used; it does not mean authenticated service calls were tested.
 | Anthropic Messages, tools, usage, and stop reasons | https://platform.claude.com/docs/en/api/messages/create |
 | GitHub checkout action | https://github.com/actions/checkout |
 | GitHub Node setup action | https://github.com/actions/setup-node |
-
-No model pricing, benchmark score, latency promise, or calibration guarantee is
-baked into this implementation. The repository tests verify its own protocol and
-software invariants using explicitly labeled fixtures. Live model behavior is a
-separate operational check.
 
 ## Cloudflare decision inference
 

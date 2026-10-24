@@ -31,14 +31,14 @@ are not followed. These controls do not authenticate an arbitrary configured hos
 resolve all DNS-rebinding risks, or sandbox untrusted URLs. An embedding server
 must impose its own allowlist and network controls.
 
-## Safe errors, not a universal secret scanner
+## Error reporting and redaction
 
 HTTP failure bodies/headers and unknown exception stacks are not copied into public
 errors. Known keys are removed from request IDs and CLI error string values.
-Model outputs, requested labels, state, and arbitrary application logs are not
-universally scrubbed. Do not deliberately include secrets in prompts. A custom
-provider constructing DecisionError is responsible for a safe message. Never add a
-verbose HTTP logger that prints Authorization or x-api-key headers.
+Model outputs, requested labels, state and application logs are outside this
+redaction scope. Remove secrets before including content in a request or log.
+Custom providers must supply safe `DecisionError` messages. Exclude `Authorization`
+and `x-api-key` headers from HTTP logs.
 
 ## Input and output
 
@@ -51,9 +51,12 @@ configuration; state is untrusted evidence. Prompt separation is a mitigation, n
 guarantee.
 
 Output files use exclusive temporary files and mode 0600 where supported, then
-same-directory finalization. Existing output requires explicit --force. Atomicity
-and permissions depend on the filesystem/OS; there is no power-loss-proof
-transaction across model billing, stdout, and filesystem writes.
+same-directory finalization. Replacing existing output requires `--force`.
+Atomicity and permissions depend on the filesystem and operating system. File
+output failures cannot undo model calls or data already written to stdout.
+The input-overwrite guard resolves known path and file aliases, but cannot prevent
+another process from changing paths concurrently. Cancellation is honored until
+atomic finalization is submitted to the operating system; it cannot retract that write.
 
 ## Plugins and cancellation
 
@@ -73,8 +76,8 @@ policy; receipt of a decision is not proof that an action completed.
 
 ## Dependencies and CI
 
-There are zero runtime dependencies. This reduces dependency surface but is not a
-security certification. Maintain Node.js security updates. The pinned TypeScript
+The package has zero runtime dependencies. Keep Node.js updated with security
+patches. The pinned TypeScript
 compiler, official Workers declarations, and Ajv configuration-schema validator
 are development-only dependencies; none is required by the installed SDK or CLI.
 The supplied CI uses read-only repository permissions, no model
@@ -92,13 +95,6 @@ not publish credentials, confidential inputs, or exploit details in an issue.
 
 ## Release assurance
 
-Automated tests and package verification are engineering checks, not an
-independent security audit. Consult CI results for the specific commit or
-release. Ordinary tests do not establish authenticated vendor
-compatibility. See [Testing](docs/development/TESTING.md) for the verification scope.
-
-The input-overwrite guard resolves known path/file aliases; it does not lock the
-whole filesystem against concurrent changes. File-output cancellation is honored
-until atomic finalization is submitted. It cannot retract an OS operation already
-submitted. Parameter objects are validated before inspection/spreading so accessors
-are rejected without being invoked by the provider constructors.
+Consult CI results for the commit or release and [Testing](docs/development/TESTING.md)
+for the checks performed. Automated tests cover software behavior and package
+integrity; security audits and authenticated provider checks require separate review.

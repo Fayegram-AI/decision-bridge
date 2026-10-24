@@ -56,8 +56,7 @@ documentation belongs in `docs/development/`.
 Keep commits focused and explain behavior changes and the checks performed.
 Open a pull request with a short description of the behavior change and the
 verification you ran; link the relevant issue when one exists.
-Inspect `git diff` and `git diff --cached` before committing. Respect existing
-authorship and use the project identity configured for the repository.
+Review the staged diff before committing to exclude unrelated changes and generated files.
 
 Follow the [packaging guide](docs/development/RELEASING.md) for the coordinated
 source and npm release. The project is licensed under [MIT](LICENSE).

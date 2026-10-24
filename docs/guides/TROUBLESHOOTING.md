@@ -7,8 +7,9 @@ it with [version availability](../README.md#version-availability). The `/extract
 and `/live` exports, their CLI commands, and expanded OpenAI history/cache inputs
 require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
 to install a compatible version.
-The `/routing` export, `inspect`, routing flags, and version-2 registries require
-0.1.4. Check the version-availability page before using these with an npm install.
+The `/routing` export, `inspect`, routing flags, and routing registries require
+0.1.4. Use the [0.1.4 archive installation](GETTING_STARTED.md#install-into-your-application)
+if your installed package does not include them.
 
 ## The command cannot find a key
 
@@ -28,7 +29,7 @@ explicit config. A compatible base includes its version prefix, not the final
 `/chat/completions` path. Jev and the custom Anthropic preset require origins
 without a path. See [configuration](../reference/CONFIGURATION.md#precedence).
 
-Version-2 registries ignore legacy `DECISION_*` selection variables and reject
+Routing registries ignore `DECISION_*` selection variables and reject
 provider/model override flags. Change the concrete route's `config` and choose it
 with `--route`. Request `model` narrows eligible targets instead of changing them.
 
@@ -128,17 +129,17 @@ native result; inspect it according to your application's needs.
 For Live, `requestDecision` and `appendCommentary` resolve on submission. Consume
 completed decisions through `subscribe`. An unmatched result indicates missing or
 ambiguous source/configuration history; a stale result refers to older observed
-transcript order. Neither is proof of a current request result. Disposal and
-connection closure cancel pending waits. Malformed offline event validation exits
+transcript order. Check correlation before applying the result to the current task.
+Disposal and connection closure cancel pending waits. Malformed offline event validation exits
 2, while failed replay rows produce exit 1 and processing continues. See
 [Live lifecycle](LIVE_DECISIONS.md#results-and-correlation).
 
 ## Type checks fail because tsc is missing
 
-Runtime and tests have no TypeScript dependency. Development type checks require
-TypeScript 5.8.3, the verified compiler. Install it as a developer tool using the
-instructions in [Testing](../development/TESTING.md). Do not confuse an absent
-development compiler with a broken runtime package.
+Run `npm ci --ignore-scripts` in the source checkout to install the pinned
+development dependencies, including TypeScript 5.8.3, then rerun
+`npm run typecheck`. The installed SDK and CLI run without TypeScript. See
+[testing](../development/TESTING.md) for the development setup.
 
 ## Filing a useful issue
 

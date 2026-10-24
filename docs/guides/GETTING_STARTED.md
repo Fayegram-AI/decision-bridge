@@ -14,19 +14,23 @@ web origin through CORS and a credential suitable for browser use. See
 
 ## Install into your application
 
-In your application's directory, install the package from npm:
+For **0.1.4**, download `fayegram-ai-decision-bridge-0.1.4.tgz` from the
+[GitHub release](https://github.com/Fayegram-AI/decision-bridge/releases/tag/decision-bridge-v0.1.4).
+Choose the `.tgz` package asset. From your application's directory, install the
+downloaded file, adjusting the path as needed:
+
+```bash
+npm install ./fayegram-ai-decision-bridge-0.1.4.tgz
+```
+
+To install the latest version published to npm:
 
 ```bash
 npm install @fayegram-ai/decision-bridge
 ```
 
-You can also install a verified package archive. Replace the example archive
-path with your own; see [packaging and release](../development/RELEASING.md) to
-build and verify one from a source checkout:
-
-```bash
-npm install /path/to/fayegram-ai-decision-bridge-0.1.4.tgz
-```
+See [packaging and release](../development/RELEASING.md) to build and verify an
+archive from a source checkout.
 
 The installed package contains the SDK, declarations, command runner, examples,
 and docs. It runs without compilation; source development scripts and tests are
@@ -248,8 +252,8 @@ npm run example
 lockfile; it can access the npm registry and requires no model credentials.
 `npm test` and `npm run validate` are offline. `models` lists account models; `ask` evaluates
 `examples/request.json`; `example` runs the source SDK example. The last three
-explicitly load `.env` when present and access the provider. A model listing does
-not prove inference access; evaluation verifies that path.
+explicitly load `.env` when present and access the provider. Use `ask` to test
+inference with the selected model.
 
 Source examples import `../src/index.mjs` and run directly without installing the
 package. Application code should use `@fayegram-ai/decision-bridge` as shown above.

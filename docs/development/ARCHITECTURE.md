@@ -13,7 +13,7 @@ provider implementation.
 `createProvider` requires an explicit native type. `custom/decision` and
 `custom/generative` expose classified extension helpers; maintained generative
 adapters are loaded only through their opt-in subpath. The CLI resolves its own configuration
-and Jev default before constructing the SDK bridge. Version-2 CLI registries
+and Jev default before constructing the SDK bridge. CLI routing registries
 instead construct a router, which selects an explicitly configured target.
 
 ```text
@@ -97,7 +97,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/batch.mjs` | Ordered bounded-concurrency SDK arrays |
 | `src/policy.mjs` | Explicit choice thresholds, without action execution |
 | `src/cli/ordered.mjs` | Concurrent JSONL processing with a bounded ordered window |
-| `src/cli/routing*.mjs` | Version-2 registry adaptation, offline inspection, initialization and terminal clarification |
+| `src/cli/routing*.mjs` | Routing configuration, offline inspection, initialization and terminal clarification |
 | `src/cli/`, `bin/decision.mjs` | Configuration, input/output, commands, process signals |
 
 ## Routing lifecycle
@@ -129,9 +129,9 @@ See [configurable routing](../guides/ROUTING.md) for policy and callback contrac
 Generative providers ask models for probability distributions, then select the
 highest-probability choice and calculate weighted scores and rubric legends in code.
 Native decision providers validate and retain their returned values, confidence, and
-reported usage. No path repairs malformed distributions or invents confidence. The
-common shape preserves provenance without claiming equivalent statistical semantics
-across models.
+reported usage. Malformed distributions are rejected, and generative results omit
+confidence. Result metadata identifies the probability source so applications can
+interpret each provider's output appropriately.
 
 The bridge takes result-validation policy from the provider contract. Cloudflare
 uses an allowance for four-decimal distributions; other built-ins retain the
