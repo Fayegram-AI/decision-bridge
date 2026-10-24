@@ -101,7 +101,7 @@ The SDK supplies an omitted model from the provider default. Explicit `null`
 model or execution options are invalid and fail before dispatch. Native questions
 use `criteria`; common typed `options` and labelled `levels` are available through
 `bridge.evaluate()`. Results preserve native probabilities, confidence, model,
-and input/output token counts. Unreported cache or total-token counts are not invented.
+and input/output token counts. The SDK does not estimate missing usage fields.
 `createDecision()` accepts an optional second argument containing `signal`.
 Configure its timeout on the provider; direct native access bypasses bridge
 extensions and the bridge's separate total deadline.
@@ -250,18 +250,12 @@ CLI evaluation/batching, and credential-free offline validation, with or without
 Gateway. An explicit native `options.rejectIfBusy: false` can override a true
 provider default; disabled execution options are omitted from REST requests.
 
-The hosted
-Clef, Clef-flash, and Clef-omni REST service rejects the `options` field with HTTP 422 and upstream code
-`5012`, including `options: { rejectIfBusy: true }`, although the general Workers AI
-documentation describes that field. The bridge rejects this known unavailable
-feature instead of dispatching it or silently disabling the requested behavior.
-Binding execution options use the third `ai.run()`
-argument; use the binding transport for these models with `rejectIfBusy: true`.
-Omni option acceptance was checked through binding both directly and through
-Gateway; those checks did not deliberately exhaust capacity. This compatibility
-behavior was checked on 2026-10-09; REST rejection was reconfirmed on 2026-10-10.
-The model-specific documentation does not establish whether this REST limitation
-is intentional or a platform defect. Behavior can change upstream.
+Clef, Clef-flash and Clef-omni REST reject the `options` field with HTTP 422 and
+upstream code `5012`, including `options: { rejectIfBusy: true }`, although the
+general Workers AI documentation describes that field. This REST limitation was
+last verified on 2026-10-10; upstream behavior may change. Use the binding transport
+for enabled busy rejection: execution options belong in the third `ai.run()`
+argument, including when a Gateway is configured.
 
 Gateway routing is disabled unless configured. Use an existing Gateway:
 
@@ -337,9 +331,9 @@ Cloudflare single JSON input and individual JSONL records are read within a
 64 MiB cap, then the same model-specific SDK preflight applies. This supports
 request-level model overrides and mixed-model batches. JSONL retains its 64 MiB
 total cap. No separate media-upload flags are needed; use embedded input parts
-or native arrays in JSON. Single-provider profiles use configuration version 1;
-[routing registries](ROUTING.md#cli-registry-configuration) use version 2 and common
-requests. `models` is unsupported.
+or native arrays in JSON. [Routing registries](ROUTING.md#cli-registry-configuration)
+accept common requests; use a single-provider profile for native requests.
+`models` is unsupported.
 SDK array batching prevalidates all requests before inference; CLI JSONL batching
 validates incrementally. Neither uses Cloudflare's asynchronous batch service.
 

@@ -62,8 +62,8 @@ Use these model selectors with the built-in decision providers:
 
 `jev-latest` is Jev's default alias. Jev also accepts `jev-preview` and explicit model IDs available through your TypeSafe account;
 use `bridge.listModels()` or the CLI `models` command to inspect that catalog.
-The bridge does not maintain a static list of Jev versions. A moving alias or a
-catalog entry does not guarantee inference access or reproducible model quality.
+The bridge does not maintain a static list of Jev versions. Pin an available model ID
+when you need a reproducible selection, and check inference access with your account.
 For OpenAI Decisions, `default` selects the provider default and `luna` selects
 the supported Luna-family model. Decision Bridge resolves selectors to supported
 upstream model IDs before calling the service. Mappings are fixed by the installed
@@ -128,8 +128,10 @@ in your application's directory:
 npm install @fayegram-ai/decision-bridge
 ```
 
-The installed SDK runs without a compilation step. See
-[getting started](docs/guides/GETTING_STARTED.md) for source and archive setup.
+For 0.1.4, including routing, follow the
+[release archive installation](docs/guides/GETTING_STARTED.md#install-into-your-application).
+The npm command installs the latest version published to the registry. The installed
+SDK runs without a compilation step.
 
 Create `.env` in your application's directory and set your TypeSafe API key:
 
@@ -225,8 +227,7 @@ const bridge = createBridge({ provider });
 The `custom/generative` entry point also exports the other presets. For OpenRouter, use `new OpenRouterProvider({ model: 'your-provider/your-model' })`
 with `OPENROUTER_API_KEY`. For Anthropic, use
 `new AnthropicProvider({ model: 'your-account-model-id' })` with
-`ANTHROPIC_API_KEY`. Substitute real available model IDs; the bridge does not
-choose an arbitrary remote model on your behalf.
+`ANTHROPIC_API_KEY`. Each preset requires an explicit model ID available to your account.
 
 A server may implement only JSON-object or text output. Select that mode explicitly
 with `responseFormat: 'json_object'` or `'text'`; the client still validates every
@@ -263,7 +264,7 @@ Its built-in provider default is Jev; SDK construction requires explicit selecti
 | npm package artifact | `npm run build` creates and verifies `release/fayegram-ai-decision-bridge-VERSION.tgz` |
 
 For maintainers, `npm run build` archives the ESM source and verifies an offline
-install of the exact tarball used for the npm release. See
+installation of that archive. See
 [packaging and release](docs/development/RELEASING.md).
 
 For running the source examples, see [source setup](docs/guides/GETTING_STARTED.md#run-from-a-source-checkout).
@@ -293,8 +294,8 @@ test suite and development scripts.
 `result` contains `answers`, `model`, `usage`, and `meta`. Native provider confidence is
 preserved. `bridge.providerKind` and `result.meta.providerKind` distinguish
 `'decision'` from `'generative'`; the bridge takes this classification from the
-provider contract. Generative backends **do not invent confidence**; missing token counts
-are `null`, not zero. Their choices and scores are derived from the returned
+provider contract. Generative results omit confidence; unreported token counts
+are `null`. Their choices and scores are derived from the returned
 probability distributions. See [SDK reference](docs/reference/SDK.md) and
 [provider compatibility](docs/reference/PROVIDERS.md).
 
@@ -324,15 +325,11 @@ under `docs/guides/` and `docs/reference/`; maintained contributor documentation
 lives under `docs/development/`. See the [repository layout](docs/development/REPOSITORY_LAYOUT.md)
 for the source and package contents.
 
-From a source checkout, run `npm run verify` for routine code, contract, and
-package checks. `npm run test:coverage` reruns the functional suite with coverage
-floors; the [release guide](docs/development/RELEASING.md) gives a single-pass
-verification sequence. These software checks use synthetic fixtures and local
-HTTP servers; they do not measure model quality. The
-[testing guide](docs/development/TESTING.md) covers code and package checks plus
-an optional live integration smoke check. Package preparation is described in the
-[release guide](docs/development/RELEASING.md).
-Public behavior changes are recorded in the [changelog](CHANGELOG.md).
+From a source checkout, run `npm run verify` for code, type and package checks.
+The [testing guide](docs/development/TESTING.md) covers coverage requirements and
+optional provider integration checks. Follow the
+[release guide](docs/development/RELEASING.md) to verify and publish a package.
+User-visible changes are recorded in the [changelog](CHANGELOG.md).
 
 ## License
 

@@ -1,11 +1,10 @@
 # Documentation
 
 Start with [using the SDK in your application](../README.md#use-in-your-application)
-for installation and a complete first call. This index separates usage guides,
-API reference, and contributor documentation.
-Install `@fayegram-ai/decision-bridge` with npm; the
+for installation and a complete first call. Browse usage guides, API references,
+and contributor documentation below. The
 [getting started guide](guides/GETTING_STARTED.md#install-into-your-application)
-also covers installation from a verified archive.
+covers the 0.1.4 release archive and npm installation.
 The hosted playground is [Decision Playground](https://decision-pg.fayegram.com/).
 See [model selectors and provider defaults](../README.md#model-selectors) for
 built-in decision models and the separate custom generative presets.
@@ -28,7 +27,7 @@ and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/de
 
 | Feature | First supported version |
 | --- | --- |
-| Configurable decision/extraction routing and version-2 CLI registries; auto mode is experimental | 0.1.4 |
+| Configurable decision/extraction routing and CLI routing registries; auto mode is experimental | 0.1.4 |
 | OpenAI conversation/tool history, remote images and prompt caching; Clairic extraction; Live Decisions | 0.1.3 |
 | Experimental Jev images, boxes and long context | 0.1.2 |
 | OpenAI `default`/`luna` model selectors | 0.1.1 |

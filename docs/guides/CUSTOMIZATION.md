@@ -44,17 +44,17 @@ try {
 ```
 
 The remaining snippets show individual changes to this SDK flow. The source
-checkout also has [examples/customize.mjs](../../examples/customize.mjs). A rule stored only
-in an unrelated repository file is not automatically known to the provider. Read
-and include the relevant content explicitly, with appropriate size/redaction checks.
+checkout also has [examples/customize.mjs](../../examples/customize.mjs). Load any
+external policies or reference material in your application and include the relevant
+content in the request, after checking its size and removing sensitive data.
 
 ## Separate specification from evidence
 
-Question definitions are your trusted decision specification. State can contain
-untrusted logs, documents, or user content. The generative providers separate these
-in their prompts, but this is not proof of prompt-injection resistance. Do not let
-untrusted input choose unrestricted instructions, URLs, credentials, or actions.
-Validation guarantees structure, not semantic correctness or authorization.
+Question definitions are trusted configuration; state can contain untrusted logs,
+documents or user content. Generative providers separate these in their prompts,
+but prompt injection remains possible. Keep control of instructions, endpoints,
+credentials and actions in your application. Request validation checks structure;
+the application must enforce permissions and assess the result.
 
 Ask focused questions and define the categories clearly. Add an `unknown` or
 `needs_review` option when the model should be able to decline a choice. Include

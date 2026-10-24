@@ -237,7 +237,7 @@ new cooldowns. After admission, the router also reapplies preferences and priori
 A local winner skips clarification and selector inference, except when
 `selector.when: 'multiple'` explicitly requests a model choice among several
 candidates. A single remaining candidate skips both clarification and selector
-inference; no remaining candidate fails without another model call.
+inference. If no candidates remain, the item fails without a model call.
 
 ## Optional recovery and diagnostics
 
@@ -276,8 +276,8 @@ budget; unsupported targets remain excluded.
 Results retain the executed provider, model and probability provenance.
 `meta.routing` adds requested/selected IDs, method, optional policy revision,
 candidate statuses, selector identity/usage, execution attempts/usage, and work,
-clarification and wall durations. Unknown usage stays null, and deterministic
-selection does not invent a probability. Errors retain terminal provider codes
+clarification and wall durations. Unknown usage stays null. Deterministic
+selection has no model-assigned probability. Errors retain terminal provider codes
 and attach bounded routing diagnostics. Additional routing errors are
 `NO_ELIGIBLE_ROUTE`, `ROUTING_AMBIGUOUS`, `ROUTE_UNAVAILABLE`,
 `ROUTING_CONTEXT_TOO_LARGE`, and `CLARIFICATION_TIMEOUT`.
@@ -286,7 +286,7 @@ and attach bounded routing diagnostics. Additional routing errors are
 
 Create a deterministic template with `decision-bridge init ./project --route auto`.
 Use `decision-bridge extraction init ./project --route auto` for extraction.
-Version 2 configuration stores provider definitions inside concrete routes:
+Set `schemaVersion: 2` and store each provider's settings inside a named route:
 
 ```json
 {
@@ -312,12 +312,13 @@ decision-bridge batch requests.jsonl --config routes.json --concurrency 4
 Extraction supports the same commands under `extraction` (`run` aliases
 `evaluate`). Routing uses common decision requests or extraction field requests;
 `--native` is unsupported. `inspect` and `validate` stay offline, including custom
-modules. `validate` reports its validation scope and rejects known impossibility.
+modules. `validate` reports its validation scope and rejects requests when it can
+determine that no route can execute them.
 Unknown registry references and cross-field semantics are checked at runtime in
 addition to the editor schema's structural checks.
 
-Version 1 configuration retains its precedence. Version 2 ignores legacy
-`DECISION_*` provider/model selection variables and rejects provider/model/transport
+Single-provider profiles retain their precedence. Routing registries ignore
+`DECISION_*` provider/model selection variables and reject provider/model/transport
 override flags. Edit the concrete configuration and select with `--route`.
 Each route's `apiKeyEnv` still resolves through the environment and optional
 `--env-file`. Custom module paths are relative to the configuration file.

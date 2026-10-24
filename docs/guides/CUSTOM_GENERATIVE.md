@@ -59,8 +59,8 @@ See [configuration](../reference/CONFIGURATION.md).
 ## A new protocol
 
 Use `defineGenerativeProvider` for a module implementing a new wire protocol.
-`init --provider custom-generative` creates a module with a clear unimplemented
-service call; it never produces synthetic decisions as a fallback.
+`init --provider custom-generative` creates a module template whose service call
+throws an error until you implement it.
 
 The subpath exports `buildResponseSchema(questions)`, `buildPrompt(request)`,
 `parseGeneratedJson(text)`, and `normalizeGenerated(payload, request, options)`.
@@ -70,7 +70,7 @@ expects exactly `{ answers }`: each `noul` answer contains `{ noul }`, and each
 choice/score contains `{ probabilities }` with exactly the supplied option keys
 or zero-based level indices. It checks probabilities, derives argmax/weighted
 scores and matching legends, and marks absent usage as unknown. It does not repair
-JSON, strip Markdown, or create confidence. `buildPrompt` and `normalizeGenerated`
+JSON or strip Markdown, and it omits confidence. `buildPrompt` and `normalizeGenerated`
 independently validate and snapshot the request. They require shared state and
 legacy questions, and reject ordered input, conversation/tool history, remote
 images, prompt-cache controls, typed choices, labelled scores and safety
@@ -101,8 +101,7 @@ reported fields; the bridge adds its own classification and final timings.
 A runnable delegation module is provided at
 [examples/custom/generative-provider.mjs](../../examples/custom/generative-provider.mjs).
 Use the shared [module contract](CUSTOM_PROVIDERS.md) for loader options, timeouts,
-capabilities, and testing requirements. No arbitrary declarative HTTP mapping
-language is supported.
+capabilities, and testing requirements.
 
 ## Result semantics
 

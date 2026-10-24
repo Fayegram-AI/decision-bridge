@@ -116,13 +116,14 @@ decision extraction batch requests.jsonl --concurrency 4 --env-file .env
 ```
 
 The namespace defaults to `cloudflare-extraction`; incompatible explicit
-providers are rejected. Single-provider profiles use configuration version 1. Use the existing
-Cloudflare account, credential, Gateway, timeout and retry settings. Inference
-options belong in request JSON. Validation is offline and reports `fieldCount`.
+providers are rejected. Configure the Cloudflare account, credential, Gateway,
+timeout and retry settings in a
+[single-provider profile](../reference/CONFIGURATION.md#single-provider-profiles-version-1).
+Inference options belong in request JSON. Validation is offline and reports `fieldCount`.
 Streaming JSONL batches can complete valid rows before a later row fails.
 
 For selection among configured Clairic targets, use `createExtractionRouter` and
-`extractRoutedBatch` from `/routing`, or a version-2 CLI registry. The
+`extractRoutedBatch` from `/routing`, or a CLI routing registry. The
 `extraction init DIRECTORY --route auto` command creates a registry template;
 `extraction inspect FILE --config REGISTRY` reports offline eligibility.
 The extraction request and native result remain unchanged, with routing metadata

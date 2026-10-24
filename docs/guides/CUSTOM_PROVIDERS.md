@@ -46,8 +46,8 @@ format. Audio and video flags/counts default to false/zero; conversation, tool h
 remote images and prompt caching default to false. Numeric limits you declare are
 enforced; `null` leaves a limit to the service. Declare additional input forms only
 after implementing their encoding and validation. The bridge checks the request again
-after preparation hooks. Unknown usage is null; no provider should invent token counts,
-confidence, or calibration. Generative native-provenance claims are rejected. Supplied
+after preparation hooks. Use null for unknown token counts and omit confidence when
+the service does not report it. Generative native-provenance claims are rejected. Supplied
 `probabilitySource` and `confidenceSource` metadata must be nonempty strings. Decision
 providers may use custom labels; omitted probability provenance uses the provider's
 declared value, or `unspecified` when none is declared.
@@ -82,7 +82,7 @@ modules or requires credentials; it reports structure-only validation for unknow
 A routing registry accepts a provider instance or a `factory({ signal })` that creates
 one when needed. Declare the provider kind when using a factory. Disabled factories are
 never called; inspection marks checks that need initialization as provisional. In a
-version-2 CLI registry, a custom route's `config` contains the same module/preset
+CLI routing registry, a custom route's `config` contains the same module/preset
 fields, with paths relative to the registry file. Inspection stays offline and does not
 import the module.
 

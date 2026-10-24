@@ -204,8 +204,9 @@ use, then enable the ones available to your application. `policy: 'deterministic
 the choice without a selector call. If only one target can handle the request, the
 router selects it locally. Auto mode is experimental in 0.1.4. The routing request's
 `model` constrains eligible targets instead of replacing a provider default. CLI
-registries use configuration version 2 and `--route`; single-provider profiles and
-precedence remain as described above.
+registries define named targets selected with `--route`; see
+[routing configuration](ROUTING.md#cli-registry-configuration). Single-provider
+profiles and precedence remain as described above.
 
 ## Boundaries
 
@@ -216,9 +217,9 @@ Jev, OpenAI Decisions, and Cloudflare Clef each have a dedicated native provider
 use those provider types for their decision APIs. Native Decisions providers
 reject generative output settings such as `responseFormat` and `maxTokens`.
 
-All shipped evaluations return probability-based decisions. Jev, OpenAI Decisions, and
+`choice`, `noul` and `score` answers include probabilities. Jev, OpenAI Decisions and
 Cloudflare probabilities are marked `native`; generative estimates are `elicited`, not
-logprobs or a calibration guarantee. This release has no mode that returns only a choice
-without its probabilities. The shared interface does not make models equally accurate or
-give their probabilities identical statistical meaning. See
+token logprobs. Jev also supports [bounding boxes](JEV.md#boxes-and-results), which
+return coordinates and confidence. Evaluate accuracy and probability calibration for
+your workload before comparing providers or choosing decision thresholds. See the
 [provider reference](../reference/PROVIDERS.md).

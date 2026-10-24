@@ -31,13 +31,10 @@ Custom decision or generative modules define their own model/capability contract
 model being supported by the SDK does not mean your account can access it or that the
 service is currently available.
 
-The interface is model-neutral, not a guarantee that every model or endpoint
-supports every strategy. A compatible URL alone is insufficient: the chosen model
-must follow the decision instruction, fit the input/schema, and return valid data.
-Provider behavior is covered by local protocol tests and checked against official
-specifications. These checks do not establish compatibility with every account or
-model. Run the optional [live checks](../development/TESTING.md) for the provider,
-account, model, and transport you intend to use; see the protocol [sources](SOURCES.md).
+Choose a model and endpoint that support the required input and output format,
+then test representative requests with your account. The optional
+[live checks](../development/TESTING.md) can help verify a configured integration.
+See the protocol [sources](SOURCES.md) for the APIs used by each adapter.
 
 ## Common request capabilities
 
@@ -91,8 +88,8 @@ explicit `dangerZone` settings. Common image input preserves ordering; native
 instructions, and criteria. Box outputs preserve normalized edges and confidence.
 See the [Jev guide](../guides/JEV.md) for limits and absence handling.
 
-Pin a version after evaluating it for your workload rather than assuming a moving
-alias yields reproducible quality. Store the returned `model` along with the
+For consistent model selection, evaluate a version on your workload and pin its ID.
+Store the returned `model` along with the
 requested model and your question-template revision.
 
 ## Native OpenAI Decisions
@@ -111,9 +108,10 @@ content, typed values, rounding, capacity rejection, Gateway, and CLI examples.
 
 ## Native versus elicited probabilities
 
-Jev, OpenAI Decisions, and Clef report native outputs and confidence. Generative models are prompted
-to produce probability distributions. Those estimates are not logprobs, repeated
-sampling frequencies, calibrated confidence, or proof of correctness.
+Jev, OpenAI Decisions and Clef report native outputs and confidence. Generative models
+are prompted to produce probability distributions; these estimates are separate from
+token logprobs and repeated-sampling frequencies. Accuracy and calibration depend on
+the model and task.
 
 Generative providers choose the option with the highest returned probability and
 calculate scores as a probability-weighted average. They do not add native confidence
@@ -129,7 +127,7 @@ costs/latencies.
 Remote context limits, JSON Schema limits, model availability, output budgets,
 pricing, and rate limits are provider/account specific. The bridge's local caps
 do not override them. The SDK has no silent provider failover, model search,
-credential refresh, provider-side batch API, or universal quality guarantee.
+credential refresh or provider-side batch API.
 Unsupported protocols require an explicit custom decision or generative provider; unsupported server
 features require an explicitly supported mode or a different model.
 

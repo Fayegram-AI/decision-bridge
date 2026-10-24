@@ -82,7 +82,6 @@ delegation ID or null; any service rejection is reported as an error event.
 
 Completed native decisions arrive as `type: 'decision'` notifications containing
 the full model, ordered answers and usage. Native refusal answers are preserved.
-The controller does not fabricate partial common success from a refusal.
 
 `correlation` contains `matched`, `stale`, source event ID/type, delegation ID, trigger
 ID and a configuration generation when known. Match quality describes how well a result
@@ -104,8 +103,8 @@ can be linked to its source, not how accurate the model's answer is.
 - Duplicate server event IDs produce `duplicate` notifications within retained
   history. Delegation results consume their source snapshot; repeated results
   cannot become newly matched work.
-- Manual request IDs are not assumed to be echoed by completion events. A manual
-  submission receipt cannot be used as proof that a later result belongs to it.
+- Completion events may omit manual request IDs, so a submission receipt alone
+  cannot associate a later result with that request.
 - Unrelated events do not enter the Decisions state machine.
 
 Only apply application actions when your own policy accepts the result and its
@@ -117,8 +116,8 @@ already knows the connection's accepted Decisions configuration.
 By default, commands have a 30-second deadline. The controller allows 128 pending
 operations, keeps 4096 history entries per correlation map, and limits each command or
 event to 8 MiB (configurable through 64 MiB). These limits control local resource use;
-the service applies its own quotas. History eviction can make late results unmatched. No
-service RPM/TPM enforcement, automatic command replay or reconnect policy is introduced.
+the service applies its own quotas. History eviction can make late results unmatched.
+The application manages request rates, command retries and reconnection.
 
 Call options accept `signal` and `timeoutMs`. Disconnect and disposal settle
 pending operations. Invalid signal values fail with `CONFIGURATION_ERROR` before

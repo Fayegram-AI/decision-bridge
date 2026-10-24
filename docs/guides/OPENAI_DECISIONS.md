@@ -199,9 +199,8 @@ common bridge extensions.
 ## Refusals, results, and execution
 
 Both paths fail the complete call with `MODEL_REFUSAL` if any question is refused.
-They return no fabricated answer or partial success. The error retains validated
-`usage`, `refusedQuestions: [{ index, name }]`, and available HTTP diagnostics;
-it does not retain sibling answers or raw upstream bodies. JSONL batches mark
+The error retains validated `usage`, `refusedQuestions: [{ index, name }]`, and
+available HTTP diagnostics. It does not retain sibling answers or raw upstream bodies. JSONL batches mark
 that request `ok: false`; independent rows can succeed.
 
 Common confidence is preserved within its existing [0, 1] invariant. Native
@@ -213,7 +212,7 @@ be equivalent or equally calibrated.
 Common usage maps reported input/output and cache counts.
 `meta.openaiDecisions.usage` preserves full native usage, including total and
 reasoning tokens. `meta.openaiDecisions.answers` retains native answer types and
-reported confidence. Predicate confidence and token counts are never invented.
+reported confidence.
 
 Decisions defaults to **zero HTTP retries**. Explicit `maxRetries` opts into the
 existing bounded policy and may repeat a billed request. There is no model

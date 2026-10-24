@@ -28,7 +28,7 @@ default to `cloudflare-extraction` when no provider is selected. Flags override
 The CLI resolves these settings before constructing a provider; SDK applications must
 select a provider when calling `createBridge`. Choose a supported native model from the
 [model selector inventory](../../README.md#model-selectors). Custom generative presets
-require an explicit model ID. Version-2 routing registries instead select configured
+require an explicit model ID. Routing registries select configured
 targets through `defaultRoute` or `--route`; see
 [routing registries](#routing-registries).
 
@@ -55,13 +55,13 @@ there is no CLI binding selector. Gateway settings route the selected REST reque
 | `init [DIRECTORY]` | Create config and schema, sample request, environment template, and gitignore; generate a custom module when needed; never overwrite |
 | `evaluate [FILE\|-]` | One evaluation; aliases `eval` and `ask` |
 | `validate [FILE\|-]` | Validate input locally; does not call a provider |
-| `inspect FILE\|- --config FILE` | Report version-2 routing eligibility and selection without inference |
+| `inspect FILE\|- --config FILE` | Report routing eligibility and selection without inference |
 | `schema [FILE\|-]` | Print the generative response schema for these questions; local only |
 | `models` | List the configured provider's models; may be paginated |
 | `batch FILE\|-` | Stream JSONL inputs and ordered JSONL result/error records |
 | `extraction run FILE\|-` | One native extraction; returns `{ extraction, meta }` |
 | `extraction validate FILE\|-` | Offline structural and client-budget validation |
-| `extraction inspect FILE\|- --config FILE` | Offline inspection of extraction routes in a version-2 registry |
+| `extraction inspect FILE\|- --config FILE` | Inspect configured extraction routes offline |
 | `extraction batch FILE\|-` | Ordered extraction JSONL results and per-row errors |
 | `extraction init [DIRECTORY]` | Create an extraction profile, request, schema and credential template |
 | `live validate FILE\|- --kind config\|command\|event` | Offline Live structure validation |
@@ -127,7 +127,8 @@ Routed commands require a request filename or `-`; they do not use the bundled
 sample. `models`, `schema`, and `--native` are unavailable with a registry.
 Single-provider override flags are rejected, and legacy `DECISION_*` selection
 variables are ignored. Set provider/model/transport fields in each route's
-configuration. See [configuration version 2](CONFIGURATION.md#routing-registries-version-2).
+configuration. See [routing configuration](CONFIGURATION.md#routing-registries-version-2)
+for the `schemaVersion: 2` file format.
 
 `inspect` and `validate` perform no inference, module imports, or prompts. The report
 includes `routes`, `eligible`, `provisional`, `validationScope` and `outcome`, plus
@@ -148,7 +149,7 @@ See the [routing guide](../guides/ROUTING.md) for policy and selector requiremen
 | --- | --- |
 | `--config FILE` | Explicit JSON configuration; never autodiscovered |
 | `--env-file FILE` | Load an explicit environment file without changing the parent shell |
-| `--route ID` | Select `auto` or a concrete route in a version-2 registry; `init --route auto` creates a registry template |
+| `--route ID` | Select `auto` or a concrete route in a routing registry; `init --route auto` creates a registry template |
 | `--interactive` | Enable terminal clarification when needed; requires terminal stdin/stderr and a request file |
 | `--no-interactive`, `--no-routing-prompt` | Suppress routing clarification and enforce unattended selector requirements |
 | `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `cloudflare-extraction` (extraction namespace), `custom-decision`, `custom-generative` |
@@ -184,8 +185,8 @@ target constraint. See [configuration](CONFIGURATION.md) for full precedence.
 
 ## JSON output contract
 
-Single evaluation stdout is exactly the result object plus a newline. It is not
-wrapped in a progress log or Markdown. Errors are `{ "error": { "code", "message",
+Single evaluations write the result object followed by a newline to stdout.
+Errors are `{ "error": { "code", "message",
 ... } }` on stderr. No debug stacks or raw HTTP error bodies are printed.
 
 Native Decisions output is `{ decision, meta }`. OpenAI refused questions fail the
@@ -237,10 +238,8 @@ is not entirely prevalidated before execution.
 | 2 | Usage, input, configuration, or filesystem failure |
 | 130 | Caller interruption/cancellation, including handled SIGINT/SIGTERM |
 
-Both signals are handled as cancellation by this CLI; it intentionally does not
-use 143 for SIGTERM. Cancellation also interrupts a blocked stdout write. The
-POSIX subprocess SIGINT check is excluded on Windows, where console signal
-delivery needs separate validation.
+The CLI handles both SIGINT and SIGTERM as cancellation with exit code 130.
+Cancellation also interrupts a blocked stdout write.
 
 ## I/O and resource limits
 

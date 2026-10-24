@@ -2,8 +2,8 @@
 
 ## Native decisions as the application contract
 
-Use shared state, ordered input or conversation and independent typed questions as the
-public contract. The bridge owns orchestration; providers own their model API protocols.
+Requests combine shared state, ordered input or conversation with independent typed
+questions. The bridge owns orchestration; providers own their model API protocols.
 This gives applications a stable decision interface and makes customization explicit at
 each call. Native decision models are the main package scope; generative protocols are
 opt-in custom strategies with their own public subpath. Every provider declares its
@@ -17,11 +17,11 @@ from the bridge's `evaluate` interface.
 
 ## ESM JavaScript with declarations and no runtime dependencies
 
-Use standard fetch, streams, and JSON in the SDK; keep Node's test runner, argument
-parser, and filesystem APIs in development tools and the optional CLI. Ship ESM source
-plus `.d.mts` types without a transpilation build. Node 22.16+ is required for Node use,
-while browser use depends on modern web APIs and the provider's CORS policy. TypeScript
-declaration synchronization needs its own tests. A CommonJS entry point is not claimed.
+The SDK uses standard fetch, streams and JSON. Node-specific APIs are confined to
+development tools and the optional CLI. The package ships ESM source and `.d.mts`
+declarations without a transpilation step. Running on Node.js requires version 22.16 or newer;
+browser use depends on modern web APIs and the provider's CORS policy. Type checks
+verify declaration compatibility. CommonJS applications can use dynamic import.
 
 ## Provenance is part of the result
 
@@ -37,12 +37,11 @@ Decision calls reject invalid JSON, unsupported request fields, wrong labels,
 distributions outside the provider precision allowance, malformed results and refusals;
 generative paths also reject explicit output truncation. Require explicit output modes
 and models. Services may truncate input without reporting it; local byte limits do not
-guarantee token fit. Some calls fail that a permissive wrapper might guess at, but
-failures remain observable and cannot silently change budgets or decision policies.
+guarantee token fit. Invalid results fail explicitly so applications can apply their
+own error-handling policy.
 
 Clairic preserves additional safe native JSON and its truncation flag. Live
 preserves native refusal events and marks ambiguous correlation as unmatched.
-Those operation contracts avoid inventing success or discarding native evidence.
 
 ## Service admission and client resources
 
@@ -93,15 +92,12 @@ is allowed, and how ambiguity is resolved. See the
 
 ## MIT licensing and coordinated distribution
 
-Publish the maintained source under the MIT License, with the copyright notice in
-`LICENSE` and matching SPDX identifiers in package metadata. Release the source
-repository and npm package together. Source and package recipients have the same MIT
-permissions and obligations; building an archive alone does not publish a release.
+The source and packaged SDK use the MIT License, with the copyright notice in
+`LICENSE` and the matching SPDX identifier in package metadata. Both distributions
+carry the same license and public API.
 
 ## Verified npm package artifact
 
-Build a versioned npm tarball from the source package and retain it only after an
-offline installation check of the exact archive. Publish that verified artifact to the
-public npm registry as part of the coordinated source and package release; building
-alone never publishes it. Consumers install the release from npm, while maintainers
-verify the exact archive before publication.
+The build retains a versioned tarball after verifying its offline installation.
+Using the same archive for GitHub and npm keeps their package contents consistent.
+See [packaging and release](RELEASING.md) for the verification and publication steps.
