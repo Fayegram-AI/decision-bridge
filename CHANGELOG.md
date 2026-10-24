@@ -2,6 +2,17 @@
 
 Notable user-facing changes by version.
 
+## 0.1.4
+
+- Add the `/routing` SDK for direct selection and experimental auto routing of
+  decisions and extraction, with enabled targets, capability filtering, rules,
+  priorities and optional decision-model selection.
+- Add request preparation, application and terminal clarification, ordered
+  batches, separate time budgets, bounded failover, cooldowns and usage diagnostics.
+- Add version-2 CLI registries, `--route`, offline inspection, initialization
+  templates and TypeScript APIs; retain version-1 configuration support.
+- Refresh SDK, provider, configuration and troubleshooting documentation for 0.1.4.
+
 ## 0.1.3
 
 - Expand OpenAI Decisions with conversation/tool history, remote images and

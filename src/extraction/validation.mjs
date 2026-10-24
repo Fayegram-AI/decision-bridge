@@ -41,12 +41,11 @@ function field(spec) {
     } else check(spec.horizon === undefined && spec.interval === undefined, 'Forecast options require a forecast field.');
 }
 
-/** Credential-free preflight shares the exact wire budget with actual dispatch. */
-export function validateExtractionRequest(input, options = {}) {
-    const settings = optionsObject(options, ['model', 'transport', 'gateway', 'maxRequestBytes', 'maxRetries', 'rejectIfBusy'], 'Extraction validation options');
+/** Structural validation is independent of route model and transport policy. */
+export function validateExtractionStructure(input) {
     const request = cloneJson(input, 'extraction request');
     check(isRecord(request) && Object.keys(request).every(key => ['model', 'state', 'fields', 'images', 'reference_date', 'options'].includes(key)), 'Invalid extraction request fields.');
-    const model = extractionModel(own(request, 'model') ? request.model : settings.model);
+    check(request.model === undefined || (typeof request.model === 'string' && request.model.trim()), 'model must be nonempty text.');
     check(isRecord(request.fields) && Object.keys(request.fields).length > 0, 'Extraction requires named fields.');
     for (const [name, spec] of Object.entries(request.fields)) {
         check(/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name), 'Invalid extraction field name.');
@@ -58,6 +57,16 @@ export function validateExtractionRequest(input, options = {}) {
     const inference = own(request, 'options') ? request.options : {};
     check(isRecord(inference) && Object.keys(inference).every(key => ['include_quantiles', 'return_state_text', 'rejectIfBusy'].includes(key)) &&
         Object.values(inference).every(value => typeof value === 'boolean'), 'Invalid extraction options.');
+    if (own(request, 'images')) validateCloudflareImages(request.images);
+    return request;
+}
+
+/** Credential-free preflight shares the exact wire budget with actual dispatch. */
+export function validateExtractionRequest(input, options = {}) {
+    const settings = optionsObject(options, ['model', 'transport', 'gateway', 'maxRequestBytes', 'maxRetries', 'rejectIfBusy'], 'Extraction validation options');
+    const request = validateExtractionStructure(input);
+    const model = extractionModel(own(request, 'model') ? request.model : settings.model);
+    const inference = request.options ?? {};
     const transport = settings.transport === undefined ? 'rest' : settings.transport;
     check(['rest', 'binding'].includes(transport), 'Unknown Cloudflare transport.', 'CONFIGURATION_ERROR');
     const gateway = cloudflareGateway(settings.gateway);

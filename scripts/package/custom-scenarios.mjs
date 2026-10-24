@@ -135,6 +135,13 @@ graph(import.meta.resolve(${JSON.stringify(name + '/custom/decision')}));
 graph(import.meta.resolve(${JSON.stringify(name + '/custom/generative')}));
 graph(import.meta.resolve(${JSON.stringify(name + '/extraction')}));
 graph(import.meta.resolve(${JSON.stringify(name + '/live')}));
+graph(import.meta.resolve(${JSON.stringify(name + '/routing')}));
+const routing = await import(${JSON.stringify(name + '/routing')});
+const routingProvider = { kind: 'decision', name: 'browser-route', defaultModel: 'fixture', async evaluate(request) {
+    return { model: request.model, answers: { q: { type: 'noul', noul: 0.7 } }, usage: { input_tokens: null, output_tokens: null } };
+} };
+const router = routing.createDecisionRouter({ routes: { primary: { provider: routingProvider } }, defaultRoute: 'primary' });
+assert.equal((await router.evaluate({ state: '', questions: { q: sdk.noul('True?') } })).answers.q.noul, 0.7);
 const extraction = await import(${JSON.stringify(name + '/extraction')});
 const live = await import(${JSON.stringify(name + '/live')});
 extraction.validateExtractionRequest({ state: '4', fields: { amount: { type: 'number' } } });

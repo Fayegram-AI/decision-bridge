@@ -79,7 +79,8 @@ function allowedKeys(value, expected, label, code = 'VALIDATION_ERROR') {
     `${label}: unknown field.`, code);
 }
 
-export function validateRequest(input, defaultModel) {
+/** Validate the common contract without inventing a model before route selection. */
+export function validateRequestStructure(input) {
   const request = cloneJson(input, 'request');
   check(isRecord(request), 'request must be an object.');
   allowedKeys(request, ['state', 'input', 'conversation', 'questions', 'model', 'safetyIdentifier',
@@ -102,8 +103,6 @@ export function validateRequest(input, defaultModel) {
     typeof request.safetyIdentifier === 'string',
   'safetyIdentifier must be a string or null.');
   if (own(request, 'model')) check(nonempty(request.model), 'model must be a nonempty string when provided.');
-    const model = own(request, 'model') ? request.model : defaultModel;
-  check(nonempty(model), 'model must be a nonempty string.');
   check(isRecord(request.questions) && Object.keys(request.questions).length > 0,
     'questions must be a nonempty object.');
   for (const [id, q] of Object.entries(request.questions)) {
@@ -154,7 +153,14 @@ export function validateRequest(input, defaultModel) {
         'noul descriptions must be text or structured JSON, not null.');
     }
   }
-  return { ...request, model };
+  return request;
+}
+
+export function validateRequest(input, defaultModel) {
+    const request = validateRequestStructure(input);
+    const model = own(request, 'model') ? request.model : defaultModel;
+    check(nonempty(model), 'model must be a nonempty string.');
+    return { ...request, model };
 }
 
 function probability(value, label) {

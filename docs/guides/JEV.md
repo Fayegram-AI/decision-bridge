@@ -1,10 +1,9 @@
 # Jev images, boxes, and long context
 
 Jev uses TypeSafe's native `POST /v1/systemone` endpoint. The SDK defaults to
-`jev-latest`; `jev-preview` and explicit version IDs are also accepted. Model
-listing is account-specific and may list aliases without versioned IDs.
-The returned `model` records the service-reported version independently of
-`meta.requestedModel`.
+`jev-latest`; `jev-preview` and explicit version IDs are also accepted. Model listing
+depends on your account and may show aliases without versioned IDs. The returned `model`
+records the service-reported version independently of `meta.requestedModel`.
 
 ## Experimental opt-ins
 
@@ -105,8 +104,8 @@ and native `confidence`. Coordinates are fractions measured from the top-left:
 `left` and `right` scale with width; `top` and `bottom` scale with height.
 All four values must be finite numbers in 0–1, with `left < right` and
 `top < bottom`. Validation rejects malformed boxes rather than repairing them.
-Common results containing box questions use result `meta.schemaVersion: 4`;
-the CLI configuration schema version remains 1.
+Common results containing box questions use result `meta.schemaVersion: 4`.
+Result versions are independent of [CLI configuration versions](../reference/CONFIGURATION.md).
 
 Each question returns one box. There is no absent-target result: a box is
 returned even when the target is absent. Pair it with a presence `noul` and
@@ -116,16 +115,16 @@ and all other result checks remain enforced.
 
 ## Images and client budgets
 
-PNG/JPEG formats, canonical base64, positive dimensions, still-image structure
-and asset reference semantics are checked locally. Service image dimensions,
-decoded/processed sizes and context admission remain upstream. The bridge does
-not resize, rotate or re-encode images. Prepare upright pixels in the application.
+The SDK checks PNG/JPEG format, base64 encoding, positive dimensions, still-image
+structure and asset references before sending a request. TypeSafe checks its own limits
+on image dimensions, decoded and processed sizes, and model context. The bridge does not
+resize, rotate or re-encode images, so prepare upright images in your application.
 
 Jev requests default to a 32 MiB client serialized-JSON budget. An explicit
-`maxRequestBytes` can select a budget through 64 MiB. Responses default to 8 MiB.
-General JSON processing retains a 100-level depth and 200,000-node safeguard;
-reference-pattern safeguards bound local regex construction. These are client
-resource controls, independent of service quotas.
+`maxRequestBytes` can select a budget through 64 MiB. Responses default to 8 MiB. JSON
+input is limited to 100 levels of nesting and 200,000 nodes. Asset reference patterns
+also have local limits to keep regular-expression construction bounded. These controls
+limit SDK resource use; TypeSafe's service quotas apply separately.
 
 ## CLI
 

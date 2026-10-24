@@ -16,7 +16,7 @@ Source and installed-consumer type checks use the same local compiler.
 | `npm test` | SDK, CLI, provider, and file/transport behavior using fixtures and loopback servers |
 | `npm run test:coverage` | The functional suite with production source/bin coverage floors |
 | `npm run typecheck` | Positive and expected-negative TypeScript API contracts |
-| `npm run test:package` | Pack, offline install, root/custom/extraction/Live exports and types, browser-safe imports, presets/modules, contents and docs |
+| `npm run test:package` | Pack, offline install, root/custom/extraction/Live/routing exports and types, browser-safe imports, presets/modules, contents and docs |
 | `npm run build` | Retain a versioned npm tarball after checking its offline installation |
 | `npm run verify` | Source checks, tests, type contracts, and package smoke check |
 
@@ -25,14 +25,14 @@ and `test:package`; running coverage and build immediately after it repeats
 those checks. CI and the release guide run `check`, `test:coverage`,
 `typecheck`, and `build` once each.
 
-These commands validate code behavior and package integrity. Model-quality
-evaluation is a separate activity, not part of the test suite: these commands do
-not score model answers, measure provider speed, or use paid inference. Coverage
-floors are 90% lines, 80% branches, and 85% functions. Coverage does not establish model
-quality, correctness of every path, or current hosted compatibility.
-The CI configuration targets Linux, Windows, and macOS on Node 22.16 and Node 24;
-consult actual run results for a particular commit instead of treating the matrix
-as evidence that every environment passed.
+These commands validate code behavior and package integrity. Model-quality evaluation is
+a separate activity, not part of the test suite: these commands do not score model
+answers, measure provider speed, or use paid inference. The suite requires at least 90%
+line coverage, 80% branch coverage and 85% function coverage. Coverage does not
+establish model quality, correctness of every path, or current hosted compatibility. The
+CI configuration targets Linux, Windows, and macOS on Node 22.16 and Node 24; consult
+actual run results for a particular commit instead of treating the matrix as evidence
+that every environment passed.
 
 ## Suite ownership
 
@@ -49,6 +49,7 @@ as evidence that every environment passed.
 - `extraction.test.mjs`: all nine Clairic field families, native JSON preservation, REST/binding options, batch preflight and model-selection diagnostics.
 - `live.test.mjs`: commands/acknowledgements, configuration history, transcript ordering, unmatched/stale/duplicate results, observer isolation and lifecycle cleanup.
 - `expansion-cli.test.mjs`: extraction commands/configuration, offline Live validation/replay, per-row errors and provider-switch isolation.
+- `routing*.test.mjs`: eligibility, deterministic/model selection, clarification, preparation, budgets, recovery/cooldowns, batch snapshots and registry CLI behavior.
 - `custom-providers.test.mjs`, `custom-config.test.mjs`: classified SDK paths, provenance, presets/modules, schema and initialization.
 - `generative-helpers.test.mjs`: exported prompt/normalization helper contracts and unsupported input rejection.
 - `config.test.mjs`: file/environment/flag precedence and provider transitions.
@@ -60,6 +61,7 @@ as evidence that every environment passed.
 - `decisions.types.mts`, `cloudflare.types.mts`: richer questions, native APIs, and precision settings.
 - `cloudflare-worker.types.mts`: compatibility with official Workers binding declarations.
 - `expansion.types.mts`: conversation/cache inputs, extraction value inference, unions, batches and Live transport/notification contracts.
+- `routing.types.mts`: router options, decision/extraction inference, prepared schema replacement and routed batch records.
 
 Node's reported test count includes each row of a parameterized input table. It
 is not a count of independent features; retain separate rows when they protect
@@ -101,12 +103,28 @@ node --test test/capability-expansion.test.mjs test/extraction.test.mjs test/liv
 npm run typecheck
 ```
 
-REST doubles and binding doubles verify inference/execution option separation and
-safe upstream errors. Live uses a supplied in-memory connection adapter and the
-same state reducer as offline replay. No test intentionally exhausts service
-quotas or treats accepted local structure as hosted admission. Installed-package
-checks exercise the dedicated exports, CLI tools, declarations and SDK imports
-without Node globals.
+REST and binding test doubles check that model-input options and execution options are
+passed separately, and that service errors are reported safely. Live uses a supplied
+in-memory connection adapter and the same state reducer as offline replay. These tests
+do not exhaust service quotas or establish that a hosted service will accept a request
+that passes local validation. Installed-package checks exercise the dedicated exports,
+CLI tools, declarations and SDK imports without Node globals.
+
+### Routing coverage
+
+For changes to routing policies or registry integration, run:
+
+```text
+node --test test/routing.test.mjs test/routing-batch.test.mjs test/routing-boundaries.test.mjs test/routing-selector.test.mjs test/routing-cli.test.mjs
+```
+
+The fixtures cover zero/one/multiple eligible targets, disabled and unavailable
+routes, capability restrictions, deterministic mode without AI, selector response
+validation, cancellation, clarification order, bounded recovery and cooldowns.
+`routing.types.mts` checks typed decision/extraction results and schema-changing
+preparation. Installed-package checks exercise the routing export in Node and
+without Node globals, plus CLI registry initialization and offline inspection.
+These checks do not evaluate selector calibration or account availability.
 
 ## Optional authenticated provider smoke check
 
@@ -160,13 +178,13 @@ validity, configured client byte budgets, effective-model overrides, request bod
 and explicit smaller ceilings. Gateway caching/logging should be disabled for
 test payloads, and each bounded run should have a request and total time budget.
 
-The SDK, CLI, and ordinary checks do not create Workers or Gateways. Provisioning
-and cleanup belong to the application's separately authorized environment setup.
-The smoke helper does not qualify Clairic or a GPT-Live connection. When a specific
-wire-contract uncertainty requires hosted verification, use the intended
-application-owned runtime/connection and a bounded, explicitly authorized case.
-Offline fixtures remain sufficient for routine development and CI; record hosted
-behavior only when that exact path was exercised.
+The SDK, CLI, and ordinary checks do not create Workers or Gateways. Provisioning and
+cleanup belong to the application's separately authorized environment setup. The smoke
+helper does not test Clairic or a GPT-Live connection. When a specific wire-contract
+uncertainty requires hosted verification, use the intended application-owned
+runtime/connection and a bounded, explicitly authorized case. Offline fixtures remain
+sufficient for routine development and CI; record hosted behavior only when that exact
+path was exercised.
 
 ## Package verification
 

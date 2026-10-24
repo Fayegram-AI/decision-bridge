@@ -196,6 +196,17 @@ profiles should choose it. Provider, preset, and module changes reset lower-prec
 provider-specific settings; supply overrides for the new provider explicitly.
 See [configuration](../reference/CONFIGURATION.md).
 
+## Automatic selection among configured targets
+
+Use the [routing API](ROUTING.md) to choose a target based on supported features, your
+rules and priorities, or a decision model. Register the providers and models you want to
+use, then enable the ones available to your application. `policy: 'deterministic'` makes
+the choice without a selector call. If only one target can handle the request, the
+router selects it locally. Auto mode is experimental in 0.1.4. The routing request's
+`model` constrains eligible targets instead of replacing a provider default. CLI
+registries use configuration version 2 and `--route`; single-provider profiles and
+precedence remain as described above.
+
 ## Boundaries
 
 The opt-in custom generative compatible preset uses Chat Completions, not the OpenAI Responses API.
@@ -205,8 +216,9 @@ Jev, OpenAI Decisions, and Cloudflare Clef each have a dedicated native provider
 use those provider types for their decision APIs. Native Decisions providers
 reject generative output settings such as `responseFormat` and `maxTokens`.
 
-All shipped evaluations return probability-based decisions. Jev, OpenAI Decisions,
-and Cloudflare probabilities are marked `native`; generative estimates are `elicited`, not logprobs or
-a calibration guarantee. There is no discrete-only mode in this release. The
-bridge standardizes the software interface, not model accuracy or statistical
-semantics. See [provider reference](../reference/PROVIDERS.md).
+All shipped evaluations return probability-based decisions. Jev, OpenAI Decisions, and
+Cloudflare probabilities are marked `native`; generative estimates are `elicited`, not
+logprobs or a calibration guarantee. This release has no mode that returns only a choice
+without its probabilities. The shared interface does not make models equally accurate or
+give their probabilities identical statistical meaning. See
+[provider reference](../reference/PROVIDERS.md).

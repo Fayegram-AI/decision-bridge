@@ -1,6 +1,7 @@
 # Custom provider contracts
 
-Decision Bridge has one bridge and two explicit extension paths:
+Custom providers work with the same bridge as the built-in providers. Choose the
+extension path that matches the service you are integrating:
 
 | Path | SDK helper | CLI provider | Purpose |
 | --- | --- | --- | --- |
@@ -31,25 +32,25 @@ that implement this contract directly. Missing or invalid kinds fail at construc
 `bridge.providerKind` and `result.meta.providerKind` come from the contract and
 cannot be overridden by response metadata.
 
-The request is already snapshotted, validated, supplied with an effective model
-selection, and frozen. Its model string retains the selection; any mapping to an
-upstream ID belongs to the provider's preparation and transport.
-Return canonical `{ model, answers, usage, meta? }`; the bridge validates and
-freezes the result. Custom providers own API encoding, transport, response mapping,
-credential destinations, bounded bodies, safe errors, and cancellation cleanup.
-Internal transport helpers are not stable public exports. Delegate a maintained
-preset for a protocol already supported, or implement and test your own transport.
+The bridge passes a validated, read-only copy of the request with its selected model. If
+your service uses a different model ID, resolve that ID inside the provider. Return
+`{ model, answers, usage, meta? }` in the shared result format; the bridge validates it
+and makes the returned result immutable. Your provider handles API encoding, networking,
+response conversion, credential destinations, body-size limits, safe errors and cleanup
+after cancellation. Internal transport helpers are not stable public exports. Delegate a
+maintained preset for a protocol already supported, or implement and test your own
+transport.
 
-Capability omissions retain the legacy shared-state and question profile. Audio
-and video additions default to false/zero; conversation, tool history, remote
-images and prompt caching default to false. Explicit quantitative custom limits
-are enforced; `null` leaves that admission limit to the service. Declare richer forms only when their
-encoding and validation are implemented. The bridge runs preflight again after
-preparation hooks. Unknown usage is null; no provider should invent token counts,
-confidence, or calibration. Generative native-provenance claims are rejected.
-Supplied `probabilitySource` and `confidenceSource` metadata must be nonempty
-strings. Decision providers may use custom labels; omitted probability provenance
-uses the provider's declared value, or `unspecified` when none is declared.
+If you omit capabilities, the provider supports the original shared-state question
+format. Audio and video flags/counts default to false/zero; conversation, tool history,
+remote images and prompt caching default to false. Numeric limits you declare are
+enforced; `null` leaves a limit to the service. Declare additional input forms only
+after implementing their encoding and validation. The bridge checks the request again
+after preparation hooks. Unknown usage is null; no provider should invent token counts,
+confidence, or calibration. Generative native-provenance claims are rejected. Supplied
+`probabilitySource` and `confidenceSource` metadata must be nonempty strings. Decision
+providers may use custom labels; omitted probability provenance uses the provider's
+declared value, or `unspecified` when none is declared.
 
 ## Explicit CLI modules
 
@@ -59,22 +60,37 @@ a kind. A generative profile chooses exactly one `preset` or `module`; module
 profiles require JSON `options` for implementation-specific transport/tuning.
 Inline `apiKey`/`api_key` options are rejected; use top-level `apiKeyEnv`.
 
-The module exports `createProvider(options)`, synchronously or asynchronously.
-Import/factory waiting is bounded by `timeoutMs` (30 seconds by default) and CLI
-cancellation, separately from evaluation. The loader passes JSON `options`, then
-the selected `apiKey` and `model` when present. Its returned kind must match the
-selected path. The CLI also applies its configured model to common requests that
-omit a model, independently of the factory's own default; an explicit request
-model takes precedence, and `--model` overrides both. Module paths in JSON resolve
-relative to that file; flag paths
-resolve relative to the working directory. Explicit modules execute trusted code;
-this extension point is not a sandbox. No module is discovered automatically.
+The module exports `createProvider(options)`, synchronously or asynchronously. The CLI
+waits up to `timeoutMs` (30 seconds by default) for import and factory initialization,
+with cancellation support. This deadline is separate from evaluation. The loader passes
+JSON `options`, then the selected `apiKey` and `model` when present. Its returned kind
+must match the selected path. In single-provider mode, the CLI applies its configured
+model to common requests that omit one, independently of the factory's own default. A
+request model takes precedence, and `--model` overrides both. Module paths in JSON
+resolve relative to that file; flag paths resolve relative to the working directory.
+Explicit modules execute trusted code; this extension point is not a sandbox. No module
+is discovered automatically.
 
 `init` creates a provider module with an unimplemented service call when no
 implementation is selected. When given an existing module, it references that module without
-loading or overwriting it. Offline `validate` never imports custom modules or
-requires credentials; it reports structure-only validation for unknown protocols.
+loading or overwriting it. Single-provider offline `validate` never imports custom
+modules or requires credentials; it reports structure-only validation for unknown protocols.
 `bridge.validate()` on an instantiated provider includes capabilities and preflight.
+
+## Routed providers
+
+A routing registry accepts a provider instance or a `factory({ signal })` that creates
+one when needed. Declare the provider kind when using a factory. Disabled factories are
+never called; inspection marks checks that need initialization as provisional. In a
+version-2 CLI registry, a custom route's `config` contains the same module/preset
+fields, with paths relative to the registry file. Inspection stays offline and does not
+import the module.
+
+Generative targets require `allowGenerative: true` and retain elicited provenance.
+A decision selector must be decision-kind with a configured model. Providers
+participating in router failover must declare `singleDispatch: true` and disable
+their own retries. See [routing](ROUTING.md) for readiness, initialization and
+recovery contracts.
 
 ## Tests for a new protocol
 

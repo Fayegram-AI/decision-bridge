@@ -51,6 +51,11 @@ export async function loadConfig({ configPath, envFile, overrides = {}, cwd = pr
     moduleBase = dirname(path);
   }
   const environment = Object.create(null);
+  if (fileConfig.schemaVersion === 2) {
+    check(Object.keys(overrides).length === 0,
+      'Provider and model override flags cannot rewrite a routing registry; edit the concrete route configuration and use --route.', 'CONFIGURATION_ERROR');
+    return { config: fileConfig, env: effectiveEnv, moduleBase };
+  }
   for (const [key, field] of Object.entries(ENV_FIELDS)) {
     if (effectiveEnv[key] === undefined) continue;
     const value = effectiveEnv[key];

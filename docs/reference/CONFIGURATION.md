@@ -1,6 +1,9 @@
 # Configuration and credentials
 
-## Explicit CLI JSON configuration
+CLI configuration supports version-1 single-provider profiles and version-2
+routing registries. Registries require 0.1.4; see [version availability](../README.md#version-availability).
+
+## Single-provider profiles (version 1)
 
 ```json
 {
@@ -27,13 +30,13 @@ is native-only. Generative presets use `createGenerativeProvider` from the
 `init` copies the configuration JSON Schema beside the generated config and adds
 `$schema` for editor completion. The packaged schema is available at
 `@fayegram-ai/decision-bridge/config.schema.json` and in
-[schemas/decision.config.schema.json](../../schemas/decision.config.schema.json).
-It checks profile structure; runtime preflight additionally checks endpoint,
-credential, capability, and serialized client-byte budgets.
-Cloudflare CLI configuration always selects REST. Inject a Workers AI binding
-through the SDK's `CloudflareDecisionsProvider` or `CloudflareExtractionProvider`
-constructor instead of a JSON profile. Gateway configuration is optional for
-either SDK transport and for CLI REST.
+[schemas/decision.config.schema.json](../../schemas/decision.config.schema.json). The
+schema checks profile structure. Before execution, runtime validation also checks the
+endpoint, credentials, supported features and encoded request size. Cloudflare CLI
+configuration always selects REST. Inject a Workers AI binding through the SDK's
+`CloudflareDecisionsProvider` or `CloudflareExtractionProvider` constructor instead of a
+JSON profile. Gateway configuration is optional for either SDK transport and for CLI
+REST.
 
 | Field | Values / scope |
 | --- | --- |
@@ -59,18 +62,18 @@ either SDK transport and for CLI REST.
 | `module` | Required for custom-decision; alternative to preset for custom-generative; explicit local ESM file |
 | `options` | Custom factory's JSON options, e.g. its own baseURL |
 
-Upper numeric limits validate client configuration, not vendor model capabilities.
-Jev requests default to a 32 MiB client budget; an explicit `maxRequestBytes`
-can select a budget through 64 MiB. `DECISION_JEV_IMAGES` and `DECISION_JEV_LONG_CONTEXT`
-accept `true` or `false`; their CLI overrides are `--jev-images`,
-`--no-jev-images`, `--jev-long-context`, and `--no-jev-long-context`.
-Cloudflare selects its byte budget from the effective request model, including
-per-call overrides. An explicit smaller `maxRequestBytes` remains the ceiling;
-selecting Omni cannot enlarge it. Omni's default is a bridge policy, not a
-documented whole-request service guarantee.
-Provider-specific unused fields are rejected. In a module profile, transport and
-generation settings belong inside `options`; the custom factory owns them. Top-level
-`timeoutMs` still bounds the bridge. The module may implement its own networking.
+These upper bounds define valid client settings. A service or model may impose smaller
+limits. Jev requests default to a 32 MiB client budget; an explicit `maxRequestBytes`
+can select a budget through 64 MiB. `DECISION_JEV_IMAGES` and
+`DECISION_JEV_LONG_CONTEXT` accept `true` or `false`; their CLI overrides are
+`--jev-images`, `--no-jev-images`, `--jev-long-context`, and `--no-jev-long-context`.
+Cloudflare selects its byte budget from the effective request model, including per-call
+overrides. An explicit smaller `maxRequestBytes` remains the ceiling; selecting Omni
+cannot enlarge it. Omni's default is a bridge policy, not a documented whole-request
+service guarantee. Provider-specific unused fields are rejected. In a module profile,
+transport and generation settings belong inside `options`; the custom factory owns them.
+Top-level `timeoutMs` still bounds the bridge. The module may implement its own
+networking.
 
 `parameters` cannot override model, messages, system instructions, schemas, tools,
 streaming, token-limit fields, or credentials. Legacy `functions` and
@@ -79,7 +82,7 @@ parameters may be rejected by the server; they are not silently dropped by us.
 
 ## Precedence
 
-For provider/configuration settings:
+For version-1 provider/configuration settings:
 
 ```text
 CLI flags > DECISION_* environment variables > explicit JSON file > defaults
@@ -91,8 +94,8 @@ For credentials loaded from an explicit environment file:
 existing process environment > --env-file values
 ```
 
-The loader does not mutate the process environment. The SDK independently reads
-its documented ambient credential variables at provider construction.
+Loading an environment file does not change the process environment. SDK provider
+constructors read their documented credential variables from that environment.
 
 The [model selector list](../../README.md#model-selectors) records native
 selectors and defaults. Configuration precedence does not expand a
@@ -115,18 +118,63 @@ Custom generative presets and modules do not inherit a
 Jev model. Offline validation of a generative/module request without a model reports
 `model: null`; evaluation requires a request model or provider default.
 
-Each layer is merged separately. Changing provider, preset, or module at a layer
-boundary discards all lower-layer implementation settings: endpoint, key selector,
-model, generation parameters, transport retries/byte limits, preset/module/options,
-and Cloudflare account/busy/Gateway settings. Only `timeoutMs` is shared. This
-prevents stale credentials and protocol options crossing implementation boundaries.
-Same-implementation overrides retain compatible settings. Supply new settings
-explicitly when switching. A module-to-preset or preset-to-module switch clears
-the old selector. Module identity uses the resolved file path: a file-relative
-module and a working-directory-relative flag retain settings only when both
-identify the same file.
+The CLI merges each configuration layer separately. If a higher-priority layer selects a
+different provider, preset or module, it discards the implementation settings inherited
+from lower-priority layers: endpoint, key selector, model, generation parameters,
+transport retries/byte limits, preset/module/options, and Cloudflare
+account/busy/Gateway settings. Only `timeoutMs` is shared. This keeps credentials and
+protocol settings from carrying over to a different implementation. Overrides for the
+same implementation keep compatible settings. Supply the settings for the new
+implementation when switching. A module-to-preset or preset-to-module switch clears the
+old selector. Module identity uses the resolved file path: a file-relative module and a
+working-directory-relative flag retain settings only when both identify the same file.
+
+## Routing registries (version 2)
+
+Auto mode is experimental in 0.1.4, including deterministic and decision-assisted
+policies.
+
+Set `schemaVersion: 2` and load the registry with `--config`. Provider settings
+belong inside each concrete route's `config`, using the profile fields above,
+including `provider` and `apiKeyEnv`. The reserved `routes.auto` entry contains
+selection policy. See the [routing guide](../guides/ROUTING.md#cli-registry-configuration)
+for a complete configuration and commands.
+
+| Top-level field | Purpose |
+| --- | --- |
+| `$schema` | Optional editor schema reference |
+| `schemaVersion` | Required value `2` |
+| `routes` | Concrete provider configurations and optional `auto` policy |
+| `defaultRoute` | Configured ID or `auto`; otherwise supply `--route` |
+| `policyRevision` | Optional application policy identifier included in diagnostics |
+| `workTimeoutMs` | Cumulative preparation, selection, execution and recovery budget; default 60,000 ms |
+| `clarificationTimeoutMs` | Active clarification budget, excluding queue time; default 300,000 ms |
+| `observerTimeoutMs` | SDK observation budget; default 1,000 ms; JSON cannot define an observer callback |
+
+Concrete route settings include `enabled`, `required`, `operation`, `description`,
+`allowGenerative`, `singleDispatch`, and `cooldownGroup`. Disabled targets need no
+credentials and their modules are not imported. Optional targets missing local
+configuration are unavailable; an enabled required automatic candidate with missing
+configuration fails execution for its operation. These checks use local configuration;
+they do not contact a service or verify account access.
+
+Version 2 ignores legacy `DECISION_*` provider/model settings and rejects the
+single-provider override flags, including `--model`, `--provider`, `--timeout-ms`
+and transport overrides. Edit a route's configuration and choose it with `--route`.
+Request `model` narrows compatible targets; it cannot replace a route's model.
+Each route still resolves `apiKeyEnv`, or its provider's default credential variable,
+from the process environment and explicit `--env-file`. Existing environment values
+win. Custom module paths remain relative to the configuration file.
+
+The shipped JSON Schema covers both versions. Runtime checks also enforce route
+references, operation compatibility and cross-field policy constraints. SDK
+registries use `config.type` instead of CLI `config.provider`, require explicit
+credentials in native descriptors, and can also accept providers or factories.
 
 ## Recognized environment variables
+
+The `DECISION_*` selection variables below apply to version-1 profiles. Provider
+credential variables also supply version-2 concrete routes as described above.
 
 | Variable | Purpose |
 | --- | --- |
@@ -181,8 +229,9 @@ The `extraction` namespace supplies provider `cloudflare-extraction` only when
 flags, environment and an explicit file have selected no provider. Its default
 model is `clairic`; `@cf/cloudflare/clairic` is also accepted. An explicit
 incompatible provider is rejected. Provider switching follows the same isolation
-rules above, including transitions between Clef and Clairic. The configuration
-schema stays at version 1.
+rules above, including transitions between Clef and Clairic. Single-provider
+extraction profiles use version 1. Version-2 registries select configured
+extraction routes through `defaultRoute` or `--route`.
 
 OpenAI prompt-cache controls and Clairic inference settings (`include_quantiles`,
 `return_state_text`) belong in request JSON. Extraction busy-mode flags override
@@ -193,6 +242,6 @@ Live SDK configuration is passed directly to `createLiveDecisions` with a suppli
 transport. Offline `live validate` and `live replay` do not load provider profiles,
 credentials or environment files. See [Live Decisions](../guides/LIVE_DECISIONS.md).
 
-Offline validation checks structure and client resource budgets. Service quotas,
-context/media admission and Gateway limits remain upstream; the SDK and CLI do
-not estimate tokens or enforce RPM/TPM.
+Offline validation checks request structure and configured resource limits. The service
+checks quotas, model context, media and Gateway limits. The SDK and CLI do not estimate
+tokens or enforce request or token rate limits.

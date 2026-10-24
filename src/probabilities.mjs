@@ -1,5 +1,9 @@
 import { requireCondition as check } from './errors.mjs';
 
+// Internal result provenance: downstream policies reuse the bridge's validated
+// pre-dispatch snapshot without trusting result metadata or re-reading providers.
+export const resultValidationPolicies = new WeakMap();
+
 /** Rounding allowance is selected by a provider contract, never response metadata. */
 export function validateResultOptions(options) {
     check(options !== null && typeof options === 'object' && !Array.isArray(options) &&

@@ -1,9 +1,9 @@
 # Custom decision providers
 
-Use this path for a service that exposes a decision model. It is separate from
-eliciting decisions from a general-purpose model. The root SDK already supports
-Jev, OpenAI Decisions, and Cloudflare; a new native decision protocol uses
-`@fayegram-ai/decision-bridge/custom/decision`.
+Use `@fayegram-ai/decision-bridge/custom/decision` to connect a service with its own
+decision-model API. Jev, OpenAI Decisions and Cloudflare are built into the root SDK. If
+you are prompting a general-purpose model to produce decisions, use
+[custom generative providers](CUSTOM_GENERATIVE.md) instead.
 
 ## SDK definition
 
@@ -23,11 +23,11 @@ const bridge = createBridge({ provider });
 console.log(bridge.providerKind); // decision
 ```
 
-For a new service, replace the delegated evaluation with your encoding, transport,
-and canonical response mapping. The helper validates and freezes the contract,
-sets `kind: 'decision'`, and preserves callback receivers. It does not infer
-capabilities or implement a protocol. Omitted capabilities use the legacy
-shared-state contract.
+The example delegates to Jev. For a new service, replace that call with code to encode
+the request, send it, and convert the response to the shared format. The helper
+validates and freezes the provider definition, sets `kind: 'decision'`, and preserves
+the callbacks' `this` value. You implement the service protocol and declare its
+capabilities; omitting them selects the original shared-state format.
 
 Return `{ model, answers, usage, meta? }`. Preserve native values and reported
 usage; use null for unknown token counts. Confidence is optional in the common

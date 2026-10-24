@@ -3,14 +3,18 @@
 The SDK exports browser-compatible ESM. Follow the
 [installation guide](GETTING_STARTED.md#install-into-your-application), then import
 `@fayegram-ai/decision-bridge` through your browser application's module bundler. The
-optional `decision-bridge` command still requires Node.js.
-Omni's embedded audio/video validation is browser-safe and adds no runtime media
-library. Build data URLs in the application; the SDK does not fetch remote media.
-The dedicated [extraction](EXTRACTION.md) and [Live](LIVE_DECISIONS.md) exports
-also use browser-compatible APIs. Clairic REST still requires provider CORS and
-explicit credentials. Live attaches to an already established application-owned
-connection; it does not create or authenticate one. OpenAI remote-image URLs are
-forwarded to the provider without a browser-side SDK fetch.
+optional `decision-bridge` command still requires Node.js. Omni's embedded audio/video
+validation is browser-safe and adds no runtime media library. Build data URLs in the
+application; the SDK does not fetch remote media. The [extraction](EXTRACTION.md) and
+[Live](LIVE_DECISIONS.md) exports also run in browsers. Clairic REST needs credentials
+you supply and a server that allows your web origin through CORS. Live uses a connection
+your application has already opened and authenticated. For OpenAI remote images, the SDK
+sends the URL to the provider without fetching the image in the browser.
+
+The [routing export](ROUTING.md) is also browser-safe. Supply each target's
+credentials explicitly and implement `onAmbiguity` with application UI when
+clarification is needed. Terminal prompting and configuration-file loading belong
+to the Node CLI; a browser router does not open a prompt by itself.
 
 Built-in REST providers need explicitly supplied credentials in browser code;
 Node environment-variable defaults and `.env` files are not available. Cloudflare

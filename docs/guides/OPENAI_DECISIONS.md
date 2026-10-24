@@ -40,13 +40,13 @@ The `default` selector follows the provider default, while `luna` stays within
 the Luna family. The resolved upstream model must have a supported capability
 profile before a selector can target it.
 
-`provider.defaultModel` and `bridge.defaultModel` expose the configured selection,
-using `default` when provider configuration omits `model`. Validated requests and
-extension context retain the effective selected value. Successful common
-and native calls expose `meta.requestedModel` for that selection and
-`meta.resolvedModel` for the upstream ID sent. The common `result.model` and native
-`decision.model` preserve the service-reported identity, which may differ from
-the outgoing ID. Byte limits apply to the resolved wire request.
+`provider.defaultModel` and `bridge.defaultModel` expose the configured selection, using
+`default` when provider configuration omits `model`. Validated requests and extension
+context retain the effective selected value. Successful common and native calls expose
+`meta.requestedModel` for that selection and `meta.resolvedModel` for the upstream ID
+sent. The common `result.model` and native `decision.model` preserve the
+service-reported identity, which may differ from the outgoing ID. Byte limits apply to
+the encoded request sent to the service.
 
 ## Common bridge access
 
@@ -71,10 +71,10 @@ const result = await bridge.evaluate({
 console.log(result.answers.route.choice);
 ```
 
-Existing state/question forms and answer shapes are retained. Strings remain
-unchanged; structured state, instructions, and descriptions become JSON text.
-Null choice descriptions are omitted. Legacy scores use zero-based native labels
-and preserve the original rubric in their common legend.
+The shared bridge API keeps its usual request and answer formats. Strings pass through
+unchanged; structured state, instructions and descriptions are sent as JSON text. Null
+choice descriptions are omitted. Legacy scores use zero-based native labels and preserve
+the original rubric in their common legend.
 
 `noul` without criteria, or with empty criteria, uses a native predicate. With
 true/false descriptions, it uses a native boolean choice carrying both options
@@ -99,9 +99,9 @@ const result = await bridge.evaluate({
 });
 ```
 
-Images accept inline base64 data URLs or an exclusive common `url` HTTP(S)
-reference. Native images use `image_url` for either form. References are forwarded;
-the bridge does not fetch URLs or read files. Image-count admission is server-owned.
+For an image, supply either a base64 data URL or an HTTP(S) `url`, not both. Native
+requests use `image_url` for either form. The bridge forwards image URLs without
+fetching them and does not read image files. The service checks image-count limits.
 Detail accepts `low`, `high`, `auto`, `original`, or null; omission uses the service
 default. Text/image ordering is preserved.
 
@@ -139,12 +139,12 @@ JSON safety and configured client wire budgets apply to all forms.
 
 ## Capabilities and preparation
 
-`bridge.getCapabilities(model?)` synchronously reports support and limits for
-ordered input, images, typed choices, labelled scores, and safety identifiers.
-It also reports conversation/tool history, remote images and prompt caching.
-`bridge.validate(request)` resolves the model, snapshots/freezes the request,
-and checks capabilities without inference. Unsupported combinations fail before
-dispatch with `UNSUPPORTED_CAPABILITY`.
+`bridge.getCapabilities(model?)` synchronously reports support and limits for ordered
+input, images, typed choices, labelled scores, and safety identifiers. It also reports
+conversation/tool history, remote images and prompt caching. `bridge.validate(request)`
+resolves the model, makes a read-only request copy, and checks supported features
+without calling the service. Unsupported combinations fail with `UNSUPPORTED_CAPABILITY`
+before a request is sent.
 
 Preflight also checks the encoded native structure and the complete UTF-8 wire
 body against `maxRequestBytes`. SDK array batches check every raw request before

@@ -1,8 +1,8 @@
 # Packaging and release
 
-The npm package build archives ESM source without compilation. The versioned
-tarball contains the runtime, TypeScript declarations, examples, and maintained
-docs. Tests and development scripts remain in the source repository.
+The build packages the ESM source directly, without a compilation step. The versioned
+tarball contains the runtime, TypeScript declarations, examples, and maintained docs.
+Tests and development scripts remain in the source repository.
 
 ## Verify source and package contents
 
@@ -27,15 +27,15 @@ To check that archive again, run:
 node scripts/package-smoke.mjs --tarball release/fayegram-ai-decision-bridge-VERSION.tgz
 ```
 
-Check public documentation against the implementation, including supported API
-shapes, examples, limits, errors, and service compatibility notes. Inspect the MIT
-copyright notice and package contents. Complete hosted checks relevant to changed
-features only when needed to resolve a specific wire-contract uncertainty, using
-an explicitly authorized account/runtime. Offline fixtures are sufficient for
-routine development and CI; fixture and declaration checks do not establish
-hosted binding/Gateway/Live behavior. Report the actual verification scope.
-Keep completed verification evidence separate from maintained consumer guidance.
-These content and verification checks do not depend on publication account setup.
+Check public documentation against the implementation, including supported API shapes,
+examples, limits, errors, and service compatibility notes. Inspect the MIT copyright
+notice and package contents. Use a hosted check only when a change leaves a specific
+question about the service protocol that fixtures cannot answer. Run it in an explicitly
+authorized account or runtime. Offline fixtures are sufficient for routine development
+and CI; fixture and declaration checks do not establish hosted binding/Gateway/Live
+behavior. Report the actual verification scope. Keep completed verification evidence
+separate from maintained consumer guidance. These content and verification checks do not
+depend on publication account setup.
 
 ## Confirm publication prerequisites
 

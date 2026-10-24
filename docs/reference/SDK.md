@@ -1,14 +1,14 @@
 # JavaScript SDK reference
 
-Import from `@fayegram-ai/decision-bridge` in your application after package installation.
-See [getting started](../guides/GETTING_STARTED.md) for a complete JavaScript call,
-TypeScript setup, and CommonJS dynamic import. The source-tree entry point is
-`src/index.mjs`. The package exposes ESM. Public
-TypeScript declarations are in `src/index.d.mts`; runtime JavaScript is authoritative
-and checked independently of those declarations.
+Import from `@fayegram-ai/decision-bridge` in your application after package
+installation. See [getting started](../guides/GETTING_STARTED.md) for a complete
+JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source checkout,
+the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
+declarations in `src/index.d.mts`. The JavaScript implementation and declarations are
+checked separately.
 
-This reference covers **0.1.3**. See
-[version availability](../README.md#version-availability) for earlier versions.
+This reference covers **0.1.4**, including the routing API described below.
+See [version availability](../README.md#version-availability).
 
 ## Create a bridge
 
@@ -96,21 +96,19 @@ built-ins reject them before dispatch. Cloudflare requires images → audio →
 videos → text. Its media use embedded data URLs, with format and client-budget
 checks described in the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video).
 
-The bridge snapshots and freezes its input, runs preparation hooks for the
-selected input form, invokes the provider once, validates the result, then
-observes an immutable result.
-Built-in transports can retry eligible response statuses within that invocation
-when client retries are configured.
+The bridge makes a read-only copy of the request, runs preparation hooks for its input
+form, calls the provider once, and validates the response. It then passes the read-only
+result to observers. Built-in transports can retry eligible response statuses within
+that invocation when client retries are configured.
 
 ### `bridge.getCapabilities(model?)` and `bridge.validate(request)`
 
-Capability lookup is synchronous and reports implemented features and limits.
-`validate` applies the default model selection, snapshots/freezes the request, and checks capabilities
-and preparation-extension compatibility without inference. Unsupported features
-fail with `UNSUPPORTED_CAPABILITY` before dispatch. Native Decisions has no model
-listing operation; capability lookup is not account model discovery.
-OpenAI validated requests retain the selected value, while preflight checks the
-resolved outgoing request, including its model ID, against the byte limit.
+Capability lookup runs synchronously and reports supported features and limits.
+`validate` fills in the default model, makes a read-only request copy, and checks that
+the provider and preparation extensions support it, without calling the service.
+Unsupported features fail with `UNSUPPORTED_CAPABILITY` before dispatch. OpenAI Decisions does not provide model listing.
+Capability lookup does not query an account's model catalog. OpenAI validated requests retain the selected value, while preflight checks
+the resolved outgoing request, including its model ID, against the byte limit.
 
 Providers can implement optional `validateRequest(resolvedRequest)` for additional
 static checks. This synchronous hook receives a frozen request, must return no
@@ -160,12 +158,11 @@ const q3 = score('How far did processing progress?', [
 must declare `boxes: true`. Jev supports it with experimental image opt-in and
 a supported model; see [Jev images and boxes](../guides/JEV.md).
 
-Builders return immutable question objects. `choice(instructions, criteria)` accepts
-a nonempty label map. `noul(instructions, criteria?)` accepts an
-optional criteria object,
+Builders return immutable question objects. `choice(instructions, criteria)` accepts a
+nonempty label map. `noul(instructions, criteria?)` accepts an optional criteria object,
 with only `true` and `false` keys. `score(instructions, criteria)` accepts at least two
-ordered levels; numeric level indices are zero-based. There is no boolean alias:
-`noul` means a probability, not a thresholded truth value.
+ordered levels; numeric level indices are zero-based. `noul` returns a probability. Your
+application applies a threshold if it needs a boolean result.
 
 `choice(instructions, options)` accepts ordered objects with unique string or
 boolean `value` fields and optional text or structured JSON descriptions. Boolean `true` and string
@@ -238,7 +235,8 @@ estimated token count is fabricated.
 | `durationMs` | Provider transport duration, including retries and body reading |
 | `totalDurationMs` | Bridge duration through observation |
 | `observerDurationMs` | Observation phase duration; initially zero inside observers |
-| `observerFailures` | Names of failed/timed-out observers |
+| `observerFailures` | Names of failed/timed-out bridge observers |
+| `routing` | Router selection, candidate statuses, selector/execution usage, attempts and timings; present on routed results |
 
 Metadata can have additional JSON fields. Application logic should not assume
 unavailable metadata exists. Result objects and nested data returned by the bridge
@@ -249,7 +247,8 @@ frozen snapshots.
 `schemaVersion` is selected by the highest applicable feature: 5 for conversation,
 remote-image URLs or prompt-cache controls; 4 for boxes; 3 for audio/video; 2 for
 ordered images/text, typed choices, labelled scores or a safety identifier; and
-1 for legacy requests. The CLI configuration schema remains 1. Extraction and
+1 for legacy requests. CLI profiles use configuration version 1; routing registries
+use version 2. Those configuration versions are independent of result versions. Extraction and
 Live use their dedicated native envelopes rather than a common result version.
 
 ## Extensions
@@ -267,10 +266,10 @@ content is revalidated, including capabilities and provider preflight. Preparati
 cannot rewrite question definitions or switch the model.
 Construct the request directly for those changes.
 
-Observers run after successful inference; their failures are collected in
-`meta.observerFailures`. They do not change answers, fail the successful request,
-or trigger another billed call. Each observer gets its own timeout, default 1,000
-milliseconds. Results shown to observers precede final timing/failure aggregation.
+Observers run after a successful model call. If one fails, its name is recorded in
+`meta.observerFailures`; the answers still succeed and the bridge does not retry the
+model call. Each observer gets its own timeout, default 1,000 milliseconds. Results
+shown to observers precede final timing/failure aggregation.
 
 `context` contains `provider`, `model`, frozen `questionIds`, and an `AbortSignal`.
 Custom callbacks should honor the signal. The bridge can stop waiting for ignored
@@ -288,12 +287,11 @@ const resultPromise = bridge.evaluate(request, {
 // controller.abort() cancels the in-flight request when needed.
 ```
 
-The transport deadline covers dispatch, attempts, backoff, and body reading for
-REST and Workers AI binding calls. A bridge deadline
-also covers preparation and the provider. The first applicable deadline wins.
-Observer time is additional and bounded separately. Aborting after a successful
-inference while observing preserves the successful result and records observer
-failure; it does not pretend the billed evaluation failed.
+The transport deadline covers dispatch, attempts, backoff, and body reading for REST and
+Workers AI binding calls. A bridge deadline also covers preparation and the provider.
+The first applicable deadline wins. Observer time is additional and bounded separately.
+If cancellation arrives after inference succeeds while an observer is running, the
+result remains successful and records the observer failure.
 
 Elapsed time is checked before dispatch and before accepting completion, including
 when synchronous work delays timer callbacks. Nested transport calls inherit the
@@ -318,6 +316,51 @@ remain per-request failures. Maximum array length is
 With `stopOnError`, already-started work completes and new work is marked
 `BATCH_SKIPPED`. Cancellation marks undispatched records `ABORTED`. There is no
 automatic model fallback. The CLI has a separate streaming JSONL implementation.
+
+## Routing entry point
+
+Import routing APIs from `@fayegram-ai/decision-bridge/routing`. They choose among
+configured targets and preserve each operation's request format, result format and
+labels describing where probabilities come from. They are separate from `createBridge`
+and the single-provider batch functions.
+
+Auto mode (`route: 'auto'`) is experimental in 0.1.4 for both deterministic and
+decision-assisted policies.
+
+| API | Contract |
+| --- | --- |
+| `createDecisionRouter(options)` | Returns a decision router with `evaluate(request, callOptions?)` and `inspect(request, callOptions?)` |
+| `createExtractionRouter(options)` | Returns an extraction router with `extract(request, callOptions?)` and `inspect(request, callOptions?)` |
+| `evaluateRoutedBatch(router, requests, options?)` | Ordered decision records with `index`, `ok`, and `result` or `error` |
+| `extractRoutedBatch(router, requests, options?)` | The same batch record contract for extraction |
+
+Router options require `routes` and may include `defaultRoute`, `policyRevision`,
+`prepare`, `onAmbiguity`, `onResult`, `workTimeoutMs`, `clarificationTimeoutMs`,
+and `observerTimeoutMs`. Configure a concrete ID for direct execution or `auto`
+for deterministic or decision-assisted selection. A call must supply `route` if
+the router has no default. Disabled targets are excluded; capability filtering
+may leave a single eligible target, which is selected without selector inference.
+
+Call options are `route`, `candidates`, `labels`, `routingDescription`,
+`onAmbiguity`, `clarify`, `signal`, and `timeoutMs`. Candidates only narrow the
+automatic set. A request's `model` constrains eligible targets rather than
+overriding their configured models. Call `timeoutMs` bounds total elapsed time,
+including clarification and queues; the router separately budgets work and
+active clarification. `inspect` is synchronous and offline, reports provisional
+checks, and does not execute preparation or initialize factories.
+
+Routed batches accept those call options plus `concurrency` and `stopOnError`,
+with at most 10,000 requests. Inputs and shared routing constraints are
+snapshotted before asynchronous preparation. All requests are prepared and
+preflighted before any router-issued inference; a failure in that stage rejects
+the batch. Execution failures become per-item records. Each item's selection
+uses current eligibility, including cooldowns established by earlier work.
+
+The subpath exports router options, call options, inspection, metadata, and
+result types. Routers without `prepare` preserve question/field inference.
+Preparation can replace the schema, so prepared routers and their batches return
+general answer types that callers must narrow. See the [routing guide](../guides/ROUTING.md)
+for complete policy, callback, selector, recovery and diagnostic behavior.
 
 ## Additional exports
 
@@ -383,10 +426,10 @@ Jev's contract. See [custom decision](../guides/CUSTOM_DECISION.md),
 
 ## Validation guarantees
 
-Legacy choice criteria maps must be nonempty. Noul
-criteria must be omitted or an object; its present true/false descriptions cannot
-be raw null. Score levels likewise cannot be raw null (nested null JSON values are
-still allowed). These invalid forms now fail before provider dispatch.
+Legacy choice criteria maps must be nonempty. Noul criteria must be omitted or an
+object; its present true/false descriptions cannot be raw null. Score levels likewise
+cannot be raw null (nested null JSON values are still allowed). These invalid inputs
+fail before the provider is called.
 
 `decideChoice()` rejects unknown option names and abstention labels not present in
 the answer. `evaluateBatch()` validates array holes as invalid requests before any
@@ -433,8 +476,8 @@ supports REST or a Workers AI binding; Live owns no authentication, audio,
 connection establishment or reconnection. See the [CLI reference](CLI.md) for
 their command namespaces.
 
-Service quotas, maximum request counts, context/media limits and Gateway
-admission remain authoritative upstream. Offline validation checks adapter
-structure and client resource budgets. SDK and CLI do not estimate tokens or
-enforce RPM/TPM. Explicit transport budgets can select up to 64 MiB, including
-Jev and all Clef models; existing default budgets are retained.
+Each service checks its own quotas, request-count limits, model context, media limits
+and Gateway acceptance. Offline validation checks request structure and configured local
+resource limits. The SDK and CLI do not estimate token counts or enforce
+requests-per-minute or tokens-per-minute limits. Explicit transport budgets can select
+up to 64 MiB, including Jev and all Clef models; existing default budgets are retained.

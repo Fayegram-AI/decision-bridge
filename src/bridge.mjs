@@ -6,7 +6,7 @@ import { JevProvider } from './providers/jev.mjs';
 import { cloneJson, freezeJson, isRecord, validateRequest, validateResult } from './validation.mjs';
 import { abortError, deadline, withSignal } from './async.mjs';
 import { assertCapabilities, commonSchemaVersion, providerCapabilities } from './capabilities.mjs';
-import { validateResultOptions } from './probabilities.mjs';
+import { validateResultOptions, resultValidationPolicies } from './probabilities.mjs';
 
 const elapsed = start => Math.round((performance.now() - start) * 1000) / 1000;
 const inputField = request => Object.hasOwn(request, 'state') ? 'state'
@@ -76,6 +76,7 @@ export function createBridge(options) {
       let request;
       let context;
       let result;
+      let resultOptions;
       try {
         budget.throwIfAborted();
         request = validate(input);
@@ -99,7 +100,6 @@ export function createBridge(options) {
           if (prepared !== undefined) request = validate({ ...request, [field]: prepared });
         }
         budget.throwIfAborted();
-        let resultOptions;
         try {
           const supplied = backend.getResultValidationOptions ? backend.getResultValidationOptions(request.model) : {};
           // Intrinsic branding observes native Promises across realms without reading then accessors.
@@ -154,8 +154,10 @@ export function createBridge(options) {
         finally { observation.close(); }
       }
       // Observation failure must not induce retries of a successful billed call.
-      return freezeJson({ ...result, meta: { ...result.meta,
+      const observed = freezeJson({ ...result, meta: { ...result.meta,
         totalDurationMs: elapsed(started), observerDurationMs: elapsed(observationStarted), observerFailures: failures } });
+      resultValidationPolicies.set(observed, Object.freeze(resultOptions));
+      return observed;
     },
 
     async listModels(callOptions = {}) {

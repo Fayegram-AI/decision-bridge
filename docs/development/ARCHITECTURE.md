@@ -2,18 +2,19 @@
 
 ## Bridge and provider responsibilities
 
-Decision Bridge exposes one application contract for structured decisions. The
-bridge owns request snapshots, common validation, extension sequencing, the total
-deadline, final result validation, immutable results, and bounded observations.
-A provider owns its API encoding, transport, decoding, model selection,
-capabilities, and native operations. Multiple models sharing a protocol can use
-one provider implementation.
+Decision Bridge exposes one application contract for structured decisions. The bridge
+copies and validates requests, runs extensions in order, applies the total deadline,
+validates results, and returns read-only data. Observer callbacks have their own time
+limits. A provider owns its API encoding, transport, decoding, model selection,
+capabilities, and native operations. Multiple models sharing a protocol can use one
+provider implementation.
 
 `createBridge` requires an explicitly selected provider or the Jev shortcut.
 `createProvider` requires an explicit native type. `custom/decision` and
 `custom/generative` expose classified extension helpers; maintained generative
 adapters are loaded only through their opt-in subpath. The CLI resolves its own configuration
-and Jev default before constructing the SDK bridge.
+and Jev default before constructing the SDK bridge. Version-2 CLI registries
+instead construct a router, which selects an explicitly configured target.
 
 ```text
 Application / CLI
@@ -87,6 +88,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/providers/cloudflare-transport.mjs` | Shared decision/extraction REST and binding authentication, dispatch and diagnostics |
 | `src/extraction/` | Clairic native field/request/response validation, provider, ordered batches and declarations |
 | `src/live/` | Live protocol validation, bounded correlation state, supplied-connection controller and declarations |
+| `src/routing/` | Registry snapshots, eligibility, selection, budgets, recovery, diagnostics and routed batches |
 | `src/embedded.mjs` | Shared embedded data URL and canonical base64 checks |
 | `src/transport.mjs`, `src/response-transport.mjs` | Credential destinations, bounded bodies, safe errors, retries |
 | `src/async.mjs` | Deadlines and cancellation races |
@@ -95,15 +97,41 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/batch.mjs` | Ordered bounded-concurrency SDK arrays |
 | `src/policy.mjs` | Explicit choice thresholds, without action execution |
 | `src/cli/ordered.mjs` | Concurrent JSONL processing with a bounded ordered window |
+| `src/cli/routing*.mjs` | Version-2 registry adaptation, offline inspection, initialization and terminal clarification |
 | `src/cli/`, `bin/decision.mjs` | Configuration, input/output, commands, process signals |
+
+## Routing lifecycle
+
+The `/routing` export orchestrates decision or extraction targets without changing
+their provider contracts. A registry snapshot defines enabled targets, local
+readiness, hard restrictions and optional automatic selection. Preparation runs
+once before final eligibility. Direct calls retain provider preflight; automatic
+calls select locally when one candidate remains or rules/priority resolve the choice.
+An optional decision selector handles unresolved choices or explicitly configured
+multiple-candidate selection. SDK clarification callbacks are separate from the
+CLI's terminal implementation; SDK imports remain browser-safe.
+
+Work, active clarification and observation have separate budgets. An optional call
+deadline also bounds queues and human interaction. Array batches snapshot shared
+constraints and prepare/preflight all requests before inference; streaming CLI
+batches preflight each row before its own execution. Eligibility is refreshed
+before selection and dispatch to account for current cooldown state.
+
+Recovery requires explicit ordered fallback targets. It can skip a selected
+target that becomes unavailable before dispatch; after dispatch, it requires a
+typed capacity/throttling failure. It reuses the prepared request without repeating
+selection or clarification, and enforces a single dispatch per attempted target. Routing
+diagnostics preserve selector and attempt usage separately from the final result.
+See [configurable routing](../guides/ROUTING.md) for policy and callback contracts.
 
 ## Results and precision
 
-Generative providers elicit distributions and derive argmax choices, weighted
-scores, and rubric legends in code. Native decision providers validate and retain
-their returned values, confidence, and reported usage. No path repairs malformed
-distributions or invents confidence. The common shape preserves provenance without
-claiming equivalent statistical semantics across models.
+Generative providers ask models for probability distributions, then select the
+highest-probability choice and calculate weighted scores and rubric legends in code.
+Native decision providers validate and retain their returned values, confidence, and
+reported usage. No path repairs malformed distributions or invents confidence. The
+common shape preserves provenance without claiming equivalent statistical semantics
+across models.
 
 The bridge takes result-validation policy from the provider contract. Cloudflare
 uses an allowance for four-decimal distributions; other built-ins retain the
@@ -114,10 +142,10 @@ policy helper does not infer it from the answer or its metadata.
 
 ## Reliability and configuration
 
-Built-in validators check structure, representation, adapter capabilities and
-response integrity. They leave service-owned question/media counts, text/context
-ceilings, quotas and RPM/TPM upstream. Custom quantitative capability limits remain
-part of those providers' contracts. Client byte budgets, JSON safeguards,
+Built-in validators check structure, representation, adapter capabilities and response
+integrity. The services check their own question and media counts, text and context
+limits, quotas, and request or token rate limits. Custom quantitative capability limits
+remain part of those providers' contracts. Client byte budgets, JSON safeguards,
 cancellation and deadlines remain local controls.
 
 Provider deadlines include dispatch, configured retries, backoff, and bounded body
@@ -151,18 +179,20 @@ bounded and does not perform full media decoding.
 The SDK does not host models or provide a server API, persistent state, autonomous
 actions, HTTP decision streaming, audio transcription, transcoding, frame extraction,
 provider-side asynchronous batch jobs, platform
-management, automatic model search, or automatic provider failover. SDK arrays and
-CLI JSONL batches provide bounded client-side concurrency.
+management, or automatic model discovery. Cross-route recovery is available only
+through explicitly configured router failover. SDK arrays and CLI JSONL batches
+provide bounded client-side concurrency.
 
-Extraction owns its request/result contract and uses shared Cloudflare dispatch.
-Its inference options remain in model input; binding execution options use the
-third `ai.run` argument. Native nulls, empty lists, predictive JSON and truncation
-are preserved in an immutable `{ extraction, meta }` envelope.
-Live owns protocol validation, a bounded pure correlation reducer and a supplied-
-connection controller. Offline replay uses that same reducer. Their dedicated
-exports do not widen the existing decision/generative provider contract.
-Live configuration changes activate on acknowledgement. Source snapshots and
-observed per-direction transcript order support correlation; unavailable evidence
-stays unmatched. Manual evaluation and commentary return submission receipts;
-completed decisions arrive through subscriptions, preserving native refusals.
-The application owns authentication, audio, connection setup and reconnection.
+Extraction owns its request/result contract and uses shared Cloudflare dispatch. Its
+inference options remain in model input; binding execution options use the third
+`ai.run` argument. Native nulls, empty lists, predictive JSON and truncation are
+preserved in an immutable `{ extraction, meta }` envelope. Live validates protocol
+messages and tracks how results relate to source events within a fixed history limit.
+Its controller uses a connection supplied by the application. Offline replay uses the
+same state reducer. Their dedicated exports do not widen the existing
+decision/generative provider contract. Live configuration changes activate on
+acknowledgement. Source snapshots and observed per-direction transcript order support
+correlation; unavailable evidence stays unmatched. Manual evaluation and commentary
+return submission receipts; completed decisions arrive through subscriptions, preserving
+native refusals. The application owns authentication, audio, connection setup and
+reconnection.

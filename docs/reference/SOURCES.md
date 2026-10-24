@@ -1,8 +1,8 @@
 # Primary protocol sources
 
-These are the upstream protocol and platform references used by the bridge.
-Recheck them before updating versions or claiming new compatibility. Listing a
-reference does not imply that authenticated inference was run against its service.
+These official protocol and platform references inform the implementation. Recheck them
+when updating versions or adding compatibility. A reference link records the
+specification used; it does not mean authenticated service calls were tested.
 
 | Subject | Official source |
 | --- | --- |

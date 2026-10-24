@@ -21,6 +21,7 @@
     "src/index.d.mts",
     "test/custom.types.mts",
     "test/jev.types.mts",
-    "test/expansion.types.mts"
+    "test/expansion.types.mts",
+    "test/routing.types.mts"
   ]
 }

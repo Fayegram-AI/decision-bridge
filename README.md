@@ -3,35 +3,37 @@
 [![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Zero runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)](package.json)
 
-A JavaScript SDK that turns supplied information into structured decisions inside
-your application. An optional Node command runner is included for evaluating files.
-Give it a `state` (text or JSON to assess) and one or more `questions`; it returns
-validated choices, probabilities for yes/no (`noul`) questions, or rubric-based
-scores. Capable providers also accept ordered media input or conversation history.
-For example, pass a failed test log to classify the failure and estimate whether
-a missing dependency caused it. Your application decides what to do with the result.
+A JavaScript SDK for asking models structured questions in your application. Pass the
+information to assess in `state`, as text or JSON, and define one or more `questions`.
+The SDK returns validated choices, probabilities for yes/no (`noul`) questions, or
+scores based on your rubric. Depending on the provider, you can also send media in a
+specific order or include conversation history. An optional Node command runner lets you
+evaluate request files. For example, pass a failed test log to classify the failure and
+estimate whether a missing dependency caused it. Your application decides what to do
+with the result.
 
 Try the [Decision Playground](https://decision-pg.fayegram.com/).
 
-The main SDK supports native decision models: Jev through TypeSafe, OpenAI
-Decisions, and Cloudflare Clef. Custom decision services use the explicit
-`custom/decision` entry point. General-purpose models remain available through
-the opt-in `custom/generative` entry point, with maintained OpenAI-compatible,
-OpenRouter, and Anthropic presets. The bridge handles the shared request and result
-contract; each provider handles its API protocol and model capabilities.
+The main SDK supports Jev through TypeSafe, OpenAI Decisions, and Cloudflare Clef. These
+services provide native decision APIs. Use `custom/decision` to integrate another
+decision service, or `custom/generative` to ask a general-purpose model for structured
+decisions. The generative entry point includes OpenAI-compatible, OpenRouter, and
+Anthropic presets. The bridge gives your application a shared request and result format;
+each provider translates that format for its service.
 
 [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) also supports ordered text/image
-input, typed string/boolean choices, labelled scores, conversation/tool history, remote images, prompt caching, and dedicated native access.
-[Cloudflare Clef, Clef-flash, and Clef-omni](docs/guides/CLOUDFLARE_DECISIONS.md) provide
-common/native access, embedded images, typed choices, labelled scores, REST,
-Workers AI bindings, and optional AI Gateway routing. Omni additionally supports
-embedded WAV/MP3 audio and MP4/WebM video, ordered images → audio → videos → text.
-The common API checks provider/model capabilities before dispatch; refusals are
-errors.
+input, typed string/boolean choices, labelled scores, conversation/tool history, remote
+images, prompt caching, and dedicated native access.
+[Cloudflare Clef, Clef-flash, and Clef-omni](docs/guides/CLOUDFLARE_DECISIONS.md)
+provide the shared bridge API and direct native access, embedded images, typed choices,
+labelled scores, REST, Workers AI bindings, and optional AI Gateway routing. Omni
+additionally supports embedded WAV/MP3 audio and MP4/WebM video, ordered images → audio
+→ videos → text. The shared API checks that the selected provider and model support your
+request before sending it. A provider refusal returns an error.
 
-**Version 0.1.3 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.4 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
-These docs cover 0.1.3. For supported features by version, see
+These docs cover 0.1.4. For feature requirements and version history, see
 [version availability](docs/README.md#version-availability) and the
 [changelog](CHANGELOG.md). Start with the
 [installation options](docs/guides/GETTING_STARTED.md#install-into-your-application).
@@ -42,9 +44,9 @@ Source and issue reports are maintained at
 [Fayegram-AI/decision-bridge](https://github.com/Fayegram-AI/decision-bridge).
 Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
-This is an independent project. The custom generative presets identify their
-probabilities as elicited model outputs.
-Changing providers does **not** make their accuracy or calibration equivalent.
+This is an independent project. Generative presets label their probabilities as
+`elicited`: estimates produced in response to a prompt. Models can differ in accuracy
+and in how closely their probabilities match observed outcomes.
 
 ## Model selectors
 
@@ -85,8 +87,14 @@ typed values, estimates and forecasts through REST or Workers bindings.
 GPT-Live connection for delegation, transcript triggers and Decision events.
 These operations have dedicated `/extraction` and `/live` package exports.
 
-Service quotas and admission limits are handled upstream. The SDK validates its
-contracts and configurable client resource budgets and returns structured errors.
+The [routing API](docs/guides/ROUTING.md) lets you choose a target directly or
+have auto mode choose from the targets you've enabled. Auto mode can follow your
+rules, use a decision model, or ask for clarification when the choice is unclear.
+**Auto mode is experimental in 0.1.4.**
+
+Each service controls its quotas and which requests it accepts. The SDK checks request
+structure and the resource limits you configure, and reports structured errors when a
+check or service call fails.
 
 ## Choose a provider
 
@@ -102,14 +110,14 @@ All native providers support shared state and the common `choice`, `noul`, and
 | Custom decision service | Explicit decision provider contract | [Custom decision providers](docs/guides/CUSTOM_DECISION.md) |
 | Custom generative presets / modules | General-purpose output mapped into decisions; explicit opt-in | [Custom generative providers](docs/guides/CUSTOM_GENERATIVE.md) |
 
-For Cloudflare REST, provide an account ID and API token. Workers binding and
-Gateway are optional paths with their own configured resources. Enabled
-`rejectIfBusy` currently requires the binding path for all three Clef models.
-Enabling it for REST fails local preflight with `UNSUPPORTED_CAPABILITY`; see the
+For Cloudflare REST, provide an account ID and API token. Workers binding and Gateway
+are optional paths with their own configured resources. Enabled `rejectIfBusy` currently
+requires the binding path for all three Clef models. Enabling it for REST fails local
+preflight with `UNSUPPORTED_CAPABILITY`; see the
 [service compatibility note](docs/guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
-Use [provider capabilities](docs/reference/PROVIDERS.md#common-request-capabilities)
-and `bridge.validate()` to check a request before inference. Capability support
-does not establish account access or model quality.
+Use [provider capabilities](docs/reference/PROVIDERS.md#common-request-capabilities) and
+`bridge.validate()` to check a request before sending it. These local checks verify
+supported features; account access and model quality need separate checks.
 
 ## Use in your application
 
@@ -269,11 +277,12 @@ test suite and development scripts.
 
 | Area | Implementation |
 | --- | --- |
-| Stable contract | Runtime-defined [questions](docs/reference/SDK.md#question-builders), state, ordered input or conversation according to capabilities, typed answers, immutable results |
+| Decision requests | Define [questions](docs/reference/SDK.md#question-builders) in code; send state, ordered input or conversation to a provider that supports it; receive typed answers and immutable results |
 | Native providers | Jev, OpenAI Decisions, Cloudflare Clef/Clef-flash/Clef-omni |
 | Custom providers | Separate decision and generative contracts; opt-in Chat Completions, OpenRouter, and Anthropic presets |
 | SDK | Provider factory, [capability preflight](docs/reference/SDK.md#bridgegetcapabilitiesmodel-and-bridgevalidaterequest), [cancellation](docs/reference/SDK.md#cancellation-and-deadlines), and [ordered batch evaluation](docs/reference/SDK.md#sdk-batch-evaluation) |
 | Dedicated operations | [Clairic extraction](docs/guides/EXTRACTION.md) and [Live Decisions](docs/guides/LIVE_DECISIONS.md), with separate exports and native results |
+| Routing | Choose configured targets directly or use [experimental auto mode](docs/guides/ROUTING.md) with rules, a decision model, or clarification |
 | Application extensions | [State/input/conversation preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
 | Node command | [Decision/extraction commands and offline Live validation/replay](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |
 | Reliability | [Transport byte limits and fetch injection](docs/reference/SDK.md#provider-transport-options), deadlines, [limited retries and safe errors](docs/reference/ERRORS.md), strict response validation, atomic output |
@@ -289,9 +298,9 @@ are `null`, not zero. Their choices and scores are derived from the returned
 probability distributions. See [SDK reference](docs/reference/SDK.md) and
 [provider compatibility](docs/reference/PROVIDERS.md).
 
-This library does not execute the selected action, operate an agent loop, train a
-model, enforce user authorization, or guarantee decision correctness. It is the
-integration layer on which you can build those policies explicitly.
+Your application decides what to do with a result, checks permissions, and executes any
+action. The library connects it to model services; it does not run an agent loop or
+train models, and a valid result is not a guarantee of correctness.
 
 ## Documentation
 

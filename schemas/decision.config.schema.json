@@ -4,6 +4,9 @@
     "description": "Explicit schemaVersion 1 configuration. Runtime validation checks adapter structure and client resource budgets; service limits remain authoritative upstream.",
     "oneOf": [
         {
+            "$ref": "#/$defs/providerConfigurations"
+        },
+        {
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -11,484 +14,47 @@
                     "$ref": "#/$defs/text"
                 },
                 "schemaVersion": {
-                    "const": 1
+                    "const": 2
                 },
-                "model": {
-                    "$ref": "#/$defs/text"
+                "defaultRoute": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
                 },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
+                "policyRevision": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 100
                 },
-                "timeoutMs": {
+                "workTimeoutMs": {
                     "$ref": "#/$defs/timeout"
                 },
-                "baseURL": {
-                    "$ref": "#/$defs/text"
+                "clarificationTimeoutMs": {
+                    "$ref": "#/$defs/timeout"
                 },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
+                "observerTimeoutMs": {
+                    "$ref": "#/$defs/timeout"
                 },
-                "maxRequestBytes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 67108864
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "provider": {
-                    "const": "jev"
-                },
-                "dangerZone": {
+                "routes": {
                     "type": "object",
-                    "additionalProperties": false,
+                    "minProperties": 1,
+                    "maxProperties": 257,
+                    "propertyNames": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+                    },
                     "properties": {
-                        "images": {
-                            "type": "boolean"
-                        },
-                        "longContext": {
-                            "type": "boolean"
+                        "auto": {
+                            "$ref": "#/$defs/routingAuto"
                         }
-                    }
-                }
-            }
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "baseURL": {
-                    "$ref": "#/$defs/text"
-                },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
-                },
-                "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "provider": {
-                    "const": "openai-decisions"
-                }
-            },
-            "required": [
-                "provider"
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "baseURL": {
-                    "$ref": "#/$defs/text"
-                },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
-                },
-                "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "provider": {
-                    "const": "cloudflare-decisions"
-                },
-                "accountId": {
-                    "$ref": "#/$defs/text"
-                },
-                "rejectIfBusy": {
-                    "$ref": "#/$defs/boolean"
-                },
-                "gateway": {
-                    "$ref": "#/$defs/gateway"
-                }
-            },
-            "required": [
-                "provider"
-            ],
-            "allOf": [
-                {
-                    "if": {
-                        "properties": {
-                            "rejectIfBusy": {
-                                "const": true
-                            }
-                        },
-                        "required": [
-                            "rejectIfBusy"
-                        ]
                     },
-                    "then": {
-                        "properties": {
-                            "maxRetries": {
-                                "const": 0
-                            },
-                            "gateway": {
-                                "properties": {
-                                    "retries": {
-                                        "properties": {
-                                            "maxAttempts": {
-                                                "const": 1
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    "additionalProperties": {
+                        "$ref": "#/$defs/routingTarget"
                     }
                 }
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "baseURL": {
-                    "$ref": "#/$defs/text"
-                },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
-                },
-                "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxTokens": {
-                    "$ref": "#/$defs/tokens"
-                },
-                "responseFormat": {
-                    "$ref": "#/$defs/responseFormat"
-                },
-                "tokenParameter": {
-                    "$ref": "#/$defs/tokenParameter"
-                },
-                "parameters": {
-                    "$ref": "#/$defs/parameters"
-                },
-                "provider": {
-                    "const": "custom-generative"
-                },
-                "preset": {
-                    "const": "openai-compatible"
-                },
-                "noAuth": {
-                    "$ref": "#/$defs/boolean"
-                }
             },
             "required": [
-                "provider",
-                "preset"
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
-                },
-                "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxTokens": {
-                    "$ref": "#/$defs/tokens"
-                },
-                "responseFormat": {
-                    "$ref": "#/$defs/responseFormat"
-                },
-                "tokenParameter": {
-                    "$ref": "#/$defs/tokenParameter"
-                },
-                "parameters": {
-                    "$ref": "#/$defs/parameters"
-                },
-                "provider": {
-                    "const": "custom-generative"
-                },
-                "preset": {
-                    "const": "openrouter"
-                }
-            },
-            "required": [
-                "provider",
-                "preset"
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "baseURL": {
-                    "$ref": "#/$defs/text"
-                },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
-                },
-                "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxTokens": {
-                    "$ref": "#/$defs/tokens"
-                },
-                "parameters": {
-                    "allOf": [
-                        {
-                            "$ref": "#/$defs/parameters"
-                        },
-                        {
-                            "properties": {
-                                "thinking": false
-                            }
-                        }
-                    ]
-                },
-                "provider": {
-                    "const": "custom-generative"
-                },
-                "preset": {
-                    "const": "anthropic"
-                }
-            },
-            "required": [
-                "provider",
-                "preset"
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "provider": {
-                    "const": "custom-decision"
-                },
-                "module": {
-                    "$ref": "#/$defs/text"
-                },
-                "options": {
-                    "$ref": "#/$defs/options"
-                }
-            },
-            "required": [
-                "provider",
-                "module"
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "$ref": "#/$defs/text"
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "provider": {
-                    "const": "custom-generative"
-                },
-                "module": {
-                    "$ref": "#/$defs/text"
-                },
-                "options": {
-                    "$ref": "#/$defs/options"
-                }
-            },
-            "required": [
-                "provider",
-                "module"
-            ]
-        },
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "$schema": {
-                    "$ref": "#/$defs/text"
-                },
-                "schemaVersion": {
-                    "const": 1
-                },
-                "model": {
-                    "enum": [
-                        "clairic",
-                        "@cf/cloudflare/clairic"
-                    ]
-                },
-                "apiKeyEnv": {
-                    "$ref": "#/$defs/keyEnv"
-                },
-                "timeoutMs": {
-                    "$ref": "#/$defs/timeout"
-                },
-                "baseURL": {
-                    "$ref": "#/$defs/text"
-                },
-                "maxRetries": {
-                    "$ref": "#/$defs/retries"
-                },
-                "maxRequestBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "maxResponseBytes": {
-                    "$ref": "#/$defs/bytes"
-                },
-                "provider": {
-                    "const": "cloudflare-extraction"
-                },
-                "accountId": {
-                    "$ref": "#/$defs/text"
-                },
-                "rejectIfBusy": {
-                    "$ref": "#/$defs/boolean"
-                },
-                "gateway": {
-                    "$ref": "#/$defs/gateway"
-                }
-            },
-            "required": [
-                "provider"
-            ],
-            "allOf": [
-                {
-                    "if": {
-                        "properties": {
-                            "rejectIfBusy": {
-                                "const": true
-                            }
-                        },
-                        "required": [
-                            "rejectIfBusy"
-                        ]
-                    },
-                    "then": {
-                        "properties": {
-                            "maxRetries": {
-                                "const": 0
-                            },
-                            "gateway": {
-                                "properties": {
-                                    "retries": {
-                                        "properties": {
-                                            "maxAttempts": {
-                                                "const": 1
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                "schemaVersion",
+                "routes"
             ]
         }
     ],
@@ -639,6 +205,986 @@
                     }
                 }
             }
+        },
+        "routingProvider": {
+            "allOf": [
+                {
+                    "$ref": "#/$defs/providerConfigurations"
+                },
+                {
+                    "type": "object",
+                    "required": [
+                        "provider"
+                    ]
+                }
+            ]
+        },
+        "routingCondition": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "operation": {
+                    "enum": [
+                        "decision",
+                        "extraction"
+                    ]
+                },
+                "modalities": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "text",
+                            "image",
+                            "audio",
+                            "video"
+                        ]
+                    }
+                },
+                "questionTypes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "choice",
+                            "noul",
+                            "score",
+                            "box"
+                        ]
+                    }
+                },
+                "fieldTypes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "text",
+                            "number",
+                            "date",
+                            "time",
+                            "datetime",
+                            "duration",
+                            "list",
+                            "estimate",
+                            "forecast"
+                        ]
+                    }
+                },
+                "labels": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                    }
+                }
+            },
+            "minProperties": 1
+        },
+        "routingAuto": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "policy": {
+                    "enum": [
+                        "deterministic",
+                        "decision-assisted"
+                    ]
+                },
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                        "not": {
+                            "const": "auto"
+                        }
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 256
+                },
+                "priority": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                        "not": {
+                            "const": "auto"
+                        }
+                    },
+                    "uniqueItems": true,
+                    "maxItems": 256
+                },
+                "rules": {
+                    "type": "array",
+                    "maxItems": 256,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "effect": {
+                                "enum": [
+                                    "require",
+                                    "prefer"
+                                ]
+                            },
+                            "when": {
+                                "$ref": "#/$defs/routingCondition"
+                            },
+                            "routes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                                    "not": {
+                                        "const": "auto"
+                                    }
+                                },
+                                "uniqueItems": true,
+                                "maxItems": 256,
+                                "minItems": 1
+                            }
+                        },
+                        "required": [
+                            "effect",
+                            "when",
+                            "routes"
+                        ]
+                    }
+                },
+                "selector": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "route": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                            "not": {
+                                "const": "auto"
+                            }
+                        },
+                        "when": {
+                            "enum": [
+                                "ambiguous",
+                                "multiple"
+                            ]
+                        },
+                        "minProbability": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                        },
+                        "minMargin": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "maxContextBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "fallbackOn": {
+                            "type": "array",
+                            "uniqueItems": true,
+                            "items": {
+                                "enum": [
+                                    "abstain",
+                                    "invalid-response",
+                                    "timeout",
+                                    "unavailable",
+                                    "context-too-large"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "route"
+                    ]
+                },
+                "clarification": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        }
+                    }
+                },
+                "failover": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "routes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                                "not": {
+                                    "const": "auto"
+                                }
+                            },
+                            "uniqueItems": true,
+                            "maxItems": 256,
+                            "minItems": 1
+                        },
+                        "maxAttempts": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 256
+                        }
+                    },
+                    "required": [
+                        "routes"
+                    ]
+                },
+                "cooldown": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "durationMs": {
+                            "$ref": "#/$defs/timeout"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "policy",
+                "candidates"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "policy": {
+                                "const": "deterministic"
+                            }
+                        },
+                        "required": [
+                            "policy"
+                        ]
+                    },
+                    "then": {
+                        "properties": {
+                            "selector": false
+                        }
+                    }
+                }
+            ]
+        },
+        "routingTarget": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "config": {
+                    "type": "object"
+                },
+                "operation": {
+                    "enum": [
+                        "decision",
+                        "extraction"
+                    ]
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "singleDispatch": {
+                    "type": "boolean"
+                },
+                "allowGenerative": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 2000
+                },
+                "cooldownGroup": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                }
+            },
+            "required": [
+                "config"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "enabled": {
+                                "const": false
+                            }
+                        },
+                        "required": [
+                            "enabled"
+                        ]
+                    },
+                    "then": {
+                        "properties": {
+                            "config": {
+                                "$ref": "#/$defs/routingProviderDisabled"
+                            }
+                        }
+                    },
+                    "else": {
+                        "properties": {
+                            "config": {
+                                "$ref": "#/$defs/routingProvider"
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "config": {
+                                "properties": {
+                                    "provider": {
+                                        "const": "custom-generative"
+                                    }
+                                },
+                                "required": [
+                                    "provider"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "config"
+                        ]
+                    },
+                    "then": {
+                        "properties": {
+                            "allowGenerative": {
+                                "const": true
+                            }
+                        },
+                        "required": [
+                            "allowGenerative"
+                        ]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "config": {
+                                "properties": {
+                                    "provider": {
+                                        "const": "cloudflare-extraction"
+                                    }
+                                },
+                                "required": [
+                                    "provider"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "config"
+                        ]
+                    },
+                    "then": {
+                        "properties": {
+                            "operation": {
+                                "const": "extraction"
+                            }
+                        }
+                    },
+                    "else": {
+                        "properties": {
+                            "operation": {
+                                "const": "decision"
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "routingProviderDisabled": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/routingProvider"
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "provider": {
+                            "const": "custom-decision"
+                        },
+                        "module": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "options": {
+                            "$ref": "#/$defs/options"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ],
+                    "dependentRequired": {
+                        "options": [
+                            "module"
+                        ]
+                    }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "provider": {
+                            "const": "custom-generative"
+                        },
+                        "module": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "options": {
+                            "$ref": "#/$defs/options"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ],
+                    "dependentRequired": {
+                        "options": [
+                            "module"
+                        ]
+                    }
+                }
+            ]
+        },
+        "providerConfigurations": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 67108864
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "jev"
+                        },
+                        "dangerZone": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "images": {
+                                    "type": "boolean"
+                                },
+                                "longContext": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "openai-decisions"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "cloudflare-decisions"
+                        },
+                        "accountId": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "rejectIfBusy": {
+                            "$ref": "#/$defs/boolean"
+                        },
+                        "gateway": {
+                            "$ref": "#/$defs/gateway"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "rejectIfBusy": {
+                                        "const": true
+                                    }
+                                },
+                                "required": [
+                                    "rejectIfBusy"
+                                ]
+                            },
+                            "then": {
+                                "properties": {
+                                    "maxRetries": {
+                                        "const": 0
+                                    },
+                                    "gateway": {
+                                        "properties": {
+                                            "retries": {
+                                                "properties": {
+                                                    "maxAttempts": {
+                                                        "const": 1
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxTokens": {
+                            "$ref": "#/$defs/tokens"
+                        },
+                        "responseFormat": {
+                            "$ref": "#/$defs/responseFormat"
+                        },
+                        "tokenParameter": {
+                            "$ref": "#/$defs/tokenParameter"
+                        },
+                        "parameters": {
+                            "$ref": "#/$defs/parameters"
+                        },
+                        "provider": {
+                            "const": "custom-generative"
+                        },
+                        "preset": {
+                            "const": "openai-compatible"
+                        },
+                        "noAuth": {
+                            "$ref": "#/$defs/boolean"
+                        }
+                    },
+                    "required": [
+                        "provider",
+                        "preset"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxTokens": {
+                            "$ref": "#/$defs/tokens"
+                        },
+                        "responseFormat": {
+                            "$ref": "#/$defs/responseFormat"
+                        },
+                        "tokenParameter": {
+                            "$ref": "#/$defs/tokenParameter"
+                        },
+                        "parameters": {
+                            "$ref": "#/$defs/parameters"
+                        },
+                        "provider": {
+                            "const": "custom-generative"
+                        },
+                        "preset": {
+                            "const": "openrouter"
+                        }
+                    },
+                    "required": [
+                        "provider",
+                        "preset"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxTokens": {
+                            "$ref": "#/$defs/tokens"
+                        },
+                        "parameters": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/$defs/parameters"
+                                },
+                                {
+                                    "properties": {
+                                        "thinking": false
+                                    }
+                                }
+                            ]
+                        },
+                        "provider": {
+                            "const": "custom-generative"
+                        },
+                        "preset": {
+                            "const": "anthropic"
+                        }
+                    },
+                    "required": [
+                        "provider",
+                        "preset"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "provider": {
+                            "const": "custom-decision"
+                        },
+                        "module": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "options": {
+                            "$ref": "#/$defs/options"
+                        }
+                    },
+                    "required": [
+                        "provider",
+                        "module"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "provider": {
+                            "const": "custom-generative"
+                        },
+                        "module": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "options": {
+                            "$ref": "#/$defs/options"
+                        }
+                    },
+                    "required": [
+                        "provider",
+                        "module"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "enum": [
+                                "clairic",
+                                "@cf/cloudflare/clairic"
+                            ]
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "cloudflare-extraction"
+                        },
+                        "accountId": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "rejectIfBusy": {
+                            "$ref": "#/$defs/boolean"
+                        },
+                        "gateway": {
+                            "$ref": "#/$defs/gateway"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "rejectIfBusy": {
+                                        "const": true
+                                    }
+                                },
+                                "required": [
+                                    "rejectIfBusy"
+                                ]
+                            },
+                            "then": {
+                                "properties": {
+                                    "maxRetries": {
+                                        "const": 0
+                                    },
+                                    "gateway": {
+                                        "properties": {
+                                            "retries": {
+                                                "properties": {
+                                                    "maxAttempts": {
+                                                        "const": 1
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
         }
     }
 }

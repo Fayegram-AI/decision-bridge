@@ -17,6 +17,7 @@ src/                       Common SDK, native providers, CLI, declarations
 src/custom/                Explicit decision definitions and generative presets
 src/extraction/            Dedicated Clairic provider, validation, batches and types
 src/live/                  Supplied-connection Live controller, protocol state and types
+src/routing/               Target registry, selection, clarification, recovery and batches
 bin/                       Node.js CLI entry point
 examples/                  Native SDK examples and request profiles
 examples/custom/           Opt-in generative and native delegation examples

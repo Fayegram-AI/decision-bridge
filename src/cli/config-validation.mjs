@@ -3,6 +3,7 @@ import { cloneJson, isRecord } from '../validation.mjs';
 import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudflare-profile.mjs';
 import { generationOptions } from '../custom/generative/shared.mjs';
 import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
+import { validateRoutingConfig } from './routing-config.mjs';
 
 export const PROVIDERS = ['jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
 export const PRESETS = ['openai-compatible', 'openrouter', 'anthropic'];
@@ -20,6 +21,7 @@ export const isModule = config => ['custom-decision', 'custom-generative'].inclu
 /** Partial layers may omit a selector; complete execution must identify one implementation. */
 export function validateConfig(input, { complete = false } = {}) {
     const config = cloneJson(input, 'configuration', 'CONFIGURATION_ERROR');
+    if (config?.schemaVersion === 2) return validateRoutingConfig(config);
     check(isRecord(config) && Object.keys(config).every(key => FIELDS.has(key)),
         'Configuration contains an unknown field; use apiKeyEnv for credentials.', 'CONFIGURATION_ERROR');
     check(config.schemaVersion === undefined || config.schemaVersion === 1,

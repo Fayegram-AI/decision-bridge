@@ -245,9 +245,11 @@ export function decideChoice<K extends string>(answer: ChoiceAnswer<K>, options:
 export function decideChoice<V extends string | boolean>(answer: TypedChoiceAnswer<V>, options: ChoicePolicyOptions<V>): ChoiceDecision<V>;
 export interface RefusedQuestion { readonly index: number; readonly name: string | null; }
 export interface ErrorDetails { code: string; message: string; status?: number; requestId?: string; gatewayLogId?: string; attempts?: number; upstreamCode?: number;
+  routing?: import('./routing/index.mjs').RoutingMetadata;
   source?: 'client' | 'provider'; upstreamErrorCode?: string; upstreamErrorType?: string; retryAfterMs?: number; retryable?: boolean;
     refusedQuestions?: readonly RefusedQuestion[]; usage?: OpenAIDecisionUsage; }
 export class DecisionError extends Error {
+  routing?: import('./routing/index.mjs').RoutingMetadata;
   source?: 'client' | 'provider'; upstreamErrorCode?: string; upstreamErrorType?: string; retryAfterMs?: number; retryable?: boolean;
   code: string; status?: number; requestId?: string; gatewayLogId?: string; attempts?: number; upstreamCode?: number;
   refusedQuestions?: readonly RefusedQuestion[]; usage?: OpenAIDecisionUsage;
