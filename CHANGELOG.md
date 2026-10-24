@@ -1,7 +1,5 @@
 # Changelog
 
-Notable user-facing changes by version.
-
 ## 0.1.4
 
 - Add the `/routing` SDK for direct selection and experimental auto routing of
