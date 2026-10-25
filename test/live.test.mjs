@@ -112,7 +112,37 @@ test('disposal interrupts a noncooperative send and commands keep Live-specific 
     await assert.rejects(receipt, { code: 'DISPOSED' });
     subscribed({ kind: 'close' });
     assert.throws(() => validateLiveCommand({ type: 'decision.item.create', item: {
-        role: 'user', content: [{ type: 'input_image', image_url: 'https://example.com/a.png' }] } }), { code: 'VALIDATION_ERROR' });
+        role: 'user', content: [{ type: 'input_image', image_url: 'file:///private.png' }] } }), { code: 'VALIDATION_ERROR' });
+});
+
+test('Live JSON and hosted-image content survives configuration and item acknowledgements', async () => {
+    const content = [{ type: 'input_json', data: { amount: 42, image_url: 'ordinary data' } },
+        { type: 'input_image', image_url: 'https://example.com/a.png', detail: null }];
+    const configured = { delegation: { type: 'decisions', decisions: { model: 'gpt-6-luna',
+        questions: [{ ...questions[0], instructions: content }] } }, triggers: config.triggers.map(trigger => ({ ...trigger,
+        decisions: { questions: [{ ...questions[0], instructions: content }] } })) };
+    const f = fixture();
+    try {
+        const pending = f.controller.configure(configured); await tick();
+        f.emit({ type: 'session.updated', event_id: 'json-config', client_event_id: f.sent[0].event_id, session: configured });
+        assert.equal((await pending).type, 'configuration');
+        const created = f.controller.createItem({ role: 'user', content }); await tick();
+        f.emit({ type: 'decision.item.created', event_id: 'json-item', client_event_id: f.sent[1].event_id,
+            item: { role: 'user', content, id: 'item' } });
+        const receipt = await created;
+        assert.deepEqual(receipt.item.content, content);
+        assert(Object.isFrozen(receipt.item.content[0].data));
+        assert(!Object.isFrozen(content[0].data));
+        f.emit(delta('json-source')); f.emit(completed('json-result', 'json-source'));
+        assert.equal(f.events.at(-1).correlation.matched, true);
+    } finally { f.controller.dispose(); }
+    for (const part of [...content.map(value => ({ ...value, prompt_cache_breakpoint: null })),
+        { type: 'input_json', data: [42] }, { type: 'input_image', image_url: 'https://user:secret@example.com/a.png' }]) {
+        const item = { role: 'user', content: [part] };
+        assert.throws(() => validateLiveCommand({ type: 'decision.item.create', item }), { code: 'VALIDATION_ERROR' });
+        assert.throws(() => validateLiveEvent({ type: 'decision.item.created', event_id: 'invalid', item: { ...item, id: 'id' } }),
+            { code: 'INVALID_RESPONSE' });
+    }
 });
 
 test('pre-abort and immediate disposal cannot dispatch queued Live commands', async () => {

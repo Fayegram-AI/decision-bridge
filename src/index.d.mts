@@ -2,8 +2,9 @@
 import type { JevDangerZone, JevQuestions, JevDecisionRequest, JevDecisionResponse, JevTransportMetadata } from './jev.d.mts';
 export type { JevDangerZone, JevImageAsset, JevQuestions, JevDecisionRequest, JevDecisionResponse, JevTransportMetadata } from './jev.d.mts';
 import type { NativeDecisionRequest, OpenAIDecisionResponse, OpenAIDecisionUsage,
-    OpenAIDecisionsMetadata, OpenAIDecisionsTransportMetadata } from './decisions.d.mts';
-export type { NativeDecisionInputPart, NativeDecisionInputItem, DecisionCacheBreakpoint, DecisionCacheOptions,
+    OpenAIDecisionsMetadata, OpenAIDecisionsTransportMetadata, DecisionJsonData } from './decisions.d.mts';
+export type { NativeDecisionInputPart, NativeDecisionToolOutputPart, NativeDecisionQuestionPart, NativeDecisionJSONPart,
+    NativeDecisionInputItem, DecisionJsonData, DecisionCacheBreakpoint, DecisionCacheOptions,
     NativeDecisionMessage, NativeDecisionQuestion, NativeDecisionRequest,
     NativeDecisionAnswer, OpenAIDecisionResponse, OpenAIDecisionUsage, OpenAIDecisionsMetadata,
     OpenAIDecisionsTransportMetadata, TransportMetadata } from './decisions.d.mts';
@@ -21,14 +22,17 @@ export type Instructions = State;
 export type ChoiceCriteria = Readonly<Record<string, Entry>>;
 export type ScoreCriteria = readonly [Instructions, Instructions, ...Instructions[]];
 export interface ChoiceQuestion<C extends ChoiceCriteria = ChoiceCriteria> {
+    readonly instructionParts?: never;
   readonly type: 'choice'; readonly instructions: Instructions; readonly criteria: C;
   readonly options?: never;
 }
 export interface NoulQuestion {
+    readonly instructionParts?: never;
   readonly type: 'noul'; readonly instructions: Instructions;
   readonly criteria?: { readonly true?: Instructions; readonly false?: Instructions };
 }
 export interface BoxQuestion {
+    readonly instructionParts?: never;
     readonly type: 'box'; readonly instructions: Instructions; readonly criteria?: never;
 }
 export interface BoxCoordinates {
@@ -38,6 +42,7 @@ export interface BoxAnswer {
     readonly type: 'box'; readonly box: BoxCoordinates; readonly confidence?: number;
 }
 export interface ScoreQuestion<C extends ScoreCriteria = ScoreCriteria> {
+    readonly instructionParts?: never;
   readonly type: 'score'; readonly instructions: Instructions; readonly criteria: C;
   readonly levels?: never;
 }
@@ -45,11 +50,13 @@ export interface ChoiceOption<V extends string | boolean = string | boolean> {
     readonly value: V; readonly description?: Entry;
 }
 export interface TypedChoiceQuestion<O extends readonly ChoiceOption[] = readonly ChoiceOption[]> {
+    readonly instructionParts?: never;
     readonly type: 'choice'; readonly instructions: Instructions; readonly options: O; readonly criteria?: never;
 }
 export interface ScoreLevel { readonly label: string; readonly description?: Instructions; }
 export type ScoreLevels = readonly [ScoreLevel, ScoreLevel, ...ScoreLevel[]];
 export interface LabeledScoreQuestion<L extends ScoreLevels = ScoreLevels> {
+    readonly instructionParts?: never;
     readonly type: 'score'; readonly instructions: Instructions; readonly levels: L; readonly criteria?: never;
 }
 export type DecisionConversationItem = import('./decisions.mjs').NativeDecisionInputItem;
@@ -58,10 +65,23 @@ export type DecisionInputPart = { readonly type: 'text'; readonly text: string;
     | ({ readonly type: 'image'; readonly detail?: 'low' | 'high' | 'auto' | 'original' | null;
         readonly promptCacheBreakpoint?: import('./decisions.mjs').DecisionCacheBreakpoint | null }
         & ({ readonly dataUrl: string; readonly url?: never } | { readonly url: string; readonly dataUrl?: never }))
+    | { readonly type: 'json'; readonly data: DecisionJsonData; readonly promptCacheBreakpoint?: never }
     | { readonly type: 'audio'; readonly dataUrl: string }
     | { readonly type: 'video'; readonly dataUrl: string };
 export type OrderedInput = readonly DecisionInputPart[];
-export type Question = ChoiceQuestion | TypedChoiceQuestion | NoulQuestion | ScoreQuestion | LabeledScoreQuestion | BoxQuestion;
+/** Content is explicit; legacy instruction arrays always remain JSON values. */
+export type QuestionInstructionPart =
+    | { readonly type: 'text'; readonly text: string; readonly promptCacheBreakpoint?: never }
+    | ({ readonly type: 'image'; readonly detail?: 'low' | 'high' | 'auto' | 'original' | null;
+        readonly promptCacheBreakpoint?: never }
+        & ({ readonly dataUrl: string; readonly url?: never } | { readonly url: string; readonly dataUrl?: never }))
+    | { readonly type: 'json'; readonly data: DecisionJsonData; readonly promptCacheBreakpoint?: never };
+export type QuestionInstructionParts = readonly QuestionInstructionPart[];
+type ContentQuestion = ChoiceQuestion | TypedChoiceQuestion | NoulQuestion | ScoreQuestion | LabeledScoreQuestion;
+export type QuestionWithParts<Q extends ContentQuestion = ContentQuestion> = Q extends ContentQuestion
+    ? Omit<Q, 'instructions' | 'instructionParts'> & { readonly instructions?: never; readonly instructionParts: QuestionInstructionParts }
+    : never;
+export type Question = ContentQuestion | BoxQuestion | QuestionWithParts;
 export type Questions = Readonly<Record<string, Question>>;
 export interface ChoiceAnswer<K extends string = string> {
   readonly type: 'choice'; readonly choice: K;
@@ -84,10 +104,11 @@ export interface LabeledScoreAnswer<L extends ScoreLevels = ScoreLevels> extends
     readonly legend: Readonly<Record<string, L[number]>>;
 }
 type ChoiceLabel<K> = K extends string ? K : K extends number ? `${K}` : never;
-export type AnswerFor<Q extends Question> = Q extends TypedChoiceQuestion<infer O> ? TypedChoiceAnswer<O[number]['value']>
-  : Q extends LabeledScoreQuestion<infer L> ? LabeledScoreAnswer<L>
-  : Q extends ChoiceQuestion<infer C>
-  ? ChoiceAnswer<ChoiceLabel<keyof C>> : Q extends NoulQuestion ? NoulAnswer : Q extends BoxQuestion ? BoxAnswer : ScoreAnswer;
+export type AnswerFor<Q extends Question> = Q extends { readonly type: 'choice'; readonly options: infer O extends readonly ChoiceOption[] }
+    ? TypedChoiceAnswer<O[number]['value']>
+    : Q extends { readonly type: 'score'; readonly levels: infer L extends ScoreLevels } ? LabeledScoreAnswer<L>
+    : Q extends { readonly type: 'choice'; readonly criteria: infer C extends ChoiceCriteria } ? ChoiceAnswer<ChoiceLabel<keyof C>>
+    : Q extends { readonly type: 'noul' } ? NoulAnswer : Q extends BoxQuestion ? BoxAnswer : ScoreAnswer;
 export type EvaluationRequest<Q extends Questions = Questions> = {
     readonly questions: Q; readonly model?: string; readonly safetyIdentifier?: string | null;
     readonly promptCacheKey?: string | null;
@@ -145,6 +166,7 @@ export interface Provider {
 }
 export interface DecisionProvider extends Provider { readonly kind: 'decision'; }
 export interface Capabilities {
+    readonly jsonInput?: boolean; readonly questionContent?: boolean;
     readonly conversation?: boolean; readonly toolHistory?: boolean; readonly remoteImages?: boolean; readonly promptCaching?: boolean;
     readonly boxes?: boolean;
     readonly audio?: boolean; readonly videos?: boolean;
@@ -231,6 +253,11 @@ export function noul(instructions: Instructions, criteria?: NoulQuestion['criter
 export function score<const C extends ScoreCriteria>(instructions: Instructions, criteria: C): ScoreQuestion<C>;
 export function scoreLevels<const L extends ScoreLevels>(instructions: Instructions, levels: L): LabeledScoreQuestion<L>;
 export function box(instructions: Instructions): BoxQuestion;
+export function choiceWithParts<const O extends readonly ChoiceOption[]>(parts: QuestionInstructionParts, options: O): QuestionWithParts<TypedChoiceQuestion<O>>;
+export function choiceWithParts<const C extends ChoiceCriteria>(parts: QuestionInstructionParts, criteria: C): QuestionWithParts<ChoiceQuestion<C>>;
+export function noulWithParts(parts: QuestionInstructionParts, criteria?: NoulQuestion['criteria']): QuestionWithParts<NoulQuestion>;
+export function scoreWithParts<const C extends ScoreCriteria>(parts: QuestionInstructionParts, criteria: C): QuestionWithParts<ScoreQuestion<C>>;
+export function scoreLevelsWithParts<const L extends ScoreLevels>(parts: QuestionInstructionParts, levels: L): QuestionWithParts<LabeledScoreQuestion<L>>;
 export interface ChoicePolicyOptions<K extends string | boolean = string> {
     minProbability: number; minMargin?: number; abstainOptions?: readonly K[];
     /** Provider-declared probability precision; omission retains the baseline tolerance. */

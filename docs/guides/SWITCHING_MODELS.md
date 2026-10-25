@@ -202,7 +202,7 @@ Use the [routing API](ROUTING.md) to choose a target based on supported features
 rules and priorities, or a decision model. Register the providers and models you want to
 use, then enable the ones available to your application. `policy: 'deterministic'` makes
 the choice without a selector call. If only one target can handle the request, the
-router selects it locally. Auto mode is experimental in 0.1.4. The routing request's
+router selects it locally. Auto mode is experimental. The routing request's
 `model` constrains eligible targets instead of replacing a provider default. CLI
 registries define named targets selected with `--route`; see
 [routing configuration](ROUTING.md#cli-registry-configuration). Single-provider
@@ -211,8 +211,11 @@ profiles and precedence remain as described above.
 ## Boundaries
 
 The opt-in custom generative compatible preset uses Chat Completions, not the OpenAI Responses API.
-Anthropic uses one forced output-schema tool, not an agent loop. A different
-protocol requires the [custom-provider contract](CUSTOM_PROVIDERS.md).
+Anthropic defaults to one forced output-schema tool and also supports explicit
+[JSON-schema output and API-version selection](CUSTOM_GENERATIVE.md#json-output-and-api-versions). Choose a
+model that supports the selected mode; neither mode executes tools or starts an
+agent loop. A different protocol requires the
+[custom-provider contract](CUSTOM_PROVIDERS.md).
 Jev, OpenAI Decisions, and Cloudflare Clef each have a dedicated native provider;
 use those provider types for their decision APIs. Native Decisions providers
 reject generative output settings such as `responseFormat` and `maxTokens`.

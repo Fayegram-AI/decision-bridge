@@ -26,6 +26,9 @@ checks and optional service checks.
 | OpenAI Live protocol | https://developers.openai.com/api/reference/resources/live/primary-websocket |
 | OpenRouter structured output and routing | https://openrouter.ai/docs/guides/features/structured-outputs |
 | Anthropic Messages, tools, usage, and stop reasons | https://platform.claude.com/docs/en/api/messages/create |
+| Anthropic JSON-schema output | https://platform.claude.com/docs/en/build-with-claude/structured-outputs |
+| Anthropic API versions | https://platform.claude.com/docs/en/api/versioning |
+| Anthropic API 2026-10-21 migration | https://platform.claude.com/docs/en/api/migration-2026-10-21 |
 | GitHub checkout action | https://github.com/actions/checkout |
 | GitHub Node setup action | https://github.com/actions/setup-node |
 

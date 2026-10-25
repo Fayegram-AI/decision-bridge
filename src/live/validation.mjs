@@ -1,8 +1,7 @@
 import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
-import { fields, validateDecisionQuestions } from '../providers/decisions-input.mjs';
+import { fields, validateDecisionQuestions, validateDecisionContentPart } from '../providers/decisions-input.mjs';
 import { validateDecisionResponse } from '../providers/decisions-validation.mjs';
-import { validateImage } from '../input.mjs';
 
 export const TRANSCRIPTS = ['session.input_transcript.delta', 'session.output_transcript.delta'];
 const text = value => typeof value === 'string' && value.length > 0;
@@ -37,16 +36,7 @@ function item(input, created = false) {
     check(created ? text(input.id) : input.id === undefined || input.id === null || text(input.id), 'Invalid item ID.');
     if (typeof input.content !== 'string') {
         check(Array.isArray(input.content) && input.content.length > 0, 'Live item requires content.');
-        for (const part of input.content) {
-            if (part?.type === 'input_text') {
-                fields(part, ['type', 'text'], ['type', 'text'], 'Live text part');
-                check(typeof part.text === 'string', 'Live text must be a string.');
-            } else {
-                fields(part, ['type', 'image_url', 'detail'], ['type', 'image_url'], 'Live image part');
-                check(part.type === 'input_image', 'Unsupported Live input part.');
-                validateImage(part.image_url, part.detail);
-            }
-        }
+        input.content.forEach(part => validateDecisionContentPart(part, { json: true, cache: false }));
     }
 }
 

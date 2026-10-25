@@ -1016,7 +1016,14 @@
                                 },
                                 {
                                     "properties": {
-                                        "thinking": false
+                                        "thinking": false,
+                                        "output_format": false,
+                                        "output_config": {
+                                            "type": "object",
+                                            "properties": {
+                                                "format": false
+                                            }
+                                        }
                                     }
                                 }
                             ]
@@ -1026,11 +1033,48 @@
                         },
                         "preset": {
                             "const": "anthropic"
+                        },
+                        "responseFormat": {
+                            "enum": [
+                                "tool",
+                                "json_schema"
+                            ]
+                        },
+                        "apiVersion": {
+                            "enum": [
+                                "2023-06-01",
+                                "2026-10-21"
+                            ]
                         }
                     },
                     "required": [
                         "provider",
                         "preset"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "apiVersion": {
+                                        "const": "2026-10-21"
+                                    }
+                                },
+                                "required": [
+                                    "apiVersion"
+                                ]
+                            },
+                            "then": {
+                                "properties": {
+                                    "parameters": {
+                                        "properties": {
+                                            "temperature": false,
+                                            "top_p": false,
+                                            "top_k": false
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     ]
                 },
                 {

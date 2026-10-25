@@ -1,6 +1,6 @@
 # Configurable routing
 
-Requires **0.1.4**. See [version availability](../README.md#version-availability).
+Requires **0.1.4 or later**. See [version availability](../README.md#version-availability).
 
 Use `/routing` to choose among the providers and models you configure. Each route gives
 a target a name, such as `fast` or `multimodal`. Pass that name to choose it directly,
@@ -9,7 +9,7 @@ priorities, ask a decision model, or request clarification when the choice is un
 You can continue using `createBridge()` or the extraction provider directly when you
 only need one provider.
 
-**Auto mode is experimental in 0.1.4**, whether it uses rules or a decision model
+**Auto mode is experimental**, whether it uses rules or a decision model
 to choose a route. This covers both decision and extraction requests. Its settings
 and routing behavior may change as the feature develops. Try it with your
 application's typical requests and enabled models, and check that it chooses
@@ -172,6 +172,12 @@ type, MIME type and byte count where available; media URLs and payloads are not
 sent. Arbitrary JSON state remains task content. Supply call `routingDescription`
 to replace task content with an application-provided description. The serialized
 context defaults to 32 KiB and is never silently truncated.
+
+Explicit JSON parts contribute to the `text` modality and question images contribute to
+`image`. Recognized images in `instructionParts` receive the same metadata
+replacement, including when `routingDescription` replaces shared task content.
+Legacy structured instructions and JSON-part data remain opaque task/schema
+content; keys inside them are not treated as media references.
 
 The selector chooses from internal route IDs and an option to abstain. The router checks
 its probability distribution, confirms that the choice is allowed, applies the

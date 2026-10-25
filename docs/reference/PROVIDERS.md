@@ -71,6 +71,12 @@ OpenAI additionally supports `conversation`, `toolHistory`, `remoteImages` and
 custom providers. Built-in quantitative limits use `null` where admission is
 left to the service; explicit custom-provider limits remain enforced.
 
+OpenAI also supports `jsonInput` and `questionContent`. Both optional flags default to false and are
+enabled only by OpenAI among built-in providers. `jsonInput` covers explicit JSON
+parts in input, conversations and questions; `questionContent` covers the
+`instructionParts` question form. Image and remote-image capabilities apply to
+question images, and `maxImages` counts shared-input and question images together.
+
 Dedicated `createDecision()` access is available on Jev, OpenAI Decisions and
 Cloudflare providers. It uses each service's native request/response shape and
 bypasses bridge preparation and observation hooks.

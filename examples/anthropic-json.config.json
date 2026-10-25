@@ -1,0 +1,12 @@
+{
+    "schemaVersion": 1,
+    "provider": "custom-generative",
+    "preset": "anthropic",
+    "model": "claude-sonnet-5-5",
+    "apiKeyEnv": "ANTHROPIC_API_KEY",
+    "responseFormat": "json_schema",
+    "apiVersion": "2026-10-21",
+    "parameters": {
+        "output_config": { "effort": "medium" }
+    }
+}

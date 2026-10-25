@@ -112,6 +112,61 @@ images. Set `maxRequestBytes` explicitly for larger requests, up to the existing
 `safetyIdentifier` is an optional per-request opaque string or null. It maps
 to `safety_identifier`; length admission remains upstream.
 
+## JSON and question content
+
+Add `{ type: 'json', data }` to common ordered input to mix structured evidence
+with text and images. `data` accepts a JSON object or an array of objects;
+nested values can contain any JSON value. Existing structured `state`,
+`instructions` and descriptions retain their JSON-text encoding.
+
+Use `instructionParts` for question-specific content, exclusively of
+`instructions`. Parts use the common `text`, `image` and `json` forms. For example:
+
+```javascript
+import { noulWithParts } from '@fayegram-ai/decision-bridge';
+
+const request = {
+    input: [{ type: 'json', data: { amount: 42, currency: 'USD' } }],
+    questions: {
+        allowed: noulWithParts([
+            { type: 'text', text: 'Is the amount within the supplied limit?' },
+            { type: 'json', data: { limit: 50, currency: 'USD' } },
+        ]),
+    },
+};
+```
+
+`choiceWithParts`, `noulWithParts`, `scoreWithParts` and `scoreLevelsWithParts`
+take parts as their first argument and the same criteria/options as the
+corresponding existing builder. They return immutable questions. Content parts
+preserve their order and use the existing answer formats. Box questions do not
+accept this form. The [JSON example](../../examples/decisions-content.json) also
+works with offline CLI `validate --provider openai-decisions`.
+
+For images, use `{ type: 'image', url }` or `{ type: 'image', dataUrl }`, with
+optional `detail`. The SDK forwards references without downloading images.
+Question images and shared-input images use one combined provider image budget.
+Question parts accept neither cache breakpoints nor audio/video.
+
+Native requests use `{ type: 'input_json', data }` in user-message content.
+Native predicate, choice and score `instructions` accept a string or a nonempty
+array of `input_text`, `input_image` and `input_json`, without a message wrapper.
+Developer/system messages remain text-only; tool outputs support text/images.
+JSON parts do not accept cache breakpoints. Keys such as `role` and `image_url`
+inside `data` remain ordinary JSON data.
+
+The [API reference](https://developers.openai.com/api/reference/resources/decisions/methods/create)
+specifies JSON limits of 32 container levels, 10,000 values and 256 KiB of compact
+UTF-8 JSON. Service admission remains upstream; local JSON safety and complete
+request-byte budgets still apply. These limits do not change legacy state or
+instruction validation.
+
+Keep reusable reference material in shared `input`: question content is outside
+the cacheable prefix. JSON input does not change answers or usage reporting.
+The capabilities are `jsonInput` and `questionContent`; both default to false
+for custom providers. Requests using these explicit forms select common schema
+version 6. Existing instruction arrays are never interpreted as content parts.
+
 ## Typed choices and labelled scores
 
 The array overload of `choice` accepts `{ value: string | boolean, description? }`:
@@ -273,7 +328,8 @@ preserves breakpoints, omission and explicit nulls without selecting cache write
 Use `prepareConversation(items, context)` to transform conversation input.
 Transformations are snapshotted, frozen and revalidated before dispatch. Capability
 flags are `conversation`, `toolHistory`, `remoteImages` and `promptCaching`;
-existing custom providers default to false. New-feature requests use common
-schema version 5; existing forms retain versions 1–4.
+existing custom providers default to false. These forms use common schema version
+5 unless explicit JSON or question content selects version 6; earlier forms
+retain versions 1–4.
 
 See [Live Decisions](LIVE_DECISIONS.md) for the separate connection lifecycle.

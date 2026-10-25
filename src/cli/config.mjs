@@ -12,6 +12,7 @@ const ENV_FIELDS = {
     DECISION_PROVIDER: 'provider', DECISION_PRESET: 'preset', DECISION_MODEL: 'model', DECISION_BASE_URL: 'baseURL',
     DECISION_API_KEY_ENV: 'apiKeyEnv', DECISION_TIMEOUT_MS: 'timeoutMs',
     DECISION_MAX_RETRIES: 'maxRetries', DECISION_RESPONSE_FORMAT: 'responseFormat',
+    DECISION_ANTHROPIC_API_VERSION: 'apiVersion',
     DECISION_ACCOUNT_ID: 'accountId', DECISION_REJECT_IF_BUSY: 'rejectIfBusy', DECISION_GATEWAY_ID: 'gateway',
     DECISION_JEV_IMAGES: 'jevImages', DECISION_JEV_LONG_CONTEXT: 'jevLongContext',
 };

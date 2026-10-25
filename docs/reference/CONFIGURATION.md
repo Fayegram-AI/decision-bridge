@@ -2,7 +2,7 @@
 
 Use a single-provider profile to configure one backend, or a routing registry to
 define named targets and a selection policy. Profiles use `schemaVersion: 1`
-(optional); registries require `schemaVersion: 2` and Decision Bridge 0.1.4.
+(optional); registries require `schemaVersion: 2` and Decision Bridge 0.1.4 or later.
 See [version availability](../README.md#version-availability).
 
 ## Single-provider profiles (version 1)
@@ -58,7 +58,8 @@ REST.
 | `gateway` | Cloudflare Gateway object; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) |
 | `dangerZone` | Jev-only `{ images?: boolean, longContext?: boolean }`; both default false; see the [Jev guide](../guides/JEV.md) |
 | `maxTokens` | Generative output budget, 1–1,048,576; default 4096 |
-| `responseFormat` | Compatible generative presets: `json_schema`, `json_object`, `text` |
+| `responseFormat` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic modes: `tool` (default), `json_schema` |
+| `apiVersion` | Anthropic-only option: `2023-06-01` (default) or `2026-10-21` |
 | `tokenParameter` | Compatible generative presets: `max_completion_tokens` or `max_tokens` |
 | `parameters` | Extra JSON generation parameters, excluding bridge-controlled fields |
 | `module` | Required for custom-decision; alternative to preset for custom-generative; explicit local ESM file |
@@ -133,7 +134,7 @@ working-directory-relative flag retain settings only when both identify the same
 
 ## Routing registries (version 2)
 
-Auto mode is experimental in 0.1.4, including deterministic and decision-assisted
+Auto mode is experimental, including deterministic and decision-assisted
 policies.
 
 Set `schemaVersion: 2` and load the registry with `--config`. Provider settings
@@ -197,7 +198,8 @@ Provider credential variables also supply configured routes as described above.
 | `DECISION_API_KEY_ENV` | CLI credential variable selector |
 | `DECISION_TIMEOUT_MS` | CLI timeout, decimal integer |
 | `DECISION_MAX_RETRIES` | CLI retry count, decimal integer |
-| `DECISION_RESPONSE_FORMAT` | CLI compatible output mode |
+| `DECISION_RESPONSE_FORMAT` | CLI preset output mode |
+| `DECISION_ANTHROPIC_API_VERSION` | Anthropic API-version selection |
 
 `RUN_LIVE_TESTS=1` applies only to the explicit development smoke helper.
 No background access or live testing is enabled by normal test commands.

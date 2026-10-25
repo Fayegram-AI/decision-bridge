@@ -15,7 +15,7 @@ export function defineGenerativeProvider(definition) {
 /** Explicit opt-in presets; the native createProvider registry does not load these. */
 export function createGenerativeProvider(configuration) {
     optionsObject(configuration, ['type', 'apiKey', 'model', 'baseURL', 'responseFormat',
-        'tokenParameter', 'maxTokens', 'parameters', 'timeoutMs', 'maxRetries',
+        'tokenParameter', 'apiVersion', 'maxTokens', 'parameters', 'timeoutMs', 'maxRetries',
         'maxRequestBytes', 'maxResponseBytes', 'fetchImpl'], 'Generative configuration');
     check(Object.hasOwn(configuration, 'type') && typeof configuration.type === 'string' && configuration.type.trim(),
         'Generative preset type must be explicitly configured.', 'CONFIGURATION_ERROR');

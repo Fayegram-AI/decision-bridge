@@ -108,12 +108,16 @@ export function validateRequestStructure(input) {
   for (const [id, q] of Object.entries(request.questions)) {
     check(nonempty(id), 'Question IDs must be nonempty.');
     check(isRecord(q), 'Every question must be an object.');
-    allowedKeys(q, q.type === 'box' ? ['type', 'instructions'] : q.type === 'choice' ? ['type', 'instructions', 'criteria', 'options'] :
-      q.type === 'score' ? ['type', 'instructions', 'criteria', 'levels'] : ['type', 'instructions', 'criteria'], 'question');
+    allowedKeys(q, q.type === 'box' ? ['type', 'instructions'] : q.type === 'choice' ? ['type', 'instructions', 'instructionParts', 'criteria', 'options'] :
+      q.type === 'score' ? ['type', 'instructions', 'instructionParts', 'criteria', 'levels'] : ['type', 'instructions', 'instructionParts', 'criteria'], 'question');
     check(['choice', 'noul', 'score', 'box'].includes(q.type), 'Question type must be choice, noul, score, or box.');
-    check(own(q, 'instructions') && q.instructions !== null && isEntry(q.instructions),
-      'instructions are required and must be text, a JSON object, or an array.');
-    if (typeof q.instructions === 'string') check(nonempty(q.instructions), 'instructions must not be empty.');
+    check(own(q, 'instructions') !== own(q, 'instructionParts'), 'Provide exactly one of instructions or instructionParts.');
+    if (own(q, 'instructionParts')) validateOrderedInput(q.instructionParts, { question: true });
+    else {
+        check(q.instructions !== null && isEntry(q.instructions),
+            'instructions are required and must be text, a JSON object, or an array.');
+        if (typeof q.instructions === 'string') check(nonempty(q.instructions), 'instructions must not be empty.');
+    }
     if (q.type === 'choice' && own(q, 'options')) {
       check(!own(q, 'criteria') && Array.isArray(q.options) && q.options.length > 0,
         'Typed choice requires options and no criteria map.');

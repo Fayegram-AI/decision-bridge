@@ -8,8 +8,11 @@ and `/live` exports, their CLI commands, and expanded OpenAI history/cache input
 require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
 to install a compatible version.
 The `/routing` export, `inspect`, routing flags, and routing registries require
-0.1.4. Use the [0.1.4 archive installation](GETTING_STARTED.md#install-into-your-application)
+0.1.4 or later. Use the [installation options](GETTING_STARTED.md#install-into-your-application)
 if your installed package does not include them.
+
+OpenAI JSON/question content, the companion `WithParts` builders, Live
+JSON/hosted-image items, and Anthropic output/version settings require 0.1.5 or later.
 
 ## The command cannot find a key
 
@@ -69,11 +72,18 @@ discover another model or fall back after failure.
 
 ## Structured output is rejected
 
-Check that the selected endpoint/model supports the requested `json_schema` mode.
-Choose `json_object` or `text` explicitly when appropriate; local validation remains
-strict. Some servers require `--token-parameter max_tokens`. A valid schema does
+Check that the selected endpoint/model supports the requested output mode.
+OpenAI-compatible and OpenRouter presets also accept explicit `json_object` or
+`text` modes; local validation remains strict. Some compatible servers require
+`--token-parameter max_tokens`. A valid schema does
 not guarantee probabilities sum to one. `INVALID_RESPONSE` must not be treated as
 an approved decision. Large schemas also consume context/output budget.
+
+For Anthropic, check the [output and API-version settings](CUSTOM_GENERATIVE.md#json-output-and-api-versions).
+Select `json_schema` or the default `tool` mode;
+`json_object`, `text`, and `tokenParameter` are unsupported. API `2026-10-21`
+rejects `temperature`, `top_p`, and `top_k`. A `TRUNCATED_OUTPUT` error may require
+a larger explicit `maxTokens` budget, which also covers default thinking tokens.
 
 ## The model returns JSON but confidence is absent
 

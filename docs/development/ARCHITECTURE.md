@@ -80,11 +80,12 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/provider-contract.mjs` | Required classification, authoritative metadata, and generative provenance |
 | `src/custom/decision.mjs` | Explicit native decision definition helper |
 | `src/custom/generative/` | Opt-in protocol presets, schema, prompts, and result derivation |
+| `src/custom/generative/anthropic-options.mjs` | Anthropic output/version settings and parameter restrictions shared by SDK construction and CLI validation |
 | `schemas/decision.config.schema.json` | Shipped CLI configuration structure and editor support |
 | `src/providers/` | API orchestration, model profiles, preflight, codecs, bounded image/audio/video inspection, and transports |
 | `src/providers/openai-profile.mjs`, `src/providers/decisions-preflight.mjs` | Release-owned OpenAI selection, capabilities, and preparation of selected and outgoing requests |
 | `src/providers/jev-profile.mjs`, `src/providers/jev-preflight.mjs`, `src/providers/jev-images.mjs` | Jev experimental policy, common/native assets, and image preflight |
-| `src/providers/decisions-input.mjs`, `src/providers/decisions-codec.mjs` | Decisions item/cache validation and lossless common/native encoding |
+| `src/providers/decisions-input.mjs`, `src/providers/decisions-codec.mjs` | Context-specific Decisions content/cache validation and lossless common/native encoding |
 | `src/providers/cloudflare-transport.mjs` | Shared decision/extraction REST and binding authentication, dispatch and diagnostics |
 | `src/extraction/` | Clairic native field/request/response validation, provider, ordered batches and declarations |
 | `src/live/` | Live protocol validation, bounded correlation state, supplied-connection controller and declarations |

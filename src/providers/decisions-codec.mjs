@@ -6,18 +6,22 @@ const own = (value, key) => Object.hasOwn(value, key);
 const encodeText = value => typeof value === 'string' ? value : JSON.stringify(value);
 const description = value => value === undefined || value === null ? {} : { description: encodeText(value) };
 
+/** Only explicit content parts are interpreted; legacy structured values remain text. */
+function encodePart(part) {
+    if (part.type === 'json') return { type: 'input_json', data: part.data };
+    const cache = own(part, 'promptCacheBreakpoint') ? { prompt_cache_breakpoint: part.promptCacheBreakpoint } : {};
+    return part.type === 'text' ? { type: 'input_text', text: part.text, ...cache }
+        : { type: 'input_image', image_url: part.dataUrl ?? part.url, ...cache,
+            ...(own(part, 'detail') ? { detail: part.detail } : {}) };
+}
+
 export function encodeCommonDecision(request) {
-    check(!request.input?.some(part => !['text', 'image'].includes(part.type)),
+    check(!request.input?.some(part => !['text', 'image', 'json'].includes(part.type)),
         'OpenAI Decisions does not support audio or video input.', 'UNSUPPORTED_CAPABILITY');
-    const cache = part => own(part, 'promptCacheBreakpoint') ? { prompt_cache_breakpoint: part.promptCacheBreakpoint } : {};
     const input = own(request, 'state') ? encodeText(request.state) : own(request, 'conversation') ? request.conversation
-        : [{ role: 'user', content: request.input.map(part => part.type === 'text'
-            ? { type: 'input_text', text: part.text, ...cache(part) } : {
-                type: 'input_image', image_url: part.dataUrl ?? part.url, ...cache(part),
-                ...(own(part, 'detail') ? { detail: part.detail } : {}),
-            }) }];
+        : [{ role: 'user', content: request.input.map(encodePart) }];
     const questions = Object.entries(request.questions).map(([name, q]) => {
-        const base = { name, instructions: encodeText(q.instructions) };
+        const base = { name, instructions: own(q, 'instructionParts') ? q.instructionParts.map(encodePart) : encodeText(q.instructions) };
         if (q.type === 'noul') {
             if (!q.criteria || Object.keys(q.criteria).length === 0) return { ...base, type: 'predicate' };
             return { ...base, type: 'choice', choices: [true, false].map(value => ({

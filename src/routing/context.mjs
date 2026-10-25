@@ -25,14 +25,17 @@ export function taskContext(request, operation, description) {
         ...(Array.isArray(item.content) ? { content: item.content.map(part) } : {}),
         ...(Array.isArray(item.output) ? { output: item.output.map(part) } : {}) }));
     else content = request.state;
+    // Only the explicit question-part field contains media; legacy JSON stays opaque.
+    const schema = request.questions ? Object.fromEntries(Object.entries(request.questions).map(([id, question]) =>
+        [id, question.instructionParts ? { ...question, instructionParts: question.instructionParts.map(part) } : question])) : request.fields;
     if (request.images) for (const item of request.images) attachments.push(media('image', typeof item === 'string' ? item : `data:${item.content_type};base64,${item.base64}`));
     return { operation, ...(description === undefined ? { content } : { description }),
-        schema: request.questions ?? request.fields, media: attachments };
+        schema, media: attachments };
 }
 
 function hasText(content) {
     return typeof content === 'string' || Array.isArray(content) &&
-        content.some(part => ['text', 'input_text', 'output_text', 'refusal'].includes(part.type));
+        content.some(part => ['text', 'input_text', 'output_text', 'refusal', 'json', 'input_json'].includes(part.type));
 }
 
 export function requestFacts(request, operation, labels = []) {
@@ -40,7 +43,8 @@ export function requestFacts(request, operation, labels = []) {
     const modalities = new Set(context.media.map(item => item.type));
     // Message roles and media metadata do not add a text modality; tool payloads do.
     if (request.state !== undefined || hasText(request.input) || request.conversation?.some(item =>
-        hasText(item.content) || hasText(item.output) || hasText(item.arguments) || hasText(item.input))) modalities.add('text');
+        hasText(item.content) || hasText(item.output) || hasText(item.arguments) || hasText(item.input)) ||
+        Object.values(request.questions ?? {}).some(question => hasText(question.instructionParts))) modalities.add('text');
     return { operation, modalities: [...modalities], labels,
         questionTypes: [...new Set(Object.values(request.questions ?? {}).map(item => item.type))],
         fieldTypes: [...new Set(Object.values(request.fields ?? {}).map(item => item.type))] };

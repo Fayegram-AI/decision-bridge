@@ -10,6 +10,7 @@ const PROFILES = Object.freeze({
         labeledScores: true, safetyIdentifier: true,
         maxImages: null, maxChoiceOptions: null, maxScoreLevels: null,
         conversation: true, toolHistory: true, remoteImages: true, promptCaching: true,
+        jsonInput: true, questionContent: true,
     }),
 });
 
