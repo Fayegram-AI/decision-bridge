@@ -35,6 +35,31 @@ async function serverFor(t, mutate = () => {}) {
         '--api-key-env', 'TEST_API_KEY'], env: { TEST_API_KEY: 'fixture-secret' } };
 }
 
+test('JSON/question content agrees across offline validation, evaluation and JSONL modes', async t => {
+    const { bodies, flags, env } = await serverFor(t);
+    const content = [{ type: 'input_text', text: 'Inspect.' }, { type: 'input_json', data: { amount: 42 } },
+        { type: 'input_image', image_url: 'https://example.com/a.png' }];
+    const input = { input: [{ type: 'json', data: { amount: 42 } }], questions: { q: { type: 'noul',
+        instructionParts: [{ type: 'text', text: 'Inspect.' }, { type: 'json', data: { amount: 42 } },
+            { type: 'image', url: 'https://example.com/a.png' }] } } };
+    const wire = { input: [{ role: 'user', content: [content[1]] }],
+        questions: [{ type: 'predicate', name: 'q', instructions: content }] };
+    for (const [request, extra] of [[input, []], [wire, ['--native']]]) {
+        const valid = await invoke(['validate', '-', '--provider', 'openai-decisions', ...extra], JSON.stringify(request));
+        assert.equal(valid.code, 0, valid.stderr);
+        const single = await invoke(['evaluate', '-', ...flags, ...extra], JSON.stringify(request), { env });
+        assert.equal(single.code, 0, single.stderr);
+        const rows = [request, request].map(JSON.stringify).join('\n');
+        const batch = await invoke(['batch', '-', ...flags, ...extra], rows, { env });
+        assert.equal(batch.code, 0, batch.stderr);
+        assert(batch.stdout.trim().split('\n').map(JSON.parse).every(row => row.ok));
+    }
+    assert.equal(bodies.length, 6);
+    for (const body of bodies) assert.deepEqual(body, { ...wire, model: 'gpt-6-luna' });
+    const bad = { ...input, questions: { q: { ...input.questions.q, instructions: 'ambiguous' } } };
+    assert.equal((await invoke(['validate', '-', '--provider', 'openai-decisions'], JSON.stringify(bad))).code, 2);
+});
+
 test('common and native offline validation use model defaults without credentials', async () => {
     const identifier = '\u{1F600}'.repeat(128);
     for (const [input, extra] of [[common, []], [native, ['--native']],

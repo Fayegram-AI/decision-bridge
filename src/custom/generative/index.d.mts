@@ -13,6 +13,8 @@ export interface OpenAICompatibleOptions extends TransportOptions {
 export interface OpenRouterOptions extends Omit<OpenAICompatibleOptions, 'baseURL' | 'apiKey'> { apiKey?: string; }
 export interface AnthropicOptions extends TransportOptions {
   apiKey?: string; model?: string; baseURL?: string; maxTokens?: number;
+  /** Independent opt-ins; omitted settings preserve the legacy tool protocol. */
+  responseFormat?: 'tool' | 'json_schema'; apiVersion?: '2023-06-01' | '2026-10-21';
   parameters?: Readonly<Record<string, JsonValue>>;
 }
 export class OpenAICompatibleProvider implements GenerativeProvider {

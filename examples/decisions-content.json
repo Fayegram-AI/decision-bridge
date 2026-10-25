@@ -1,0 +1,14 @@
+{
+    "input": [
+        { "type": "json", "data": { "amount": 42, "currency": "USD" } }
+    ],
+    "questions": {
+        "allowed": {
+            "type": "noul",
+            "instructionParts": [
+                { "type": "text", "text": "Is the amount within the supplied limit?" },
+                { "type": "json", "data": { "limit": 50, "currency": "USD" } }
+            ]
+        }
+    }
+}

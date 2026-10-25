@@ -6,6 +6,11 @@ supports. Describe what to assess in `instructions` and define categories or a s
 rubric in `criteria`. You can reuse one bridge for unrelated tasks; each call supplies
 its own questions without changing the model or account settings.
 
+For OpenAI's [question content](OPENAI_DECISIONS.md#json-and-question-content),
+use `instructionParts` and the companion builders to include ordered text, images,
+or JSON in a question. Existing instruction objects and arrays remain JSON-text
+values; they are never inferred to be content parts.
+
 ## Runtime templates
 
 In your application, save reusable question definitions as `questions.mjs`:

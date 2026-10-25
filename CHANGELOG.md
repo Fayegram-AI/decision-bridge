@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.5
+
+- Add native OpenAI `input_json` and ordered text/image/JSON question content
+  across REST, the common SDK, and CLI validation/evaluation.
+- Add `choiceWithParts`, `noulWithParts`, `scoreWithParts`, and
+  `scoreLevelsWithParts`, with literal answer inference, capability checks, and
+  common result schema version 6. Preserve legacy JSON-text serialization.
+- Include question images in capability budgets and routing metadata; replace
+  recognized image sources before constructing selector context.
+- Add JSON and hosted images to Live user-message items, and content parts to
+  Live questions, configuration, acknowledgements, and session snapshots.
+- Add opt-in Anthropic `json_schema` output and API `2026-10-21` selection through
+  the SDK, CLI flags, environment, and configuration. Keep `tool` output and API
+  `2023-06-01` as defaults.
+- Handle Anthropic JSON text alongside default thinking blocks, preserve strict
+  answer validation, and reject conflicting sampling or output-format parameters
+  before dispatch.
+
 ## 0.1.4
 
 - Add the `/routing` SDK for direct selection and experimental auto routing of

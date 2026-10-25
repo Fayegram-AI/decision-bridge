@@ -2,13 +2,14 @@ import { requireCondition as check } from '../errors.mjs';
 import { cloneJson, isRecord } from '../validation.mjs';
 import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudflare-profile.mjs';
 import { generationOptions } from '../custom/generative/shared.mjs';
+import { anthropicOptions, ANTHROPIC_API_VERSIONS } from '../custom/generative/anthropic-options.mjs';
 import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 import { validateRoutingConfig } from './routing-config.mjs';
 
 export const PROVIDERS = ['jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
 export const PRESETS = ['openai-compatible', 'openrouter', 'anthropic'];
 export const TRANSPORT = ['baseURL', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes'];
-export const GENERATION = ['maxTokens', 'responseFormat', 'tokenParameter', 'parameters', 'noAuth'];
+export const GENERATION = ['maxTokens', 'responseFormat', 'apiVersion', 'tokenParameter', 'parameters', 'noAuth'];
 export const PROVIDER_FIELDS = [...TRANSPORT, ...GENERATION, 'apiKeyEnv', 'model', 'preset', 'module',
     'options', 'accountId', 'rejectIfBusy', 'gateway', 'dangerZone'];
 const FIELDS = new Set(['$schema', 'schemaVersion', 'provider', 'timeoutMs', ...PROVIDER_FIELDS]);
@@ -45,8 +46,10 @@ export function validateConfig(input, { complete = false } = {}) {
         check(Number.isSafeInteger(config[field]) && config[field] >= min && config[field] <= max,
             'Numeric configuration field is out of range.', 'CONFIGURATION_ERROR');
     }
-    check(config.responseFormat === undefined || ['json_schema', 'json_object', 'text'].includes(config.responseFormat),
+    check(config.responseFormat === undefined || ['tool', 'json_schema', 'json_object', 'text'].includes(config.responseFormat),
         'Unsupported responseFormat.', 'CONFIGURATION_ERROR');
+    check(config.apiVersion === undefined || ANTHROPIC_API_VERSIONS.includes(config.apiVersion),
+        'Unsupported Anthropic API version.', 'CONFIGURATION_ERROR');
     check(config.tokenParameter === undefined || ['max_tokens', 'max_completion_tokens'].includes(config.tokenParameter),
         'Unsupported tokenParameter.', 'CONFIGURATION_ERROR');
     for (const field of ['parameters', 'options']) check(config[field] === undefined || isRecord(config[field]),
@@ -79,12 +82,15 @@ export function validateConfig(input, { complete = false } = {}) {
         else if (config.provider !== 'custom-generative') check(GENERATION.every(key => config[key] === undefined),
             'Generation settings require a custom-generative preset.', 'CONFIGURATION_ERROR');
     }
-    if (config.preset === 'anthropic') check(config.responseFormat === undefined && config.tokenParameter === undefined,
-        'Anthropic uses its forced-tool response format.', 'CONFIGURATION_ERROR');
+    if (config.preset === 'anthropic') check(config.tokenParameter === undefined,
+        'Anthropic uses maxTokens rather than tokenParameter.', 'CONFIGURATION_ERROR');
     if (config.preset) {
-        generationOptions(config);
-        check(config.preset !== 'anthropic' || config.parameters?.thinking === undefined,
-            'Forced-tool evaluations do not enable extended thinking.', 'CONFIGURATION_ERROR');
+        if (config.preset === 'anthropic') anthropicOptions(config);
+        else {
+            check(config.apiVersion === undefined && config.responseFormat !== 'tool',
+                'apiVersion and tool response format require the Anthropic preset.', 'CONFIGURATION_ERROR');
+            generationOptions(config);
+        }
     }
     if (config.preset === 'openrouter') check(config.baseURL === undefined,
         'The OpenRouter preset has a fixed endpoint; select preset openai-compatible for another gateway.', 'CONFIGURATION_ERROR');

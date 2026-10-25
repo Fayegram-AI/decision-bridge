@@ -22,10 +22,10 @@ const SAMPLE_PATH = fileURLToPath(new URL('../../examples/request.json', import.
 const BOOLS = ['help', 'version', 'pretty', 'compact', 'no-auth', 'force', 'native', 'reject-if-busy', 'no-reject-if-busy',
     'jev-images', 'no-jev-images', 'jev-long-context', 'no-jev-long-context', 'interactive', 'no-interactive', 'no-routing-prompt'];
 const STRINGS = ['config', 'env-file', 'provider', 'preset', 'model', 'base-url', 'api-key-env', 'timeout-ms',
-  'retries', 'max-tokens', 'response-format', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind', 'route'];
+  'retries', 'max-tokens', 'response-format', 'anthropic-api-version', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind', 'route'];
 const FIELD_MAP = { preset: 'preset', provider: 'provider', model: 'model', 'base-url': 'baseURL', 'api-key-env': 'apiKeyEnv',
   'timeout-ms': 'timeoutMs', retries: 'maxRetries', 'max-tokens': 'maxTokens',
-  'response-format': 'responseFormat', 'token-parameter': 'tokenParameter', 'provider-module': 'module', 'account-id': 'accountId' };
+  'response-format': 'responseFormat', 'anthropic-api-version': 'apiVersion', 'token-parameter': 'tokenParameter', 'provider-module': 'module', 'account-id': 'accountId' };
 
 export const HELP = `decision-bridge ${VERSION} — typed decisions, Jev by default
 
@@ -74,7 +74,8 @@ Options:
   --no-reject-if-busy       Explicitly disable Cloudflare capacity rejection
   --gateway-id ID           Use an existing Cloudflare AI Gateway
   --max-tokens N            Generative output-token budget; default 4096
-  --response-format FORMAT  json_schema (default), json_object, or text
+  --response-format FORMAT  Anthropic: tool (default) or json_schema; chat: json_schema/json_object/text
+  --anthropic-api-version V Anthropic: 2023-06-01 (default) or 2026-10-21
   --token-parameter NAME    max_completion_tokens or max_tokens
   --provider-module FILE    Trusted ESM module; explicitly select a custom path
   --input FILE              Alternative to positional request filename

@@ -15,3 +15,11 @@ export const score = (instructions, criteria) => build({ type: 'score', instruct
 export const scoreLevels = (instructions, levels) => build({ type: 'score', instructions, levels });
 /** One bounding box; use a separate noul to check whether the target is present. */
 export const box = instructions => build({ type: 'box', instructions });
+
+/** Explicit content builders preserve the legacy meaning of instruction arrays. */
+export const choiceWithParts = (instructionParts, criteria) => build({ type: 'choice', instructionParts,
+    ...(Array.isArray(criteria) ? { options: criteria } : { criteria }) });
+export const noulWithParts = (instructionParts, criteria) => build({ type: 'noul', instructionParts,
+    ...(criteria === undefined ? {} : { criteria }) });
+export const scoreWithParts = (instructionParts, criteria) => build({ type: 'score', instructionParts, criteria });
+export const scoreLevelsWithParts = (instructionParts, levels) => build({ type: 'score', instructionParts, levels });

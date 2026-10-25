@@ -4,7 +4,7 @@ The optional command runner evaluates decision files, runs Clairic extraction,
 and validates or replays Live protocol records offline. For application
 integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
 
-Routing registries and inspection require **0.1.4**. Extraction and Live commands
+Routing registries and inspection require **0.1.4 or later**. Extraction and Live commands
 require **0.1.3 or later**; see
 [version availability](../README.md#version-availability).
 
@@ -109,7 +109,7 @@ later configuration changes to control selection.
 ## Routing registries
 
 Auto mode (`--route auto` or a configured `defaultRoute: 'auto'`) is experimental
-in 0.1.4 for both deterministic and decision-assisted policies.
+for both deterministic and decision-assisted policies.
 
 Create a registry template with `init DIRECTORY --route auto`, or
 `extraction init DIRECTORY --route auto`. Load it explicitly on later commands:
@@ -167,8 +167,9 @@ See the [routing guide](../guides/ROUTING.md) for policy and selector requiremen
 | `--timeout-ms N` | Single-provider HTTP and bridge deadline for each evaluation/listing; registry budgets belong in configuration |
 | `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare default to 0, Jev and generative presets to 2 |
 | `--max-tokens N` | Generative output budget; default 4096 |
-| `--response-format MODE` | `json_schema`, `json_object`, or `text`; compatible generative presets only |
-| `--token-parameter NAME` | `max_completion_tokens` or `max_tokens` |
+| `--response-format MODE` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic modes: `tool` (default), `json_schema` |
+| `--anthropic-api-version VERSION` | Anthropic option: `2023-06-01` (default) or `2026-10-21` |
+| `--token-parameter NAME` | Compatible presets: `max_completion_tokens` or `max_tokens` |
 | `--provider-module FILE` | Explicit trusted ESM module; requires custom-decision or custom-generative |
 | `--input FILE` | Alternative to positional request filename |
 | `--output FILE`, `-o FILE` | Atomic file output; `-` means stdout |

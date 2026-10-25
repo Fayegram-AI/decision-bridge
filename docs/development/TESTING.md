@@ -42,7 +42,8 @@ also verify cancellation from a native Windows console.
 - `transport.test.mjs`: HTTP policy, limits, retries, cancellation, and deadlines.
 - `deadlines.test.mjs`: synchronous preparation/dispatch/completion and inherited budgets.
 - `result-validation.test.mjs`: provider-selected precision and policy-hook boundaries.
-- `decisions*.test.mjs`: native/common OpenAI codecs, selectors and model identities, boundaries, preflight, CLI, and smoke-helper fixtures.
+- `decisions*.test.mjs`: native/common OpenAI codecs, explicit JSON/question content, builders, selectors and model identities, boundaries, preflight, CLI, and smoke-helper fixtures.
+- `anthropic*.test.mjs`: tool/JSON output, API versions, response blocks, parameter restrictions, SDK/CLI/schema parity, and loopback commands.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
 - `jev*.test.mjs`: native/common assets, reference substitution, boxes, opt-ins, nullable usage and CLI behavior.
 - `capability-expansion.test.mjs`: conversation/tool history, remote images, cache controls, extension revalidation, service-limit ownership and safe rejection diagnostics.

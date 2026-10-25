@@ -72,9 +72,9 @@ or zero-based level indices. It checks probabilities, derives argmax/weighted
 scores and matching legends, and marks absent usage as unknown. It does not repair
 JSON or strip Markdown, and it omits confidence. `buildPrompt` and `normalizeGenerated`
 independently validate and snapshot the request. They require shared state and
-legacy questions, and reject ordered input, conversation/tool history, remote
-images, prompt-cache controls, typed choices, labelled scores and safety
-identifiers with `UNSUPPORTED_CAPABILITY`. Malformed request JSON raises
+legacy questions, and reject ordered input, `instructionParts`, conversation/tool
+history, remote images, prompt-cache controls, typed choices, labelled scores and
+safety identifiers with `UNSUPPORTED_CAPABILITY`. Malformed request JSON raises
 `VALIDATION_ERROR`; unsupported input is never silently discarded. New modules
 implement their own encoding and normalization for richer capabilities.
 
@@ -110,9 +110,9 @@ produces in response to a prompt, labelled `elicited`. They are not native decis
 probabilities or token logprobs, and the label does not establish that they are
 calibrated. The bridge requires `confidenceSource: 'unavailable'` and rejects
 native-confidence claims or confidence fields on answers. Presets support shared state
-and legacy `choice`, `noul`, and `score`; ordered media, conversation/tool history,
-remote images, prompt-cache controls, typed choices, labelled scores and safety
-identifiers are unsupported. A new module may declare capabilities only after
+and legacy `choice`, `noul`, and `score`; ordered input, `instructionParts`,
+conversation/tool history, remote images, prompt-cache controls, typed choices,
+labelled scores and safety identifiers are unsupported. A new module may declare capabilities only after
 implementing and validating them.
 
 ## OpenAI-compatible servers
@@ -156,13 +156,64 @@ protocols require an explicit [custom provider](CUSTOM_PROVIDERS.md).
 
 ## Anthropic
 
-The provider sends Messages API headers `x-api-key` and
-`anthropic-version: 2023-06-01`. It defines a synthetic `submit_decisions` tool whose
-input schema is the expected answer object, then forces exactly that tool. The
-returned `tool_use.input` carries the data; **no tool is executed** and no follow-up
-agent cycle is started.
+The provider sends Messages API headers `x-api-key` and `anthropic-version`.
+Its defaults are API `2023-06-01` and `responseFormat: 'tool'`. Tool mode defines
+and forces a synthetic `submit_decisions` tool whose input schema is the expected
+answer object. The returned `tool_use.input` carries the data; no tool is executed
+and no follow-up agent cycle is started.
 
-Extended thinking is not enabled in this forced-tool strategy; a `thinking`
-parameter is rejected. Refusals, truncated output, unexpected stop reasons, and
-missing/extra named tools fail. `GET /v1/models` returns the first page with
-`has_more` / `last_id` preserved. Automatic pagination is not implemented.
+### JSON output and API versions
+
+Configure these two independent options through `createGenerativeProvider` or
+`AnthropicProvider`:
+
+| Option | Values | Default |
+| --- | --- | --- |
+| `responseFormat` | `tool`, `json_schema` | `tool` |
+| `apiVersion` | `2023-06-01`, `2026-10-21` | `2023-06-01` |
+
+```javascript
+const provider = createGenerativeProvider({
+    type: 'anthropic',
+    model: 'claude-sonnet-5-5',
+    responseFormat: 'json_schema',
+    apiVersion: '2026-10-21',
+    parameters: { output_config: { effort: 'medium' } },
+});
+```
+
+Set `ANTHROPIC_API_KEY` through your application's environment. JSON mode sends
+the answer schema in `output_config.format`, without tools. It requires an
+`end_turn` completion, joins text blocks in order and parses the JSON strictly.
+Default `thinking` and `redacted_thinking` response blocks are ignored during
+answer extraction. Unexpected blocks, malformed JSON and invalid probabilities
+fail; Markdown is not stripped. Results retain elicited probabilities and no
+native confidence. `meta.responseFormat` reports the selected mode.
+
+Choose a model that supports the selected output mode. For example,
+[Sonnet 5.5 rejects forced tool choice](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide#forced-tool-use-is-not-supported),
+so use JSON mode for this decision-output workflow. The SDK does not infer a mode
+from the model ID or retry using another mode/version. See Anthropic's
+[structured-output contract](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+
+API `2026-10-21` rejects `temperature`, `top_p` and `top_k`; the SDK and offline
+CLI reject their presence locally, including null/default values. API
+`2023-06-01` preserves their passthrough, subject to model support. Selecting a
+version does not change the output mode. See the
+[API migration guide](https://platform.claude.com/docs/en/api/migration-2026-10-21).
+
+Explicit `parameters.thinking` is rejected in both modes. The default `maxTokens`
+remains 4096; on models with default thinking, that budget also covers thinking
+tokens. Set the budget explicitly when needed. Other `output_config` fields,
+such as `effort`, are preserved; `output_config.format` and deprecated
+`output_format` are reserved for the adapter and cannot be supplied in parameters.
+
+The CLI accepts `--response-format tool|json_schema` and
+`--anthropic-api-version 2023-06-01|2026-10-21`. Their environment equivalents are
+`DECISION_RESPONSE_FORMAT` and `DECISION_ANTHROPIC_API_VERSION`. Flags take
+precedence over environment, configuration and defaults. See the
+[modern configuration example](../../examples/anthropic-json.config.json).
+
+Refusals, truncated output, unexpected stop reasons, and invalid output fail in
+both modes. `GET /v1/models` uses the selected version and returns the first page
+with `has_more` / `last_id` preserved. Automatic pagination is not implemented.

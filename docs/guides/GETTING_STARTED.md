@@ -14,19 +14,25 @@ web origin through CORS and a credential suitable for browser use. See
 
 ## Install into your application
 
-For **0.1.4**, download `fayegram-ai-decision-bridge-0.1.4.tgz` from the
-[GitHub release](https://github.com/Fayegram-AI/decision-bridge/releases/tag/decision-bridge-v0.1.4).
-Choose the `.tgz` package asset. From your application's directory, install the
-downloaded file, adjusting the path as needed:
-
-```bash
-npm install ./fayegram-ai-decision-bridge-0.1.4.tgz
-```
-
-To install the latest version published to npm:
+From your application's directory, install the latest version published to npm:
 
 ```bash
 npm install @fayegram-ai/decision-bridge
+```
+
+To pin the documented **0.1.5** release:
+
+```bash
+npm install @fayegram-ai/decision-bridge@0.1.5
+```
+
+You can also download `fayegram-ai-decision-bridge-0.1.5.tgz` from the
+[GitHub release](https://github.com/Fayegram-AI/decision-bridge/releases/tag/decision-bridge-v0.1.5).
+Choose the `.tgz` package asset and install the downloaded file, adjusting its path
+as needed:
+
+```bash
+npm install ./fayegram-ai-decision-bridge-0.1.5.tgz
 ```
 
 See [packaging and release](../development/RELEASING.md) to build and verify an

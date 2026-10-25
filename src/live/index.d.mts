@@ -1,5 +1,5 @@
 import type { CallOptions, ErrorDetails, JsonValue } from '../index.mjs';
-import type { NativeDecisionQuestion, NativeDecisionAnswer, OpenAIDecisionResponse } from '../decisions.mjs';
+import type { NativeDecisionQuestion, NativeDecisionQuestionPart, NativeDecisionAnswer, OpenAIDecisionResponse } from '../decisions.mjs';
 
 export type LiveTranscriptType = 'session.input_transcript.delta' | 'session.output_transcript.delta';
 export interface LiveDecisionsConfiguration {
@@ -10,8 +10,7 @@ export interface LiveDecisionsConfiguration {
 }
 export interface LiveDecisionItem {
     readonly id?: string | null; readonly role: 'user'; readonly type?: 'message';
-    readonly content: string | readonly ({ readonly type: 'input_text'; readonly text: string }
-        | { readonly type: 'input_image'; readonly image_url: string; readonly detail?: 'low' | 'high' | 'auto' | 'original' | null })[];
+    readonly content: string | readonly NativeDecisionQuestionPart[];
 }
 export type LiveCommand = (
     | { readonly type: 'session.update'; readonly session: LiveDecisionsConfiguration }

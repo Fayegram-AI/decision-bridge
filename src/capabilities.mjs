@@ -12,6 +12,7 @@ export const LEGACY_CAPABILITIES = freezeJson({
     audio: false, videos: false, maxAudioClips: 0, maxVideos: 0,
     boxes: false,
     conversation: false, toolHistory: false, remoteImages: false, promptCaching: false,
+    jsonInput: false, questionContent: false,
 });
 
 const CLOUDFLARE_CAPABILITIES = freezeJson({
@@ -52,7 +53,7 @@ export function providerCapabilities(provider, model) {
         'Invalid capability profile.', 'CONFIGURATION_ERROR');
     const result = { ...LEGACY_CAPABILITIES, ...profile };
     for (const key of ['supported', 'orderedInput', 'images', 'typedChoices', 'labeledScores', 'safetyIdentifier', 'audio', 'videos', 'boxes',
-        'conversation', 'toolHistory', 'remoteImages', 'promptCaching']) {
+        'conversation', 'toolHistory', 'remoteImages', 'promptCaching', 'jsonInput', 'questionContent']) {
         check(typeof result[key] === 'boolean', 'Capability flags must be boolean.', 'CONFIGURATION_ERROR');
     }
     for (const key of ['maxImages', 'maxChoiceOptions', 'maxScoreLevels', 'maxAudioClips', 'maxVideos']) {
@@ -62,34 +63,35 @@ export function providerCapabilities(provider, model) {
     return freezeJson(result);
 }
 
+function conversationParts(request) {
+    return request.conversation?.flatMap(item => Array.isArray(item.content) ? item.content
+        : Array.isArray(item.output) ? item.output : []) ?? [];
+}
+
 /** Run before dispatch, including when a provider is used without a bridge. */
 export function assertCapabilities(request, capabilities) {
     const requireFeature = (condition, feature) => check(condition,
         `Selected provider/model does not support ${feature}.`, 'UNSUPPORTED_CAPABILITY');
     requireFeature(capabilities.supported, 'this model');
+    const historyParts = conversationParts(request);
+    const questionParts = Object.values(request.questions).flatMap(q => q.instructionParts ?? []);
+    const parts = [...(request.input ?? []), ...historyParts, ...questionParts];
+    const images = parts.filter(part => ['image', 'input_image'].includes(part.type));
+    if (images.length) requireFeature(capabilities.images, 'image input');
+    requireFeature(capabilities.maxImages === null || images.length <= capabilities.maxImages, 'this image count');
+    if (images.some(part => Object.hasOwn(part, 'url') || /^https?:/i.test(part.image_url))) {
+        requireFeature(capabilities.remoteImages, 'remote images');
+    }
+    if (parts.some(part => ['json', 'input_json'].includes(part.type))) requireFeature(capabilities.jsonInput, 'JSON input');
     if (Object.hasOwn(request, 'conversation')) {
         requireFeature(capabilities.conversation, 'conversation input');
         if (request.conversation.some(item => !Object.hasOwn(item, 'role'))) requireFeature(capabilities.toolHistory, 'tool history');
-        const parts = request.conversation.flatMap(item => Array.isArray(item.content) ? item.content
-            : Array.isArray(item.output) ? item.output : []);
-        const images = parts.filter(part => part.type === 'input_image');
-        if (images.length) requireFeature(capabilities.images, 'image input');
-        requireFeature(capabilities.maxImages === null || images.length <= capabilities.maxImages, 'this image count');
-        if (parts.some(part => part.type === 'input_image' && /^https?:/i.test(part.image_url))) {
-            requireFeature(capabilities.remoteImages, 'remote images');
-        }
-        if (parts.some(part => Object.hasOwn(part, 'prompt_cache_breakpoint'))) requireFeature(capabilities.promptCaching, 'prompt caching');
+        if (historyParts.some(part => Object.hasOwn(part, 'prompt_cache_breakpoint'))) requireFeature(capabilities.promptCaching, 'prompt caching');
     }
     if (Object.hasOwn(request, 'promptCacheKey') || Object.hasOwn(request, 'promptCacheOptions') ||
         request.input?.some(part => Object.hasOwn(part, 'promptCacheBreakpoint'))) requireFeature(capabilities.promptCaching, 'prompt caching');
     if (Object.hasOwn(request, 'input')) {
         requireFeature(capabilities.orderedInput, 'ordered input');
-        const images = request.input.filter(part => part.type === 'image').length;
-        if (request.input.some(part => part.type === 'image' && Object.hasOwn(part, 'url'))) {
-            requireFeature(capabilities.remoteImages, 'remote images');
-        }
-        if (images) requireFeature(capabilities.images, 'image input');
-        requireFeature(capabilities.maxImages === null || images <= capabilities.maxImages, 'this image count');
         for (const [kind, flag, limit] of [['audio', 'audio', 'maxAudioClips'], ['video', 'videos', 'maxVideos']]) {
             const count = request.input.filter(part => part.type === kind).length;
             if (count) {
@@ -100,6 +102,7 @@ export function assertCapabilities(request, capabilities) {
     }
     if (Object.hasOwn(request, 'safetyIdentifier')) requireFeature(capabilities.safetyIdentifier, 'safetyIdentifier');
     for (const q of Object.values(request.questions)) {
+        if (Object.hasOwn(q, 'instructionParts')) requireFeature(capabilities.questionContent, 'question content');
         if (q.type === 'box') requireFeature(capabilities.boxes, 'box questions');
         if (q.options) requireFeature(capabilities.typedChoices, 'typed choices');
         if (q.levels) requireFeature(capabilities.labeledScores, 'labelled scores');
@@ -112,6 +115,8 @@ export function assertCapabilities(request, capabilities) {
 }
 
 export function commonSchemaVersion(request) {
+    if (Object.values(request.questions).some(q => Object.hasOwn(q, 'instructionParts')) ||
+        request.input?.some(part => part.type === 'json') || conversationParts(request).some(part => part.type === 'input_json')) return 6;
     if (Object.hasOwn(request, 'conversation') || Object.hasOwn(request, 'promptCacheKey') ||
         Object.hasOwn(request, 'promptCacheOptions') || request.input?.some(part =>
         Object.hasOwn(part, 'url') || Object.hasOwn(part, 'promptCacheBreakpoint'))) return 5;

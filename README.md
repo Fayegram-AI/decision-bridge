@@ -21,9 +21,9 @@ decisions. The generative entry point includes OpenAI-compatible, OpenRouter, an
 Anthropic presets. The bridge gives your application a shared request and result format;
 each provider translates that format for its service.
 
-[OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) also supports ordered text/image
-input, typed string/boolean choices, labelled scores, conversation/tool history, remote
-images, prompt caching, and dedicated native access.
+[OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) also supports ordered text/image/JSON
+input, question-specific content, typed string/boolean choices, labelled scores,
+conversation/tool history, remote images, prompt caching, and dedicated native access.
 [Cloudflare Clef, Clef-flash, and Clef-omni](docs/guides/CLOUDFLARE_DECISIONS.md)
 provide the shared bridge API and direct native access, embedded images, typed choices,
 labelled scores, REST, Workers AI bindings, and optional AI Gateway routing. Omni
@@ -31,9 +31,10 @@ additionally supports embedded WAV/MP3 audio and MP4/WebM video, ordered images 
 → videos → text. The shared API checks that the selected provider and model support your
 request before sending it. A provider refusal returns an error.
 
-**Version 0.1.4 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.5 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
-These docs cover 0.1.4. For feature requirements and version history, see
+These docs cover 0.1.5.
+For feature requirements and version history, see
 [version availability](docs/README.md#version-availability) and the
 [changelog](CHANGELOG.md). Start with the
 [installation options](docs/guides/GETTING_STARTED.md#install-into-your-application).
@@ -90,7 +91,7 @@ These operations have dedicated `/extraction` and `/live` package exports.
 The [routing API](docs/guides/ROUTING.md) lets you choose a target directly or
 have auto mode choose from the targets you've enabled. Auto mode can follow your
 rules, use a decision model, or ask for clarification when the choice is unclear.
-**Auto mode is experimental in 0.1.4.**
+**Auto mode is experimental.**
 
 Each service controls its quotas and which requests it accepts. The SDK checks request
 structure and the resource limits you configure, and reports structured errors when a
@@ -104,7 +105,7 @@ All native providers support shared state and the common `choice`, `noul`, and
 | Provider | Additional supported features | Guide |
 | --- | --- | --- |
 | Jev | Native decisions, opt-in images, boxes, and long context through TypeSafe | [Jev guide](docs/guides/JEV.md) |
-| OpenAI Decisions | Ordered text/images, conversation/tool history, remote images, prompt caching, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
+| OpenAI Decisions | Ordered text/image/JSON input, question content, conversation/tool history, remote images, prompt caching, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
 | Cloudflare Clef / Clef-flash | Embedded images before text, typed choices, labelled scores, native access, Workers AI binding, optional Gateway | [Cloudflare decisions](docs/guides/CLOUDFLARE_DECISIONS.md) |
 | Cloudflare Clef-omni | The same decision and transport features, plus embedded audio/video | [Omni media and limits](docs/guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video) |
 | Custom decision service | Explicit decision provider contract | [Custom decision providers](docs/guides/CUSTOM_DECISION.md) |
@@ -128,10 +129,10 @@ in your application's directory:
 npm install @fayegram-ai/decision-bridge
 ```
 
-For 0.1.4, including routing, follow the
-[release archive installation](docs/guides/GETTING_STARTED.md#install-into-your-application).
-The npm command installs the latest version published to the registry. The installed
-SDK runs without a compilation step.
+The npm command installs the latest version published to the registry. See
+[installation options](docs/guides/GETTING_STARTED.md#install-into-your-application)
+to pin 0.1.5 or install a release archive. The installed SDK runs without a
+compilation step.
 
 Create `.env` in your application's directory and set your TypeSafe API key:
 
@@ -228,10 +229,14 @@ The `custom/generative` entry point also exports the other presets. For OpenRout
 with `OPENROUTER_API_KEY`. For Anthropic, use
 `new AnthropicProvider({ model: 'your-account-model-id' })` with
 `ANTHROPIC_API_KEY`. Each preset requires an explicit model ID available to your account.
+Anthropic offers `tool` and `json_schema` output with explicit API-version
+selection. The model must support the selected output mode; see
+[Anthropic output settings](docs/guides/CUSTOM_GENERATIVE.md#anthropic).
 
-A server may implement only JSON-object or text output. Select that mode explicitly
-with `responseFormat: 'json_object'` or `'text'`; the client still validates every
-answer. It never silently downgrades formats, repairs JSON, or changes models.
+For OpenAI-compatible and OpenRouter endpoints that support only JSON-object or
+text output, select `responseFormat: 'json_object'` or `'text'` explicitly. The
+client still validates every answer. It never silently downgrades formats,
+repairs JSON, or changes models.
 
 ## Optional command runner
 

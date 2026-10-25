@@ -4,11 +4,45 @@ import { createDecisionRouter } from '../src/routing/index.mjs';
 import { DecisionError } from '../src/errors.mjs';
 import { registry, worker, selector, routingRequest as request } from './routing-fixtures.mjs';
 import { image } from './decisions-fixtures.mjs';
+import { noulWithParts } from '../src/index.mjs';
 
 function assisted(policy = {}, routes = {}) {
     return registry({ policy: 'decision-assisted', selector: { route: 'judge', minProbability: 0.6, minMargin: 0.1 }, ...policy },
         { judge: { provider: selector() }, ...routes });
 }
+
+test('question images are sanitized for selectors while JSON data remains opaque', async () => {
+    const instructionParts = [{ type: 'text', text: 'Compare.' },
+        { type: 'json', data: { image_url: 'ordinary data', type: 'image', dataUrl: 'opaque reference' } },
+        { type: 'image', dataUrl: image }, { type: 'image', url: 'https://example.com/private-reference.png' }];
+    const capabilities = { orderedInput: true, jsonInput: true, questionContent: true, images: true, remoteImages: true, maxImages: 2 };
+    let context;
+    let received;
+    const judge = selector(input => { context = JSON.parse(input.state); return selector().evaluate(input); });
+    const a = worker('a', input => { received = input; return worker('a').evaluate(input); }, capabilities);
+    const router = createDecisionRouter(assisted({}, { a: { provider: a }, b: { provider: worker('b', undefined, capabilities) }, judge: { provider: judge } }));
+    const result = await router.evaluate({ input: [{ type: 'json', data: { ticket: 42 } }],
+        questions: { yes: noulWithParts(instructionParts) } }, { routingDescription: 'Summarized task' });
+    assert.equal(result.meta.schemaVersion, 6);
+    const serialized = JSON.stringify(context);
+    assert(!serialized.includes('base64') && !serialized.includes('private-reference.png'));
+    assert.deepEqual(context.task.schema.yes.instructionParts[1], instructionParts[1]);
+    assert.equal(context.task.media.length, 2);
+    assert.equal(context.task.media[1].remote, true);
+    assert.deepEqual(received.questions.yes.instructionParts, instructionParts);
+});
+
+test('JSON-only input uses text routing rules and unsupported content routes are excluded', async () => {
+    const capabilities = { orderedInput: true, jsonInput: true };
+    const router = createDecisionRouter(registry({ rules: [{ effect: 'require', when: { modalities: ['text'] }, routes: ['a'] }] },
+        { a: { provider: worker('a', undefined, capabilities) }, b: { provider: worker('b', undefined, capabilities) } }));
+    const json = { input: [{ type: 'json', data: {} }], questions: request.questions };
+    assert.equal((await router.evaluate(json)).meta.routing.selectedRoute, 'a');
+    const filtered = createDecisionRouter(registry({}, { a: { provider: worker('a', undefined, capabilities) } }));
+    const report = filtered.inspect(json);
+    assert.equal(report.routes.find(route => route.id === 'b').status, 'unsupported');
+    assert.equal((await filtered.evaluate(json)).meta.routing.selectedRoute, 'a');
+});
 
 test('unattended decision-assisted requires selector even with one target; ready selector bypasses inference for deterministic outcomes', async () => {
     let calls = 0;

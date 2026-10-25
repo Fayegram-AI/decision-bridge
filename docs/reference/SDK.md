@@ -6,7 +6,7 @@ JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source chec
 the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
 declarations in `src/index.d.mts`.
 
-This reference covers **0.1.4**, including the routing API described below.
+This reference covers **0.1.5**.
 See [version availability](../README.md#version-availability).
 
 ## Create a bridge
@@ -84,12 +84,16 @@ resolve to upstream IDs within the provider. No default is assumed for a generat
 independent transport timeout, including Workers AI binding calls.
 
 Ordered parts are `{ type: 'text', text }`, `{ type: 'image', dataUrl, detail? }`,
-`{ type: 'image', url, detail? }`, `{ type: 'audio', dataUrl }`, or
-`{ type: 'video', dataUrl }`. Image `url` and `dataUrl` are exclusive. Text/image
+`{ type: 'image', url, detail? }`, `{ type: 'json', data }`,
+`{ type: 'audio', dataUrl }`, or `{ type: 'video', dataUrl }`.
+Image `url` and `dataUrl` are exclusive. Text/image
 parts may carry `promptCacheBreakpoint`. Remote HTTP(S) images and cache controls
 require their respective capabilities and are forwarded without URL fetching or
 cache-policy selection. `conversation` uses the native Decisions input-item union;
 see [conversation and prompt caching](../guides/OPENAI_DECISIONS.md#conversation-and-prompt-caching).
+JSON `data` accepts an object or array of objects. JSON parts require `jsonInput`
+and do not accept cache breakpoints. User conversation content uses the native
+`input_json` spelling.
 Audio/video are supported by Cloudflare Clef-omni and explicitly capable custom providers; other
 built-ins reject them before dispatch. Cloudflare requires images → audio →
 videos → text. Its media use embedded data URLs, with format and client-budget
@@ -130,13 +134,25 @@ be any JSON values. JSON snapshots reject `undefined`, cycles, non-finite number
 functions, dates, class instances, accessors, symbols, sparse arrays, and extra or
 non-enumerable array/object properties. Limits: nesting depth 100, 200,000 nodes.
 
-`questions` is a nonempty object keyed by application-owned identifiers. Every
-question requires non-null `instructions`: nonempty text, a JSON object, or an
-array. Descriptions can be text or structured JSON. Only choice descriptions permit
+`questions` is a nonempty object keyed by application-owned identifiers. Legacy
+questions require non-null `instructions`: nonempty text, a JSON object, or an
+array. The `instructionParts` alternative requires a nonempty ordered
+array of text/image/JSON parts and the `questionContent` capability. Supply
+exactly one instruction field; boxes retain `instructions` only. JSON parts
+additionally require `jsonInput`; question images require image capabilities
+and share the input image budget. Question parts accept no cache controls.
+Descriptions can be text or structured JSON. Only choice descriptions permit
 raw null. Question IDs and legacy choice-map keys must be nonempty; typed string
 choice values may be empty. Request and question unknown fields are rejected.
 
 ### Question builders
+
+Content builders are `choiceWithParts(parts, criteriaOrOptions)`,
+`noulWithParts(parts, criteria?)`, `scoreWithParts(parts, criteria)` and
+`scoreLevelsWithParts(parts, levels)`. Their criteria, results and literal type
+inference match the existing builders. `QuestionInstructionPart`,
+`QuestionInstructionParts`, `DecisionJsonData` and `QuestionWithParts<Q>` describe
+these forms. Existing builders continue treating instruction arrays as JSON data.
 
 ```javascript
 const q1 = choice('Which queue should receive this?', {
@@ -249,7 +265,8 @@ are immutable. Standalone common `validateRequest` and `validateResult` return
 snapshots without freezing them; dedicated extraction and Live validators return
 frozen snapshots.
 
-`schemaVersion` is selected by the highest applicable feature: 5 for conversation,
+`schemaVersion` is selected by the highest applicable feature: 6 for explicit JSON
+parts or `instructionParts`; 5 for conversation,
 remote-image URLs or prompt-cache controls; 4 for boxes; 3 for audio/video; 2 for
 ordered images/text, typed choices, labelled scores or a safety identifier; and
 1 for legacy requests. The separate `schemaVersion` field in
@@ -330,7 +347,7 @@ configured targets and preserve each operation's request format, result format a
 labels describing where probabilities come from. They are separate from `createBridge`
 and the single-provider batch functions.
 
-Auto mode (`route: 'auto'`) is experimental in 0.1.4 for both deterministic and
+Auto mode (`route: 'auto'`) is experimental for both deterministic and
 decision-assisted policies.
 
 | API | Contract |
@@ -412,6 +429,12 @@ factory selects native decision providers.
 | `custom/decision` | `defineDecisionProvider` | `DecisionProviderDefinition`; `DecisionProvider` |
 | `custom/generative` | `defineGenerativeProvider`, `createGenerativeProvider`, `OpenAICompatibleProvider`, `OpenRouterProvider`, `AnthropicProvider` | `GenerativeProvider`, definition/config, and preset options |
 | `custom/generative` | `buildResponseSchema`, `buildPrompt`, `parseGeneratedJson`, `normalizeGenerated` | Typed legacy generative strategy helpers |
+
+`AnthropicOptions` supports `responseFormat: 'tool' | 'json_schema'` and
+`apiVersion: '2023-06-01' | '2026-10-21'`. Defaults remain `tool` and `2023-06-01`.
+The options are independent and apply through `createGenerativeProvider` too.
+See [Anthropic output and version settings](../guides/CUSTOM_GENERATIVE.md#json-output-and-api-versions)
+for parameter restrictions, thinking-block handling and canonical result semantics.
 
 Import these as package subpaths under `@fayegram-ai/decision-bridge/`. All SDK
 entry points are browser-safe ESM. Definition helpers preserve callback receivers

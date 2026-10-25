@@ -4,10 +4,11 @@ import { isRecord, validateRequest } from '../../validation.mjs';
 import { assertCapabilities, LEGACY_CAPABILITIES } from '../../capabilities.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../../transport.mjs';
 import { environmentValue } from '../../runtime-env.mjs';
-import { buildPrompt, buildResponseSchema, normalizeGenerated } from './schema.mjs';
-import { generationOptions, anthropicUsage } from './shared.mjs';
+import { buildPrompt, buildResponseSchema, normalizeGenerated, parseGeneratedJson } from './schema.mjs';
+import { anthropicUsage } from './shared.mjs';
+import { anthropicOptions } from './anthropic-options.mjs';
 
-/** Uses one forced, non-executed tool as an output schema, not an agent tool loop. */
+/** Explicit structured JSON or one synthetic, non-executed output tool. */
 export class AnthropicProvider {
   getCapabilities() { return LEGACY_CAPABILITIES; }
   name = 'anthropic';
@@ -18,31 +19,34 @@ export class AnthropicProvider {
 
   constructor(options = {}) {
     const { apiKey, model, baseURL = 'https://api.anthropic.com',
-    maxTokens = 4096, parameters = {}, ...transportOptions } = optionsObject(options,
-      ['apiKey', 'model', 'baseURL', 'maxTokens', 'parameters', ...TRANSPORT_FIELDS], 'Anthropic options');
+    maxTokens = 4096, parameters = {}, responseFormat = 'tool', apiVersion = '2023-06-01', ...transportOptions } = optionsObject(options,
+      ['apiKey', 'model', 'baseURL', 'maxTokens', 'parameters', 'responseFormat', 'apiVersion', ...TRANSPORT_FIELDS], 'Anthropic options');
     const endpoint = parseBaseURL(baseURL, { originOnly: true });
     const supplied = apiKey === undefined && endpoint.origin === 'https://api.anthropic.com'
       ? environmentValue('ANTHROPIC_API_KEY') : apiKey;
     const key = validateApiKey(supplied, 'ANTHROPIC_API_KEY');
-    this.#options = generationOptions({ model, maxTokens, parameters });
-    check(this.#options.parameters.thinking === undefined,
-      'Forced-tool evaluations do not enable extended thinking.', 'CONFIGURATION_ERROR');
+    this.#options = anthropicOptions({ model, maxTokens, parameters, responseFormat, apiVersion });
     this.defaultModel = this.#options.model;
     this.#transport = new JsonTransport({ ...transportOptions, baseURL: endpoint.baseURL,
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, secrets: [key] });
+      headers: { 'x-api-key': key, 'anthropic-version': this.#options.apiVersion }, secrets: [key] });
   }
 
   async evaluate(input, options = {}) {
     const request = validateRequest(input, this.defaultModel ?? '');
     assertCapabilities(request, this.getCapabilities(request.model));
     const prompt = buildPrompt(request);
-    const body = { ...this.#options.parameters, model: request.model,
-      max_tokens: this.#options.maxTokens, stream: false, system: prompt.system,
+    const { parameters, maxTokens, responseFormat } = this.#options;
+    const body = { ...parameters, model: request.model,
+      max_tokens: maxTokens, stream: false, system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }],
-      tools: [{ name: 'submit_decisions', description: 'Return only the requested decision probabilities.',
-        input_schema: buildResponseSchema(request.questions) }],
-      tool_choice: { type: 'tool', name: 'submit_decisions', disable_parallel_tool_use: true },
     };
+    const schema = buildResponseSchema(request.questions);
+    if (responseFormat === 'json_schema') {
+      body.output_config = { ...parameters.output_config, format: { type: 'json_schema', schema } };
+    } else {
+      body.tools = [{ name: 'submit_decisions', description: 'Return only the requested decision probabilities.', input_schema: schema }];
+      body.tool_choice = { type: 'tool', name: 'submit_decisions', disable_parallel_tool_use: true };
+    }
     const { data, meta } = await this.#transport.request('POST', '/v1/messages', body, options);
     return withResponseMeta(meta, () => {
       check(isRecord(data) && !data.error && Array.isArray(data.content), 'Invalid Messages response.', 'INVALID_RESPONSE');
@@ -52,12 +56,22 @@ export class AnthropicProvider {
       if (data.stop_reason === 'max_tokens' || data.stop_reason === 'model_context_window_exceeded') {
         throw new DecisionError('Model output was truncated; adjust input or maxTokens explicitly.', { code: 'TRUNCATED_OUTPUT', ...meta });
       }
-      check(data.stop_reason === 'tool_use', 'Provider did not return the required decision output.', 'INVALID_RESPONSE');
-      const tools = data.content.filter(block => isRecord(block) && block.type === 'tool_use');
-      check(tools.length === 1 && tools[0].name === 'submit_decisions',
-        'Provider must return exactly one submit_decisions result.', 'INVALID_RESPONSE');
-      return normalizeGenerated(tools[0].input, request, { model: data.model,
-        usage: anthropicUsage(data.usage), meta: { ...meta, provider: this.name, responseFormat: 'tool' } });
+      let payload;
+      if (responseFormat === 'json_schema') {
+        check(data.stop_reason === 'end_turn', 'Provider did not finish a JSON response normally.', 'INVALID_RESPONSE');
+        check(data.content.every(block => isRecord(block) && ['text', 'thinking', 'redacted_thinking'].includes(block.type) &&
+          (block.type !== 'text' || typeof block.text === 'string')), 'Unexpected content in JSON response.', 'INVALID_RESPONSE');
+        // Preserve exact text order; thinking is never parsed or copied into result metadata.
+        payload = parseGeneratedJson(data.content.filter(block => block.type === 'text').map(block => block.text).join(''));
+      } else {
+        check(data.stop_reason === 'tool_use', 'Provider did not return the required decision output.', 'INVALID_RESPONSE');
+        const tools = data.content.filter(block => isRecord(block) && block.type === 'tool_use');
+        check(tools.length === 1 && tools[0].name === 'submit_decisions',
+          'Provider must return exactly one submit_decisions result.', 'INVALID_RESPONSE');
+        payload = tools[0].input;
+      }
+      return normalizeGenerated(payload, request, { model: data.model,
+        usage: anthropicUsage(data.usage), meta: { ...meta, provider: this.name, responseFormat } });
     });
   }
 

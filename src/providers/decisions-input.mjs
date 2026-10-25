@@ -1,6 +1,6 @@
 import { requireCondition as check } from '../errors.mjs';
 import { isRecord } from '../validation.mjs';
-import { validateImageSource } from '../input.mjs';
+import { validateImageSource, validateJsonInputData } from '../input.mjs';
 
 const own = (value, key) => Object.hasOwn(value, key);
 export function fields(value, allowed, required, label, code = 'VALIDATION_ERROR') {
@@ -22,16 +22,21 @@ export function validateCacheOptions(value) {
     check(value.ttl === undefined || value.ttl === '30m', 'Unsupported Decisions cache TTL.');
 }
 
-function inputPart(part, textOnly = false) {
+/** Explicit contexts prevent user JSON and shared cache fields leaking into other parts. */
+export function validateDecisionContentPart(part, { textOnly = false, json = false, cache = true } = {}) {
+    const cacheFields = cache ? ['prompt_cache_breakpoint'] : [];
     if (part?.type === 'input_text') {
-        fields(part, ['type', 'text', 'prompt_cache_breakpoint'], ['type', 'text'], 'input text');
+        fields(part, ['type', 'text', ...cacheFields], ['type', 'text'], 'input text');
         text(part.text, 'Input text');
+    } else if (!textOnly && json && part?.type === 'input_json') {
+        fields(part, ['type', 'data'], ['type', 'data'], 'input JSON');
+        validateJsonInputData(part.data);
     } else {
         check(!textOnly && part?.type === 'input_image', 'Unsupported input content.');
-        fields(part, ['type', 'image_url', 'detail', 'prompt_cache_breakpoint'], ['type', 'image_url'], 'input image');
+        fields(part, ['type', 'image_url', 'detail', ...cacheFields], ['type', 'image_url'], 'input image');
         validateImageSource(part.image_url, part.detail);
     }
-    validateCacheBreakpoint(part.prompt_cache_breakpoint);
+    if (cache) validateCacheBreakpoint(part.prompt_cache_breakpoint);
 }
 
 function outputPart(part) {
@@ -61,7 +66,7 @@ export function validateDecisionInput(input) {
                 check(Array.isArray(item.content) && item.content.length > 0, 'Message requires ordered content.');
                 for (const part of item.content) {
                     if (item.role === 'assistant') outputPart(part);
-                    else inputPart(part, item.role === 'system' || item.role === 'developer');
+                    else validateDecisionContentPart(part, { textOnly: item.role !== 'user', json: item.role === 'user' });
                 }
             }
             continue;
@@ -84,7 +89,7 @@ export function validateDecisionInput(input) {
             check(calls.get(item.call_id) === item.type.replace('_output', ''), 'Tool output requires a matching preceding call.');
             if (typeof item.output !== 'string') {
                 check(Array.isArray(item.output) && item.output.length > 0, 'Tool output requires text or ordered content.');
-                item.output.forEach(part => inputPart(part));
+                item.output.forEach(part => validateDecisionContentPart(part));
             }
         }
     }
@@ -96,7 +101,10 @@ export function validateDecisionQuestions(questions) {
         check(isRecord(q) && ['predicate', 'choice', 'score'].includes(q.type), 'Unsupported native question type.');
         const extra = q.type === 'choice' ? ['choices'] : q.type === 'score' ? ['levels'] : [];
         fields(q, ['type', 'name', 'instructions', ...extra], ['type', 'instructions', ...extra], 'question');
-        text(q.instructions, 'Instructions');
+        if (typeof q.instructions !== 'string') {
+            check(Array.isArray(q.instructions) && q.instructions.length > 0, 'Instructions must be text or nonempty content parts.');
+            q.instructions.forEach(part => validateDecisionContentPart(part, { json: true, cache: false }));
+        }
         if (own(q, 'name')) text(q.name, 'Question name');
         if (q.type === 'choice') {
             check(Array.isArray(q.choices) && q.choices.length >= 2, 'choices requires at least two options.');

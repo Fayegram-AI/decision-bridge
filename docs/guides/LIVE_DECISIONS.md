@@ -68,9 +68,14 @@ delta, and `decisions: { questions }`. Trigger arrays replace the trigger list;
 an empty list disables them. Omitted fields preserve server configuration.
 Questions use the native predicate/choice/score representation.
 
-Decision items are user messages containing text or embedded image parts. Live
-items do not inherit the HTTP Decisions conversation, remote-image or cache
-input extensions. Item creation appends evidence for later evaluations; it does
+Decision items are user messages containing text, images, or `input_json` parts.
+Images use embedded data URLs or publicly accessible HTTP(S) URLs. JSON
+`data` accepts an object or array of objects. Questions also accept ordered
+`input_text`, `input_image` and `input_json` instruction parts, using the
+[native content contract](OPENAI_DECISIONS.md#json-and-question-content).
+These forms are validated in commands, acknowledgements and session snapshots.
+Live items remain user messages and accept no cache controls.
+Item creation appends evidence for later evaluations; it does
 not itself request evaluation. IDs are generated uniquely for commands.
 
 An application can execute a selected action, append its confirmed outcome with
