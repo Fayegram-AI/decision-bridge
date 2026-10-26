@@ -131,7 +131,7 @@ npm install @fayegram-ai/decision-bridge
 
 The npm command installs the latest version published to the registry. See
 [installation options](docs/guides/GETTING_STARTED.md#install-into-your-application)
-to pin 0.1.5 or install a release archive. The installed SDK runs without a
+to pin 0.1.5 or install a local package archive. The installed SDK runs without a
 compilation step.
 
 Create `.env` in your application's directory and set your TypeSafe API key:

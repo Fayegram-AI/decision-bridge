@@ -18,6 +18,10 @@ npm run build
 `npm run build` packs the source with lifecycle scripts disabled, installs and
 checks that exact tarball in a clean offline consumer, and retains it at
 `release/fayegram-ai-decision-bridge-VERSION.tgz`. The `release/` directory is Git-ignored.
+Use `npm run test:package` to verify a temporary archive without retaining a build.
+Preserve published tarballs unchanged: `npm run build` writes the filename for the
+current package version. Subsequent publication requires a new version and a newly
+verified archive.
 Packing and individual verification commands have 120-second bounds; the combined
 installed-consumer verification stage has a separate 600-second bound and streams
 its progress.

@@ -4,7 +4,7 @@ Start with [using the SDK in your application](../README.md#use-in-your-applicat
 for installation and a complete first call. Browse usage guides, API references,
 and contributor documentation below. The
 [getting started guide](guides/GETTING_STARTED.md#install-into-your-application)
-covers npm and release archive installation.
+covers npm and local package archive installation.
 The hosted playground is [Decision Playground](https://decision-pg.fayegram.com/).
 See [model selectors and provider defaults](../README.md#model-selectors) for
 built-in decision models and the separate custom generative presets.

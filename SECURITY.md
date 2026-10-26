@@ -50,6 +50,12 @@ accuracy or resist every adversarial semantic input. Question instructions are t
 configuration; state is untrusted evidence. Prompt separation is a mitigation, not a
 guarantee.
 
+Applications own authorization, allowed request forms, and media, evidence and
+history policies. Apply those checks before common or native calls, including recognized
+content in `input`, `conversation`, and question `instructionParts`. SDK preflight
+checks structure, capabilities and resource budgets; it does not enforce application
+permissions or media quotas.
+
 Output files use exclusive temporary files and mode 0600 where supported, then
 same-directory finalization. Replacing existing output requires `--force`.
 Atomicity and permissions depend on the filesystem and operating system. File

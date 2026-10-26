@@ -26,10 +26,14 @@ To pin the documented **0.1.5** release:
 npm install @fayegram-ai/decision-bridge@0.1.5
 ```
 
-You can also download `fayegram-ai-decision-bridge-0.1.5.tgz` from the
-[GitHub release](https://github.com/Fayegram-AI/decision-bridge/releases/tag/decision-bridge-v0.1.5).
-Choose the `.tgz` package asset and install the downloaded file, adjusting its path
-as needed:
+To download the same version as a package archive for transfer or offline
+installation:
+
+```bash
+npm pack @fayegram-ai/decision-bridge@0.1.5
+```
+
+Install the resulting file in the target application, adjusting its path as needed:
 
 ```bash
 npm install ./fayegram-ai-decision-bridge-0.1.5.tgz

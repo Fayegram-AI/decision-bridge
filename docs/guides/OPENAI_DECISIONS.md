@@ -196,7 +196,8 @@ JSON safety and configured client wire budgets apply to all forms.
 
 `bridge.getCapabilities(model?)` synchronously reports support and limits for ordered
 input, images, typed choices, labelled scores, and safety identifiers. It also reports
-conversation/tool history, remote images and prompt caching. `bridge.validate(request)`
+conversation/tool history, remote images, prompt caching, JSON input and question
+content. `bridge.validate(request)`
 resolves the model, makes a read-only request copy, and checks supported features
 without calling the service. Unsupported combinations fail with `UNSUPPORTED_CAPABILITY`
 before a request is sent.
@@ -217,9 +218,11 @@ incompatible extensions fail explicitly rather than being skipped. Extensions
 can implement all three preparation hooks. `onResult` works with every form and runs only after
 success, with the existing isolated-failure policy.
 
-Legacy common requests retain `meta.schemaVersion: 1`. New input/question forms
-or safety identifiers use version 2. Conversation, remote image URLs or cache
-controls select version 5; see [conversation and prompt caching](#conversation-and-prompt-caching).
+Legacy common requests retain `meta.schemaVersion: 1`. Ordered text/images, typed
+choices, labelled scores or safety identifiers use version 2. Conversation, remote
+image URLs or cache controls select version 5; explicit JSON parts or
+`instructionParts` select version 6. The highest applicable version takes
+precedence; see the [SDK result contract](../reference/SDK.md#returned-data).
 
 ## Dedicated native access
 
