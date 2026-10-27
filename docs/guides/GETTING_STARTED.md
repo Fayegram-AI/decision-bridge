@@ -26,21 +26,12 @@ To pin the documented **0.1.5** release:
 npm install @fayegram-ai/decision-bridge@0.1.5
 ```
 
-To download the same version as a package archive for transfer or offline
-installation:
+To download and install the same version as a package archive:
 
 ```bash
 npm pack @fayegram-ai/decision-bridge@0.1.5
-```
-
-Install the resulting file in the target application, adjusting its path as needed:
-
-```bash
 npm install ./fayegram-ai-decision-bridge-0.1.5.tgz
 ```
-
-See [packaging and release](../development/RELEASING.md) to build and verify an
-archive from a source checkout.
 
 The installed package contains the SDK, declarations, command runner, examples,
 and docs. It runs without compilation; source development scripts and tests are

@@ -131,7 +131,7 @@ npm install @fayegram-ai/decision-bridge
 
 The npm command installs the latest version published to the registry. See
 [installation options](docs/guides/GETTING_STARTED.md#install-into-your-application)
-to pin 0.1.5 or install a local package archive. The installed SDK runs without a
+to pin 0.1.5 or install a package archive. The installed SDK runs without a
 compilation step.
 
 Create `.env` in your application's directory and set your TypeSafe API key:
@@ -266,11 +266,7 @@ Its built-in provider default is Jev; SDK construction requires explicit selecti
 | --- | --- |
 | JavaScript SDK | Import `@fayegram-ai/decision-bridge` in your application; TypeScript declarations are included |
 | Optional command runner | `decision-bridge`, `decision`, and `faye-decision`, all backed by `bin/decision.mjs` |
-| npm package artifact | `npm run build` creates and verifies `release/fayegram-ai-decision-bridge-VERSION.tgz` |
-
-For maintainers, `npm run build` archives the ESM source and verifies an offline
-installation of that archive. See
-[packaging and release](docs/development/RELEASING.md).
+| npm package | Install from the npm registry or a `.tgz` package archive |
 
 For running the source examples, see [source setup](docs/guides/GETTING_STARTED.md#run-from-a-source-checkout).
 See [platform setup](docs/guides/PLATFORMS.md) for Windows/macOS/Linux details.
@@ -292,7 +288,7 @@ test suite and development scripts.
 | Application extensions | [State/input/conversation preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
 | Node command | [Decision/extraction commands and offline Live validation/replay](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |
 | Reliability | [Transport byte limits and fetch injection](docs/reference/SDK.md#provider-transport-options), deadlines, [limited retries and safe errors](docs/reference/ERRORS.md), strict response validation, atomic output |
-| Development | Functional tests, coverage, TypeScript and Workers binding contracts, offline tarball-install checks, cross-platform CI configuration |
+| Development | [Contributor guides](docs/development/README.md) for architecture, testing, and releases |
 
 ## Result semantics
 

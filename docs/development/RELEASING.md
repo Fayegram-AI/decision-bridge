@@ -15,29 +15,20 @@ npm run typecheck
 npm run build
 ```
 
-`npm run build` packs the source with lifecycle scripts disabled, installs and
-checks that exact tarball in a clean offline consumer, and retains it at
-`release/fayegram-ai-decision-bridge-VERSION.tgz`. The `release/` directory is Git-ignored.
-Use `npm run test:package` to verify a temporary archive without retaining a build.
-Preserve published tarballs unchanged: `npm run build` writes the filename for the
-current package version. Subsequent publication requires a new version and a newly
-verified archive.
-Packing and individual verification commands have 120-second bounds; the combined
-installed-consumer verification stage has a separate 600-second bound and streams
-its progress.
-To check that archive again, run:
+`npm run build` packages the source, verifies the package, and writes
+`release/fayegram-ai-decision-bridge-VERSION.tgz`. The `release/` directory is
+Git-ignored. Use a new package version for each publication and preserve published
+archives unchanged. See [Testing](TESTING.md) for details of the checks.
+
+To verify an existing package archive, run:
 
 ```text
 node scripts/package-smoke.mjs --tarball release/fayegram-ai-decision-bridge-VERSION.tgz
 ```
 
-Check public documentation against the implementation, including supported API shapes,
-examples, limits, errors, and service compatibility notes. Inspect the MIT copyright
-notice and package contents. Use a hosted check only when a change leaves a specific
-question about the service protocol that fixtures cannot answer. Run it in an explicitly
-authorized account or runtime. Offline fixtures are sufficient for routine development
-and CI. For protocol changes, document which hosted paths were checked and any
-remaining compatibility limits in the pull request.
+Review the changelog, API examples, compatibility notes, license, and package
+contents before publication. Include relevant verification results and compatibility
+limits in the pull request.
 
 ## Confirm publication prerequisites
 
@@ -56,7 +47,7 @@ the user's npm configuration. Keep credentials in the user configuration, never
 in the repository. Verify the target with `npm config get @fayegram-ai:registry`
 before staging or publishing. Replace `VERSION` and `STAGE_ID` below with the
 package version and the returned stage identifier. The `./` prefix identifies a
-local archive path to npm.
+package file on the filesystem to npm.
 
 ## Publish the source release
 
