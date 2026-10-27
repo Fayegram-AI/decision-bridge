@@ -201,9 +201,6 @@ Provider credential variables also supply configured routes as described above.
 | `DECISION_RESPONSE_FORMAT` | CLI preset output mode |
 | `DECISION_ANTHROPIC_API_VERSION` | Anthropic API-version selection |
 
-`RUN_LIVE_TESTS=1` applies only to the explicit development smoke helper.
-No background access or live testing is enabled by normal test commands.
-
 ## Custom endpoint credential boundary
 
 A CLI `baseURL` always requires explicit `apiKeyEnv`, even when it happens to equal
