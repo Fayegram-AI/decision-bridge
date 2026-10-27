@@ -86,10 +86,10 @@ the complete integration check. A selector mapping change must be verified again
 the target model's protocol and capabilities; local fixtures alone do not establish
 compatibility with a newly selected upstream model.
 
-### Capability expansion coverage
+### OpenAI content, extraction, and Live coverage
 
-For changes across expanded OpenAI input, Clairic or Live, use the existing
-functional fixtures and declaration checks. A focused source-root command is:
+For changes to OpenAI content, Clairic extraction, or Live, run the functional
+fixtures and declaration checks. A focused source-root command is:
 
 ```text
 node --test test/capability-expansion.test.mjs test/extraction.test.mjs test/live.test.mjs test/expansion-cli.test.mjs
@@ -144,7 +144,8 @@ Model listing is unsupported for OpenAI Decisions and Cloudflare Clef.
 
 The OpenAI Decisions helper performs four bounded common/native requests when
 invoked with `--decisions`. It includes a valid embedded PNG, typed choices, and
-labelled scores. For example, after setting the same opt-in variable:
+labelled scores, with retries disabled. For example, after setting the same opt-in
+variable:
 
 ```text
 npm run smoke:live -- --decisions --env-file .env
@@ -178,12 +179,12 @@ request and time limits. Use offline fixtures for routine development and CI.
 
 ## Package verification
 
-To test a specific local tarball against this source checkout:
+To verify a package archive against this source checkout:
 
 ```text
 node scripts/package-smoke.mjs --tarball /path/to/fayegram-ai-decision-bridge-VERSION.tgz
 ```
 
 The check installs the specified archive offline and compares installed bytes,
-documentation links, exports, CLI shims, and the bundled sample. It also rejects
-local archives and development-only files leaking into the runtime package.
+documentation links, exports, CLI shims, and the bundled sample. It also checks
+that generated `.tgz` files and development-only files are excluded from the package.

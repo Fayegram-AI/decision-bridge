@@ -117,8 +117,7 @@ defaults to Jev; SDK applications choose their provider in code.
 ## TypeScript
 
 Declarations ship with the package. For a standalone Node TypeScript example,
-install these development tools in the consuming application (TypeScript 5.8.3
-is the compiler used by this repository's CI):
+install a TypeScript compiler and Node.js declarations in your application:
 
 ```bash
 npm install --save-dev typescript@5.8.3 @types/node@22
@@ -242,7 +241,6 @@ in PowerShell), then edit the key locally. Run:
 
 ```bash
 npm ci --ignore-scripts
-npm test
 npm run validate
 npm run models
 npm run ask
@@ -251,10 +249,10 @@ npm run example
 
 `npm ci --ignore-scripts` installs the pinned development dependencies from the
 lockfile; it can access the npm registry and requires no model credentials.
-`npm test` and `npm run validate` are offline. `models` lists account models; `ask` evaluates
-`examples/request.json`; `example` runs the source SDK example. The last three
-explicitly load `.env` when present and access the provider. Use `ask` to test
-inference with the selected model.
+`npm run validate` checks the example request without calling a provider. `models`
+lists account models; `ask` evaluates `examples/request.json`; `example` runs the
+source SDK example. These three commands load `.env` when present and call the
+provider.
 
 Source examples import `../src/index.mjs` and run directly without installing the
 package. Application code should use `@fayegram-ai/decision-bridge` as shown above.

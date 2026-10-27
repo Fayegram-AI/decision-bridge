@@ -209,7 +209,8 @@ dispatching any entry. Prepared input is revalidated during each evaluation.
 Jev supports shared state and ordered text, with experimental images and boxes;
 the maintained generative presets use legacy shared-state forms. Existing custom
 providers default to the legacy profile; implement
-`getCapabilities(model)` and corresponding behavior to support new forms.
+`getCapabilities(model)` and corresponding behavior to support additional input
+and question forms.
 
 Use `prepareInput(parts, context)` for ordered input, `prepareState` for state,
 and `prepareConversation(items, context)` for conversation history.
@@ -305,14 +306,13 @@ configuration uses `default`. Offline validation reports the selected value as
 Decisions offline validation also checks native structure and the configured
 request byte limit in both modes.
 
-The `schema` command remains a generative utility and rejects the new request
-forms. Generation settings (`maxTokens`, `responseFormat`, `parameters`, etc.)
-are rejected for Decisions. See the [CLI reference](../reference/CLI.md).
+The `schema` command is a generative utility with a separate
+[supported request format](CUSTOM_GENERATIVE.md#a-new-protocol). Generation
+settings (`maxTokens`, `responseFormat`, `parameters`, etc.) are rejected for
+Decisions. See the [CLI reference](../reference/CLI.md).
 
-From a source checkout, the optional `npm run smoke:live -- --decisions --env-file .env`
-checks four bounded requests when `RUN_LIVE_TESTS=1` is explicitly set. It checks
-protocol behavior rather than prediction quality, disables retries, and prints
-only model identities and token usage. Normal verification never runs it.
+Contributors can find authenticated protocol checks in the
+[testing guide](../development/TESTING.md#optional-authenticated-provider-smoke-check).
 
 ## Conversation and prompt caching
 

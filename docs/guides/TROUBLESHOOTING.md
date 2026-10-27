@@ -4,8 +4,8 @@
 
 Run `npm exec -- decision-bridge --version` in the consuming project and compare
 it with [version availability](../README.md#version-availability). The `/extraction`
-and `/live` exports, their CLI commands, and expanded OpenAI history/cache inputs
-require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
+and `/live` exports, their CLI commands, and OpenAI conversation/tool history and
+cache controls require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
 to install a compatible version.
 The `/routing` export, `inspect`, routing flags, and routing registries require
 0.1.4 or later. Use the [installation options](GETTING_STARTED.md#install-into-your-application)

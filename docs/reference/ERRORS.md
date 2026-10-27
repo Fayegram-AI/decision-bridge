@@ -79,7 +79,7 @@ observer failed; inspect `meta.observerFailures` separately.
 
 ## Routing failures and recovery
 
-The `/routing` API in 0.1.4 adds these codes:
+The `/routing` API reports these codes:
 
 | Code | Meaning and response |
 | --- | --- |

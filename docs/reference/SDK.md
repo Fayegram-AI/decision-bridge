@@ -72,8 +72,8 @@ they interact; [errors](ERRORS.md#retry-policy) lists retryable statuses.
 
 `request` has exactly one of `state`, ordered `input` or `conversation`, plus
 `questions`. Optional fields are `model`, `safetyIdentifier`, `promptCacheKey`
-and `promptCacheOptions`. New forms require declared provider capabilities;
-see [OpenAI Decisions](../guides/OPENAI_DECISIONS.md) and
+and `promptCacheOptions`. Additional input and question forms require declared
+provider capabilities; see [OpenAI Decisions](../guides/OPENAI_DECISIONS.md) and
 [Cloudflare Clef](../guides/CLOUDFLARE_DECISIONS.md). The request model
 wins over the provider's configured default, which an omitted request model inherits.
 OpenAI Decisions uses the `default` selector when its provider configuration omits
@@ -509,4 +509,4 @@ Each service checks its own quotas, request-count limits, model context, media l
 and Gateway acceptance. Offline validation checks request structure and configured local
 resource limits. The SDK and CLI do not estimate token counts or enforce
 requests-per-minute or tokens-per-minute limits. Explicit transport budgets can select
-up to 64 MiB, including Jev and all Clef models; existing default budgets are retained.
+up to 64 MiB. See [provider transport options](#provider-transport-options) for defaults.

@@ -1,6 +1,6 @@
 # Platforms and installation
 
-## Compatibility and verification
+## Runtime compatibility
 
 The SDK runs on Node.js **22.16 or newer** on Windows, macOS, and Linux, and in modern
 browsers through a module bundler. It uses standard web APIs and has no third-party
@@ -12,9 +12,8 @@ provided. Direct browser calls also depend on
 For application integration, follow the [SDK quickstart](GETTING_STARTED.md).
 The shell-specific source commands below are for working in a source checkout.
 
-The CI matrix targets Windows, macOS, and Linux with Node 22.16 and Node 24. Check the
-CI results for the commit and environment you plan to use. ARM machines require a
-compatible native Node runtime. See [testing](../development/TESTING.md).
+Use a Node.js build for your operating system and processor architecture. Contributor
+checks are described in the [testing guide](../development/TESTING.md).
 
 ## Windows / PowerShell
 
@@ -38,7 +37,7 @@ node bin/decision.mjs evaluate examples/request.json --env-file .env
 ```
 
 `npm run models` and `npm run ask` are equivalent convenience commands. If a local
-PowerShell execution policy blocks the npm PowerShell shim, use `npm.cmd test` /
+PowerShell execution policy blocks the npm PowerShell shim, use `npm.cmd run models` /
 `npm.cmd run ask`, or the direct `node` commands above. Do not weaken your system's
 execution policy merely to run this project. Paths containing spaces should be
 quoted. A project copied across operating systems should be re-extracted from
@@ -71,7 +70,7 @@ Install the package with npm from your application's directory:
 npm install @fayegram-ai/decision-bridge
 ```
 
-For version requirements and installation from a verified local archive, see
+For version requirements and package archive installation, see
 [getting started](GETTING_STARTED.md#install-into-your-application).
 
 Import from `@fayegram-ai/decision-bridge` in ESM JavaScript, or invoke the installed
