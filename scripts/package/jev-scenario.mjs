@@ -12,10 +12,10 @@ const reply = request => ({ model: 'jev-1.14.0', answers: {
 }, usage: { input_tokens: null, output_tokens: 0 } });
 const response = Response.json(reply());
 delete globalThis.process; delete globalThis.Buffer;
-const provider = new JevProvider({ apiKey: 'fixture', model: 'jev-preview', dangerZone: { images: true, longContext: true },
+const provider = new JevProvider({ apiKey: 'fixture', model: 'jev-latest', dangerZone: { images: true, longContext: true },
     fetchImpl: async (_, init) => {
         const request = JSON.parse(init.body);
-        assert.equal(request.model, 'jev-preview');
+        assert.equal(request.model, 'jev-latest');
         assert.equal(init.headers['TypeSafe-Danger-Zone-Images'], 'true');
         assert.equal(init.headers['TypeSafe-Danger-Zone-Long-Context'], 'true');
         assert.equal(Object.keys(request.assets).length, 1);
@@ -27,7 +27,7 @@ assert.equal(result.usage.input_tokens, null);
 const native = await provider.createDecision({ state: 'reference-image', questions: question,
     assets: { 'reference-image': { format: 'png', data_base64: image.split(',')[1] } } });
 assert.equal(native.decision.answers.target.box.left, 0);
-assert.equal(native.meta.requestedModel, 'jev-preview');
+assert.equal(native.meta.requestedModel, 'jev-latest');
 console.log('Installed Jev common/native images, boxes and opt-ins passed without Node globals.');
 `;
 }

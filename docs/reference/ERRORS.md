@@ -16,14 +16,14 @@ and raw response bodies are omitted. Custom providers deliberately constructing
 | `DECISION_ERROR` | Generic code for a deliberately constructed DecisionError without a more specific code |
 | `CONFIGURATION_ERROR` | Invalid/unknown option, missing credential, incompatible provider setting, or invalid endpoint; fix configuration |
 | `VALIDATION_ERROR` | Invalid request/template/JSON; fix input before retrying |
-| `UNSUPPORTED_CAPABILITY` | Selected provider/model or preparation extension cannot support this request; fails before dispatch |
+| `UNSUPPORTED_CAPABILITY` | Selected provider/model or extension cannot fulfill the requested contract; usually rejected before dispatch. OpenRouter common evaluation can fail after inference when a native answer omits required probabilities. |
 | `USAGE_ERROR` | Invalid CLI flags/arguments or stdin usage; consult help |
 | `IO_ERROR` | Input/output path or permissions failure; preserve previous output |
 | `INPUT_TOO_LARGE` | CLI byte limit exceeded; reduce or split input |
 | `REQUEST_TOO_LARGE` | Configured client byte budget or upstream size admission rejected the request; inspect `source` and optional status |
 | `RESPONSE_TOO_LARGE` | Provider response exceeds configured limit; inspect budget/model behavior |
 | `HTTP_ERROR` | Non-success HTTP response; use status/request ID, not raw error body |
-| `CAPACITY_EXCEEDED` | Cloudflare capacity unavailable (3040); busy mode does not queue/retry |
+| `CAPACITY_EXCEEDED` | No available provider capacity or eligible upstream: Cloudflare 3040 or native OpenRouter HTTP 503 |
 | `ALLOCATION_EXCEEDED` | Provider allocation, credit or spending limit exceeded; not automatically retried |
 | `RATE_LIMITED` | Temporary provider throttling without a more specific allocation/capacity code |
 | `AUTHENTICATION_ERROR`, `PERMISSION_DENIED` | Provider authentication or authorization failure |
@@ -40,7 +40,9 @@ and raw response bodies are omitted. Custom providers deliberately constructing
 | `UNSUPPORTED_OPERATION` | Provider does not implement listing or another requested operation |
 | `BATCH_SKIPPED` | SDK stop-on-error prevented a not-yet-started record |
 | `INVALID_REQUEST` | Upstream request rejection; inspect safe machine code/type and correct the request |
-| `CONNECTION_CLOSED`, `DISPOSED` | Live connection ended or controller was disposed; pending work is cancelled |
+| `CONNECTION_CLOSED`, `DISPOSED` | Live connection ended, or a Live controller or Anthropic thread was disposed; pending work is cancelled |
+| `THREAD_BUSY` | An Anthropic thread already has an evaluation in progress; wait before evaluating or resetting it |
+| `HISTORY_LIMIT` | An Anthropic thread reached its retained turn or byte budget; reset or create another thread |
 | `RESOURCE_LIMIT` | Live client pending-operation budget exceeded; settle existing operations before submitting more |
 | `OBSERVER_ERROR` | Live observer notification failed; no command or application action is repeated |
 | `UNEXPECTED_ERROR` | Unrecognized error sanitized for public output |
@@ -54,9 +56,10 @@ successful siblings are not exposed as a partial result.
 The shared response transport retries statuses **429, 502, 503, 504, and 529**
 as a fallback for HTTP and binding responses. Provider decoders refine eligibility; known allocation/billing failures are never retried. `maxRetries`
 means additional attempts; the default 2 allows at most 3 total attempts. Native
-OpenAI Decisions, Cloudflare Clef and Clairic default to 0; explicitly enabling retries can repeat a billed
-request. All
-attempts, backoff, and response-body reading share one timeout budget.
+OpenAI Decisions, Cloudflare Clef/Clairic, and native OpenRouter default to 0;
+explicitly enabling retries can repeat a billed request. Anthropic thread transport
+retries are disabled; its documented continuation recovery allows one replay.
+All attempts, backoff, and response-body reading share one timeout budget.
 
 Valid `Retry-After` decimal integer seconds or HTTP dates are honored. All three
 HTTP date forms are interpreted in UTC; an elapsed date means zero delay.
@@ -114,10 +117,9 @@ configuration deliberately and retest; do not disable local validation.
 
 Enabling busy execution options for Cloudflare Clef REST fails local preflight
 with `UNSUPPORTED_CAPABILITY`, without an HTTP status, upstream code, or dispatch.
-Direct calls to the hosted service were observed to reject that field with
-HTTP 422 and `upstreamCode: 5012`, distinct from capacity code 3040. Other upstream
-validation failures can still return HTTP 422/5012 and retain safe diagnostics.
-Keep the default disabled setting for ordinary REST
+Upstream validation failures can return HTTP 422 and `upstreamCode: 5012`,
+distinct from capacity code 3040. The SDK retains safe diagnostics for service
+rejections. Keep the default disabled setting for ordinary REST
 inference; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
 
 Keep a request ID and available Gateway log ID, bridge version, configured provider,
@@ -132,6 +134,8 @@ own data-handling policy. No logging or telemetry is enabled by default.
 Clairic preserves native nulls, empty lists and the `truncated` flag in a successful
 extraction envelope; truncation is not converted into a decision-style failure.
 The application decides whether that extraction is sufficient for its task.
+OpenRouter extraction preserves optional `truncated` and nullable `state_text`
+without adding Clairic defaults; omitted values remain absent.
 
 Live preserves native refusal answers on completed decision events. Malformed
 server events report `INVALID_RESPONSE`; the offline event-file validator reports

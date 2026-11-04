@@ -22,7 +22,7 @@ export function createLiveState({ configuration, maxHistory = 4096 } = {}) {
     }
     function questionsFor(type) {
         if (!config || pendingConfigurations.size || lostConfigurationHistory) return undefined;
-        if (type === 'delegation') return config.delegation?.decisions.questions;
+        if (type === 'delegation') return config.delegation?.decisions?.questions;
         const matches = config.triggers?.filter(trigger => trigger.event_type === type) ?? [];
         return matches.length === 1 ? matches[0].decisions.questions : undefined;
     }
@@ -58,7 +58,7 @@ export function createLiveState({ configuration, maxHistory = 4096 } = {}) {
             if (seen.has(event.event_id)) return freezeJson({ type: 'duplicate', eventId: event.event_id, eventType: event.type });
             remember(seen, event.event_id, true);
             const base = { eventId: event.event_id, eventType: event.type };
-            if (['session.created', 'session.updated'].includes(event.type)) {
+            if (['session.started', 'session.created', 'session.updated'].includes(event.type)) {
                 config = configurationFromSession(event.session);
                 generation++;
                 if (event.client_event_id) pendingConfigurations.delete(event.client_event_id);

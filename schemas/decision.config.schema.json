@@ -582,7 +582,10 @@
                             "config": {
                                 "properties": {
                                     "provider": {
-                                        "const": "cloudflare-extraction"
+                                        "enum": [
+                                            "cloudflare-extraction",
+                                            "openrouter-extraction"
+                                        ]
                                     }
                                 },
                                 "required": [
@@ -1001,7 +1004,9 @@
                             "$ref": "#/$defs/retries"
                         },
                         "maxRequestBytes": {
-                            "$ref": "#/$defs/bytes"
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 128000000
                         },
                         "maxResponseBytes": {
                             "$ref": "#/$defs/bytes"
@@ -1045,6 +1050,11 @@
                                 "2023-06-01",
                                 "2026-10-21"
                             ]
+                        },
+                        "workspaceId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[\\u0021-\\u007e]+$"
                         }
                     },
                     "required": [
@@ -1071,6 +1081,39 @@
                                             "top_p": false,
                                             "top_k": false
                                         }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "if": {
+                                "properties": {
+                                    "baseURL": {
+                                        "not": {
+                                            "enum": [
+                                                "https://api.anthropic.com",
+                                                "https://api.anthropic.com/"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "baseURL"
+                                ]
+                            },
+                            "then": {
+                                "properties": {
+                                    "maxRequestBytes": {
+                                        "$ref": "#/$defs/bytes"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "parameters": {
+                                    "properties": {
+                                        "thread": false
                                     }
                                 }
                             }
@@ -1227,8 +1270,184 @@
                             }
                         }
                     ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "openrouter-decisions"
+                        },
+                        "providerPreferences": {
+                            "$ref": "#/$defs/openRouterPreferences"
+                        },
+                        "api": {
+                            "enum": [
+                                "decisions",
+                                "systemone"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "openrouter-extraction"
+                        },
+                        "providerPreferences": {
+                            "$ref": "#/$defs/openRouterPreferences"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ]
                 }
             ]
+        },
+        "openRouterPreferences": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "allow_fallbacks": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "require_parameters": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "zdr": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "enforce_distillable_text": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "order": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "\\S"
+                    }
+                },
+                "only": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "\\S"
+                    }
+                },
+                "ignore": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "\\S"
+                    }
+                },
+                "quantizations": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "\\S"
+                    }
+                },
+                "data_collection": {
+                    "enum": [
+                        "allow",
+                        "deny",
+                        null
+                    ]
+                },
+                "max_price": {
+                    "type": "object"
+                },
+                "options": {
+                    "type": "object"
+                },
+                "sort": {},
+                "preferred_max_latency": {},
+                "preferred_min_throughput": {}
+            }
         }
     }
 }

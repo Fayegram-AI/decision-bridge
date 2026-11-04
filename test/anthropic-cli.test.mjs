@@ -48,6 +48,19 @@ test('Anthropic SDK, runtime and configuration schema agree on modes and conflic
     }
 });
 
+test('Anthropic workspace IDs are header-safe in SDK, runtime and schema validation', () => {
+    for (const workspaceId of ['wrkspc_01-Example', 'workspace']) {
+        assert(schemaValid({ ...base, workspaceId }), JSON.stringify(schemaValid.errors));
+        assert.doesNotThrow(() => validateConfig({ ...base, workspaceId }, { complete: true }));
+        assert.doesNotThrow(() => new AnthropicProvider({ apiKey: 'fixture', workspaceId }));
+    }
+    for (const workspaceId of ['', 'has space', 'line\nbreak', '\u007f', '\u0080', '\u0100', 'workspace\ud800']) {
+        assert.equal(schemaValid({ ...base, workspaceId }), false, JSON.stringify(workspaceId));
+        assert.throws(() => validateConfig({ ...base, workspaceId }, { complete: true }), { code: 'CONFIGURATION_ERROR' });
+        assert.throws(() => new AnthropicProvider({ apiKey: 'fixture', workspaceId }), { code: 'CONFIGURATION_ERROR' });
+    }
+});
+
 test('Anthropic mode/version precedence, switching and initialization preserve explicit settings', async t => {
     const cwd = await temporaryWorkspace(t);
     await writeFile(join(cwd, 'config.json'), JSON.stringify({ ...base, responseFormat: 'tool', apiVersion: '2023-06-01' }));

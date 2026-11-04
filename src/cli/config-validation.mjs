@@ -1,20 +1,21 @@
+import { openRouterPreferences } from '../providers/openrouter-shared.mjs';
 import { requireCondition as check } from '../errors.mjs';
 import { cloneJson, isRecord } from '../validation.mjs';
 import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudflare-profile.mjs';
 import { generationOptions } from '../custom/generative/shared.mjs';
-import { anthropicOptions, ANTHROPIC_API_VERSIONS } from '../custom/generative/anthropic-options.mjs';
+import { anthropicOptions, anthropicRequestCeiling, ANTHROPIC_API_VERSIONS } from '../custom/generative/anthropic-options.mjs';
 import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 import { validateRoutingConfig } from './routing-config.mjs';
 
-export const PROVIDERS = ['jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
+export const PROVIDERS = ['jev', 'openrouter-decisions', 'openrouter-extraction', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
 export const PRESETS = ['openai-compatible', 'openrouter', 'anthropic'];
 export const TRANSPORT = ['baseURL', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes'];
-export const GENERATION = ['maxTokens', 'responseFormat', 'apiVersion', 'tokenParameter', 'parameters', 'noAuth'];
+export const GENERATION = ['maxTokens', 'responseFormat', 'apiVersion', 'tokenParameter', 'parameters', 'noAuth', 'workspaceId'];
 export const PROVIDER_FIELDS = [...TRANSPORT, ...GENERATION, 'apiKeyEnv', 'model', 'preset', 'module',
-    'options', 'accountId', 'rejectIfBusy', 'gateway', 'dangerZone'];
+    'options', 'accountId', 'rejectIfBusy', 'gateway', 'dangerZone', 'api', 'providerPreferences'];
 const FIELDS = new Set(['$schema', 'schemaVersion', 'provider', 'timeoutMs', ...PROVIDER_FIELDS]);
 export const NUMERIC = new Set(['timeoutMs', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes', 'maxTokens']);
-export const KEY_ENVS = { jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
+export const KEY_ENVS = { 'openrouter-decisions': 'OPENROUTER_API_KEY', 'openrouter-extraction': 'OPENROUTER_API_KEY', jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
     'cloudflare-decisions': 'CLOUDFLARE_API_TOKEN', 'cloudflare-extraction': 'CLOUDFLARE_API_TOKEN', 'openai-compatible': 'OPENAI_API_KEY',
     openrouter: 'OPENROUTER_API_KEY', anthropic: 'ANTHROPIC_API_KEY' };
 export const isModule = config => ['custom-decision', 'custom-generative'].includes(config.provider) && config.module !== undefined;
@@ -31,7 +32,7 @@ export function validateConfig(input, { complete = false } = {}) {
         `Provider ${config.provider} moved to provider custom-generative with preset ${config.provider}.`, 'CONFIGURATION_ERROR');
     check(config.provider === undefined || PROVIDERS.includes(config.provider),
         'Select a native provider, custom-decision or custom-generative; provider custom is no longer supported.', 'CONFIGURATION_ERROR');
-    for (const field of ['$schema', 'model', 'baseURL', 'apiKeyEnv', 'module', 'accountId', 'preset']) {
+    for (const field of ['$schema', 'model', 'baseURL', 'apiKeyEnv', 'module', 'accountId', 'preset', 'workspaceId']) {
         check(config[field] === undefined || (typeof config[field] === 'string' && config[field].trim()),
             'Configuration string fields must be nonempty.', 'CONFIGURATION_ERROR');
     }
@@ -42,7 +43,7 @@ export function validateConfig(input, { complete = false } = {}) {
         if (config[field] === undefined) continue;
         const min = field === 'maxRetries' ? 0 : 1;
         const max = field === 'maxRetries' ? 10 : field === 'maxTokens' ? 1048576
-            : field.endsWith('Bytes') ? 67108864 : 2147483647;
+            : field === 'maxRequestBytes' && config.preset === 'anthropic' ? anthropicRequestCeiling(config.baseURL) : field.endsWith('Bytes') ? 67108864 : 2147483647;
         check(Number.isSafeInteger(config[field]) && config[field] >= min && config[field] <= max,
             'Numeric configuration field is out of range.', 'CONFIGURATION_ERROR');
     }
@@ -64,6 +65,12 @@ export function validateConfig(input, { complete = false } = {}) {
     check(config.options === undefined || isModule(config), 'options requires a custom provider module.', 'CONFIGURATION_ERROR');
     // Validate nested shape even when a partial file omits its provider selector.
     if (Object.hasOwn(config, 'dangerZone')) config.dangerZone = jevDangerZone(config.dangerZone);
+    if (config.api !== undefined) check(config.provider === 'openrouter-decisions' && ['decisions', 'systemone'].includes(config.api),
+        'api selects the native OpenRouter Decisions endpoint.', 'CONFIGURATION_ERROR');
+    if (config.providerPreferences !== undefined) {
+        check(['openrouter-decisions', 'openrouter-extraction'].includes(config.provider), 'providerPreferences requires native OpenRouter.', 'CONFIGURATION_ERROR');
+        config.providerPreferences = openRouterPreferences(config.providerPreferences);
+    }
     if (config.provider !== undefined) {
         if (config.provider !== 'jev') check(!Object.hasOwn(config, 'dangerZone'),
             'dangerZone requires Jev.', 'CONFIGURATION_ERROR');
@@ -87,7 +94,7 @@ export function validateConfig(input, { complete = false } = {}) {
     if (config.preset) {
         if (config.preset === 'anthropic') anthropicOptions(config);
         else {
-            check(config.apiVersion === undefined && config.responseFormat !== 'tool',
+            check(config.apiVersion === undefined && config.workspaceId === undefined && config.responseFormat !== 'tool',
                 'apiVersion and tool response format require the Anthropic preset.', 'CONFIGURATION_ERROR');
             generationOptions(config);
         }

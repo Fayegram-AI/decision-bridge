@@ -14,7 +14,7 @@ with the result.
 
 Try the [Decision Playground](https://decision-pg.fayegram.com/).
 
-The main SDK supports Jev through TypeSafe, OpenAI Decisions, and Cloudflare Clef. These
+The main SDK supports Jev through TypeSafe, OpenAI Decisions, Cloudflare Clef, and OpenRouter native Decisions. These
 services provide native decision APIs. Use `custom/decision` to integrate another
 decision service, or `custom/generative` to ask a general-purpose model for structured
 decisions. The generative entry point includes OpenAI-compatible, OpenRouter, and
@@ -31,9 +31,9 @@ additionally supports embedded WAV/MP3 audio and MP4/WebM video, ordered images 
 → videos → text. The shared API checks that the selected provider and model support your
 request before sending it. A provider refusal returns an error.
 
-**Version 0.1.5 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.6 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
-These docs cover 0.1.5.
+These docs cover 0.1.6.
 For feature requirements and version history, see
 [version availability](docs/README.md#version-availability) and the
 [changelog](CHANGELOG.md). Start with the
@@ -55,13 +55,14 @@ Use these model selectors with the built-in decision providers:
 
 | Decision provider | Model selectors | Provider default |
 | --- | --- | --- |
-| Jev through TypeSafe (`jev`) | `jev-latest` | `jev-latest` |
-| OpenAI Decisions (`openai-decisions`) | `default`, `luna` | `default` |
+| OpenRouter native (`openrouter-decisions`) | Explicit native model ID; [verified profiles](docs/guides/OPENROUTER_NATIVE.md) | No default |
+| Jev through TypeSafe (`jev`) | `jev-latest`, `jev-preview`, available pinned IDs such as `jev-1.14.0` | `jev-latest` |
+| OpenAI Decisions (`openai-decisions`) | `default`, `luna`, `gpt-6-luna` | `default` |
 | Cloudflare (`cloudflare-decisions`) | `clef`, `@cf/cloudflare/clef` | `clef` |
 | Cloudflare (`cloudflare-decisions`) | `clef-flash`, `@cf/cloudflare/clef-flash` | — |
 | Cloudflare (`cloudflare-decisions`) | `clef-omni`, `@cf/cloudflare/clef-omni` | — |
 
-`jev-latest` is Jev's default alias. Jev also accepts `jev-preview` and explicit model IDs available through your TypeSafe account;
+`jev-latest` is Jev's stable 1.14 default alias. Jev also accepts `jev-preview` and explicit model IDs available through your TypeSafe account;
 use `bridge.listModels()` or the CLI `models` command to inspect that catalog.
 The bridge does not maintain a static list of Jev versions. Pin an available model ID
 when you need a reproducible selection, and check inference access with your account.
@@ -84,6 +85,8 @@ configured service and have no default model or fixed model catalog.
 Clairic uses the dedicated [extraction API](docs/guides/EXTRACTION.md), with
 selectors `clairic` and `@cf/cloudflare/clairic` (default `clairic`). It returns
 typed values, estimates and forecasts through REST or Workers bindings.
+[OpenRouter native Extractions](docs/guides/OPENROUTER_NATIVE.md#extractions) uses
+explicit model IDs with common images or native image/PDF assets.
 [Live Decisions](docs/guides/LIVE_DECISIONS.md) attaches to an application-owned
 GPT-Live connection for delegation, transcript triggers and Decision events.
 These operations have dedicated `/extraction` and `/live` package exports.
@@ -108,6 +111,7 @@ All native providers support shared state and the common `choice`, `noul`, and
 | OpenAI Decisions | Ordered text/image/JSON input, question content, conversation/tool history, remote images, prompt caching, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
 | Cloudflare Clef / Clef-flash | Embedded images before text, typed choices, labelled scores, native access, Workers AI binding, optional Gateway | [Cloudflare decisions](docs/guides/CLOUDFLARE_DECISIONS.md) |
 | Cloudflare Clef-omni | The same decision and transport features, plus embedded audio/video | [Omni media and limits](docs/guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video) |
+| OpenRouter native | Decisions with explicit model IDs, model-specific media, native access, discovery, and upstream routing preferences | [OpenRouter native](docs/guides/OPENROUTER_NATIVE.md) |
 | Custom decision service | Explicit decision provider contract | [Custom decision providers](docs/guides/CUSTOM_DECISION.md) |
 | Custom generative presets / modules | General-purpose output mapped into decisions; explicit opt-in | [Custom generative providers](docs/guides/CUSTOM_GENERATIVE.md) |
 
@@ -131,7 +135,7 @@ npm install @fayegram-ai/decision-bridge
 
 The npm command installs the latest version published to the registry. See
 [installation options](docs/guides/GETTING_STARTED.md#install-into-your-application)
-to pin 0.1.5 or install a package archive. The installed SDK runs without a
+to pin a published version or install a package archive. The installed SDK runs without a
 compilation step.
 
 Create `.env` in your application's directory and set your TypeSafe API key:
@@ -232,6 +236,9 @@ with `OPENROUTER_API_KEY`. For Anthropic, use
 Anthropic offers `tool` and `json_schema` output with explicit API-version
 selection. The model must support the selected output mode; see
 [Anthropic output settings](docs/guides/CUSTOM_GENERATIVE.md#anthropic).
+The Anthropic preset also supports workspace headers and explicit
+[cumulative threads](docs/guides/ANTHROPIC_THREADS.md) for evaluating accepted
+states together against fixed questions.
 
 For OpenAI-compatible and OpenRouter endpoints that support only JSON-object or
 text output, select `responseFormat: 'json_object'` or `'text'` explicitly. The
@@ -280,10 +287,10 @@ test suite and development scripts.
 | Area | Implementation |
 | --- | --- |
 | Decision requests | Define [questions](docs/reference/SDK.md#question-builders) in code; send state, ordered input or conversation to a provider that supports it; receive typed answers and immutable results |
-| Native providers | Jev, OpenAI Decisions, Cloudflare Clef/Clef-flash/Clef-omni |
+| Native providers | Jev, OpenAI Decisions, Cloudflare Clef/Clef-flash/Clef-omni, and OpenRouter Decisions |
 | Custom providers | Separate decision and generative contracts; opt-in Chat Completions, OpenRouter, and Anthropic presets |
 | SDK | Provider factory, [capability preflight](docs/reference/SDK.md#bridgegetcapabilitiesmodel-and-bridgevalidaterequest), [cancellation](docs/reference/SDK.md#cancellation-and-deadlines), and [ordered batch evaluation](docs/reference/SDK.md#sdk-batch-evaluation) |
-| Dedicated operations | [Clairic extraction](docs/guides/EXTRACTION.md) and [Live Decisions](docs/guides/LIVE_DECISIONS.md), with separate exports and native results |
+| Dedicated operations | [Cloudflare Clairic extraction](docs/guides/EXTRACTION.md), [OpenRouter Extractions](docs/guides/OPENROUTER_NATIVE.md#extractions), and [Live Decisions](docs/guides/LIVE_DECISIONS.md), with separate exports and native results |
 | Routing | Choose configured targets directly or use [experimental auto mode](docs/guides/ROUTING.md) with rules, a decision model, or clarification |
 | Application extensions | [State/input/conversation preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
 | Node command | [Decision/extraction commands and offline Live validation/replay](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |

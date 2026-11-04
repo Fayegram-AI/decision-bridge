@@ -238,13 +238,18 @@ export class CloudflareDecisionsProvider implements DecisionProvider {
 }
 export type CloudflareDecisionsConfig = { type: 'cloudflare-decisions' } & CloudflareDecisionsOptions;
 export type JevConfig = { type: 'jev' } & JevOptions;
-export type ProviderConfig = JevConfig
+export { OpenRouterDecisionsProvider } from './openrouter.mjs';
+export type { OpenRouterDecisionsOptions, OpenRouterNativeOptions, OpenRouterPreferences, OpenRouterDecisionRequest,
+    OpenRouterDecisionResponse, OpenRouterDecisionQuestions, OpenRouterImageAsset, OpenRouterTransportMetadata } from './openrouter.mjs';
+export type OpenRouterDecisionsConfig = { type: 'openrouter-decisions' } & import('./openrouter.mjs').OpenRouterDecisionsOptions;
+export type ProviderConfig = JevConfig | OpenRouterDecisionsConfig
   | ({ type: 'openai-decisions' } & OpenAIDecisionsOptions)
   | CloudflareDecisionsConfig;
 export type OpenAIDecisionsConfig = { type: 'openai-decisions' } & OpenAIDecisionsOptions;
 export function createProvider(options: JevConfig): JevProvider;
 export function createProvider(options: OpenAIDecisionsConfig): OpenAIDecisionsProvider;
 export function createProvider(options: CloudflareDecisionsConfig): CloudflareDecisionsProvider;
+export function createProvider(options: OpenRouterDecisionsConfig): import('./openrouter.mjs').OpenRouterDecisionsProvider;
 export function createProvider(options: ProviderConfig | OpenAIDecisionsConfig): DecisionProvider;
 export function createProvider(options: ProviderConfig): DecisionProvider;
 export function choice<const O extends readonly ChoiceOption[]>(instructions: Instructions, options: O): TypedChoiceQuestion<O>;

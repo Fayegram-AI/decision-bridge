@@ -7,8 +7,19 @@ import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudf
 import { unwrapCloudflareResponse } from '../providers/cloudflare-validation.mjs';
 import { validateExtractionRequest, validateExtractionResponse, extractionModel } from './validation.mjs';
 import { evaluateBatch } from '../batch.mjs';
+import { extractionResult } from './result.mjs';
+import { OpenRouterExtractionProvider } from './openrouter.mjs';
 
 export { validateExtractionRequest } from './validation.mjs';
+export { OpenRouterExtractionProvider };
+
+export function createExtractionProvider(input) {
+    const options = optionsObject(input, ['type', 'apiKey', 'model', 'baseURL', 'providerPreferences',
+        'transport', 'accountId', 'ai', 'rejectIfBusy', 'gateway', ...TRANSPORT_FIELDS], 'Extraction provider config');
+    const { type, ...settings } = options;
+    check(['cloudflare-extraction', 'openrouter-extraction'].includes(type), 'Unknown extraction provider.', 'CONFIGURATION_ERROR');
+    return type === 'openrouter-extraction' ? new OpenRouterExtractionProvider(settings) : new CloudflareExtractionProvider(settings);
+}
 
 /** Typed extraction remains independent of the decision bridge's answer contract. */
 export class CloudflareExtractionProvider {
@@ -36,6 +47,12 @@ export class CloudflareExtractionProvider {
     }
 
     validate(request) { return validateExtractionRequest(request, this.#settings); }
+
+    validateResult(result, input) {
+        const request = this.validate(input);
+        return extractionResult(result, request, { provider: this.name,
+            requestedModel: input.model ?? request.model, validateResponse: validateExtractionResponse });
+    }
 
     async extract(input, options = {}) {
         const { signal } = optionsObject(options, ['signal'], 'Extraction call options');

@@ -192,8 +192,10 @@ Native media entries accept data URLs or `{ content_type, base64 }` objects.
 Audio supports WAV (`audio/wav`, alias `audio/x-wav`) and MP3 (`audio/mpeg`, alias
 `audio/mp3`). Video supports MP4 (`video/mp4`) and WebM (`video/webm`). Common
 audio/video parts accept only `type` and `dataUrl`; remote URLs, paths, image
-detail, and caller-provided durations are rejected. Other providers and the older
-Clef models reject audio/video before dispatch.
+detail, and caller-provided durations are rejected. Clef and Clef-flash reject
+audio/video before dispatch. OpenRouter's separate
+[Clef-omni profile](OPENROUTER_NATIVE.md#common-media-and-capability-profiles)
+also supports audio/video, with its own ordered-input contract.
 
 Inspectors validate canonical base64, MIME/header consistency and supported
 container structure. Service count, decoded-size and duration limits are handled
@@ -250,12 +252,8 @@ CLI evaluation/batching, and credential-free offline validation, with or without
 Gateway. An explicit native `options.rejectIfBusy: false` can override a true
 provider default; disabled execution options are omitted from REST requests.
 
-Clef, Clef-flash and Clef-omni REST reject the `options` field with HTTP 422 and
-upstream code `5012`, including `options: { rejectIfBusy: true }`, although the
-general Workers AI documentation describes that field. This REST limitation was
-last verified on 2026-10-10; upstream behavior may change. Use the binding transport
-for enabled busy rejection: execution options belong in the third `ai.run()`
-argument, including when a Gateway is configured.
+Use the binding transport for enabled busy rejection. Execution options belong
+in the third `ai.run()` argument, including when a Gateway is configured.
 
 Gateway routing is disabled unless configured. Use an existing Gateway:
 

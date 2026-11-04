@@ -4,7 +4,7 @@ import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { deadline, withSignal, abortError } from '../async.mjs';
 import { providerContract } from '../provider-contract.mjs';
 import { createProvider } from '../providers/index.mjs';
-import { CloudflareExtractionProvider } from '../extraction/index.mjs';
+import { createExtractionProvider } from '../extraction/index.mjs';
 import { validateConfig, isModule, KEY_ENVS } from './config-validation.mjs';
 
 /** Executable modules are loaded only by explicit inference/model-list commands. */
@@ -55,5 +55,5 @@ export async function configuredProvider(loaded, { signal } = {}) {
     }
     if (['cloudflare-decisions', 'cloudflare-extraction'].includes(type)) options.accountId = config.accountId ??
         (config.baseURL === undefined ? loaded.env.CLOUDFLARE_ACCOUNT_ID : undefined) ?? '';
-    return type === 'cloudflare-extraction' ? new CloudflareExtractionProvider(options) : createProvider({ type, ...options });
+    return type.endsWith('-extraction') ? createExtractionProvider({ type, ...options }) : createProvider({ type, ...options });
 }

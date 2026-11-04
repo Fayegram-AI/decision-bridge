@@ -67,10 +67,10 @@ test('Jev text defaults preserve the existing protocol without experimental head
 test('Jev capabilities require opt-in and distinguish known box-capable selectors', () => {
     assert.equal(new JevProvider({ apiKey: 'fixture' }).getCapabilities().images, false);
     const provider = providerFor();
-    for (const model of ['jev-preview', 'jev-1.14.0', 'jev-1.15.0', 'jev-2.0.0']) {
+    for (const model of ['jev-latest', 'jev-preview', 'jev-1.14.0', 'jev-1.15.0', 'jev-2.0.0']) {
         assert.equal(provider.getCapabilities(model).boxes, true);
     }
-    for (const model of ['jev-latest', 'jev-1.13.0', 'jev-test']) assert.equal(provider.getCapabilities(model).boxes, false);
+    for (const model of ['jev-1.13.0', 'jev-test']) assert.equal(provider.getCapabilities(model).boxes, false);
     assert.equal(provider.getCapabilities('jev-1.13.0').images, true);
 });
 

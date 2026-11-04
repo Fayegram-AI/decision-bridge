@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "provider": "openrouter-extraction",
+    "model": "VENDOR/EXTRACTION_MODEL",
+    "providerPreferences": {
+        "allow_fallbacks": false
+    }
+}

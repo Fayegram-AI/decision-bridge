@@ -7,8 +7,9 @@
 | `jev` | `POST /v1/systemone` at api.typesafe.ai | `TYPESAFE_API_KEY` | `jev-latest` | Native typed decisions |
 | `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `default` | Native Decisions with common and dedicated access |
 | `cloudflare-decisions` | Workers AI REST model route or `AI.run` binding | `CLOUDFLARE_API_TOKEN` and account ID for REST | `clef` | Native Clef decisions with common and dedicated access |
+| `openrouter-decisions` | OpenRouter `/api/alpha/decisions` or explicit `/api/v1/systemone` | `OPENROUTER_API_KEY` | Explicit model required | Native Decisions; optional fields preserved |
 
-`createProvider()` and the root SDK export these three native providers only. Custom
+`createProvider()` and the root SDK export these four native providers. Custom
 decision services use `defineDecisionProvider` from `custom/decision`. General-purpose
 models use the maintained presets in `custom/generative`. Import that entry point when
 you want to prompt a model for decisions. See
@@ -17,7 +18,7 @@ you want to prompt a model for decisions. See
 ## Supported model selection
 
 The [model selector inventory](../../README.md#model-selectors) summarizes the
-built-in providers. Jev accepts `jev-latest` and explicit Jev IDs from
+built-in providers. Jev accepts `jev-latest`, `jev-preview` and explicit Jev IDs from
 its account catalog. OpenAI Decisions accepts `default`, `luna`, and explicit
 `gpt-6-luna`. Decision Bridge resolves these to the upstream `gpt-6-luna` model
 in this release. The selected value remains in `meta.requestedModel`, the outgoing
@@ -47,7 +48,8 @@ contract. The following additional forms are checked before dispatch:
 | OpenAI Decisions | Supported; preserving order | Supported | Supported | Supported | Unsupported |
 | Cloudflare Clef / Clef-flash | Supported; images before text | Supported | Supported; ordered levels | Unsupported | Unsupported |
 | Cloudflare Clef-omni | Supported; images before audio/video/text | Supported | Supported; ordered levels | Unsupported | Unsupported |
-| OpenAI-compatible / OpenRouter / Anthropic | Unsupported | Unsupported | Unsupported | Unsupported | Supported; service-specific catalog |
+| OpenRouter native | Ordered text; media per verified model profile | Per profile | Per profile | Unsupported | Decisions catalog |
+| OpenAI-compatible / OpenRouter generative / Anthropic | Unsupported | Unsupported | Unsupported | Unsupported | Supported; service-specific catalog |
 
 `bridge.getCapabilities(model)` reports the local profile, and
 `bridge.validate(request)` checks that profile and provider preflight without
@@ -60,10 +62,12 @@ Omni additionally accepts embedded audio clips and videos; service counts remain
 upstream. The optional capability fields `audio`, `videos`, `maxAudioClips`, and
 `maxVideos` normalize to
 false/zero when omitted, preserving legacy custom profiles. Cloudflare's older
-models and all other shipped providers reject audio/video before inference.
+models reject audio/video before inference. OpenRouter also enables common audio/video
+for `cloudflare/clef-omni`; see its [native guide](../guides/OPENROUTER_NATIVE.md).
 
-Jev additionally supports `box` questions on `jev-preview` and pinned 1.14+ models
-when `dangerZone.images` is enabled. Other built-ins reject box questions.
+Jev additionally supports `box` questions on `jev-latest`, `jev-preview` and pinned
+1.14+ models when `dangerZone.images` is enabled. Native OpenRouter enables boxes
+for its verified Jev 1.14/latest profiles. Other built-ins reject box questions.
 See the [Jev guide](../guides/JEV.md) for asset placement and experimental opt-ins.
 
 OpenAI additionally supports `conversation`, `toolHistory`, `remoteImages` and
@@ -77,8 +81,8 @@ parts in input, conversations and questions; `questionContent` covers the
 `instructionParts` question form. Image and remote-image capabilities apply to
 question images, and `maxImages` counts shared-input and question images together.
 
-Dedicated `createDecision()` access is available on Jev, OpenAI Decisions and
-Cloudflare providers. It uses each service's native request/response shape and
+Dedicated `createDecision()` access is available on Jev, OpenAI Decisions,
+Cloudflare and OpenRouter providers. It uses each service's native request/response shape and
 bypasses bridge preparation and observation hooks.
 
 ## Native Jev
@@ -88,8 +92,8 @@ validates and preserves Jev's `choice`, `noul` and `score` results. `GET /v1/mod
 lists native models. A listed catalog can differ from valid aliases; `jev-latest` is the
 documented stable alias.
 
-`jev-preview` selects the preview release. Images and longer context require
-explicit `dangerZone` settings. Common image input preserves ordering; native
+`jev-latest` selects stable Jev 1.14. Images and longer context require explicit
+`dangerZone` settings. Common image input preserves ordering; native
 `createDecision()` additionally accepts JSON assets referenced in state,
 instructions, and criteria. Box outputs preserve normalized edges and confidence.
 See the [Jev guide](../guides/JEV.md) for limits and absence handling.
@@ -112,9 +116,18 @@ Workers AI binding. Common and native access share validation and codecs. See th
 [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) for image/audio/video limits, structured
 content, typed values, rounding, capacity rejection, Gateway, and CLI examples.
 
+## Native OpenRouter
+
+Use `openrouter-decisions` for native model IDs and `openrouter-extraction` for
+extraction fields/assets. Rich common capabilities use verified model profiles;
+native responses preserve optional distributions and confidence. See the
+[OpenRouter native guide](../guides/OPENROUTER_NATIVE.md) for endpoints, media,
+routing ownership, metadata, CLI and result contracts.
+
 ## Native versus elicited probabilities
 
-Jev, OpenAI Decisions and Clef report native outputs and confidence. Generative models
+Jev, OpenAI Decisions, Clef and native OpenRouter return native decisions;
+confidence availability follows each service's response contract. Generative models
 are prompted to produce probability distributions; these estimates are separate from
 token logprobs and repeated-sampling frequencies. Accuracy and calibration depend on
 the model and task.
@@ -145,7 +158,8 @@ not discover models or establish account access. Generative targets require
 
 ## Dedicated operations
 
-Clairic is a native extraction model exposed through [extraction](../guides/EXTRACTION.md).
-Its provider is not a DecisionProvider and is not accepted by createBridge.
+Cloudflare Clairic and OpenRouter Extractions use the dedicated
+[extraction API](../guides/EXTRACTION.md#provider-neutral-extraction).
+Extraction providers are not DecisionProviders and are not accepted by `createBridge`.
 [Live Decisions](../guides/LIVE_DECISIONS.md) owns a connection-oriented command
 and event lifecycle through a dedicated export.

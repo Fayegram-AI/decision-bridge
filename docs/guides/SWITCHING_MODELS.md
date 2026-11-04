@@ -9,14 +9,15 @@ See [model selectors and provider defaults](../../README.md#model-selectors).
 
 ## Native and custom selection
 
-The main package supports native Jev, OpenAI Decisions, and Cloudflare. The
+The main package supports native Jev, OpenAI Decisions, Cloudflare and OpenRouter Decisions. The
 request remains shared when switching providers, subject to capabilities.
 General-purpose models use the explicit [custom generative](CUSTOM_GENERATIVE.md)
 entry point. A new decision protocol uses [custom decision](CUSTOM_DECISION.md).
 The example below demonstrates the opt-in generative path; native alternatives
 follow it.
 
-Clairic [extraction](EXTRACTION.md) and [Live Decisions](LIVE_DECISIONS.md) use
+Cloudflare and OpenRouter [extraction](EXTRACTION.md#provider-neutral-extraction),
+and [Live Decisions](LIVE_DECISIONS.md), use
 dedicated APIs. They cannot replace a provider in an existing `createBridge` call.
 
 ## SDK: same request, different provider
@@ -78,6 +79,7 @@ example and provide that backend's credential in `.env`:
 | `jev` | `TYPESAFE_API_KEY` | Defaults to `jev-latest`; an explicit model overrides it |
 | `openai-decisions` | `OPENAI_API_KEY` | Defaults to `default`; also accepts `luna` and explicit `gpt-6-luna` |
 | `cloudflare-decisions` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for REST | Defaults to `clef`; also supports `clef-flash` and `clef-omni` |
+| `openrouter-decisions` | `OPENROUTER_API_KEY` | Explicit native model ID; see [supported profiles](OPENROUTER_NATIVE.md#common-media-and-capability-profiles) |
 
 Custom generative presets use `createGenerativeProvider` instead. Their types are
 `openai-compatible` (`OPENAI_API_KEY` at the default OpenAI origin), `openrouter`
@@ -89,6 +91,7 @@ using the following native alternatives:
 createProvider({ type: 'jev', model: 'jev-latest' });
 createProvider({ type: 'openai-decisions', model: 'luna' });
 createProvider({ type: 'cloudflare-decisions', model: 'clef-flash' });
+createProvider({ type: 'openrouter-decisions', model: 'cloudflare/clef' });
 createGenerativeProvider({ type: 'openai-compatible', model: process.env.DECISION_MODEL });
 createGenerativeProvider({ type: 'anthropic', model: process.env.DECISION_MODEL });
 ```
@@ -106,7 +109,8 @@ through Decision Bridge. Use `model: 'gpt-6-luna'` to select that explicit upstr
 ID. Mappings are fixed by the installed package release; results expose the
 selection in `meta.requestedModel` and outgoing ID in `meta.resolvedModel`.
 
-For Jev and the generative providers, list models with `await bridge.listModels()`.
+For Jev, native OpenRouter Decisions and the generative providers, list models
+with `await bridge.listModels()`. Native OpenRouter filters its catalog to Decisions models.
 OpenAI Decisions and Cloudflare Clef do not implement model discovery and return
 `UNSUPPORTED_OPERATION`; their capability profiles do not prove account availability.
 A catalog entry does not prove support for a particular response format. Check
@@ -155,6 +159,7 @@ uppercase model placeholders with IDs available to your account/server:
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider jev --model jev-latest --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider openai-decisions --model default --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider cloudflare-decisions --model clef-flash --env-file .env
+npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider openrouter-decisions --model cloudflare/clef --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider custom-generative --preset openrouter --model VENDOR/MODEL_ID --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider custom-generative --preset openai-compatible --model MODEL_ID --env-file .env
 npm exec -- decision-bridge evaluate ./my-decisions/request.json --provider custom-generative --preset anthropic --model MODEL_ID --env-file .env
@@ -216,13 +221,16 @@ Anthropic defaults to one forced output-schema tool and also supports explicit
 model that supports the selected mode; neither mode executes tools or starts an
 agent loop. A different protocol requires the
 [custom-provider contract](CUSTOM_PROVIDERS.md).
-Jev, OpenAI Decisions, and Cloudflare Clef each have a dedicated native provider;
+Jev, OpenAI Decisions, Cloudflare Clef and OpenRouter Decisions each have a dedicated native provider;
 use those provider types for their decision APIs. Native Decisions providers
 reject generative output settings such as `responseFormat` and `maxTokens`.
 
-`choice`, `noul` and `score` answers include probabilities. Jev, OpenAI Decisions and
-Cloudflare probabilities are marked `native`; generative estimates are `elicited`, not
-token logprobs. Jev also supports [bounding boxes](JEV.md#boxes-and-results), which
+Common `choice`, `noul` and `score` answers include probabilities. Jev, OpenAI
+Decisions, Cloudflare and native OpenRouter probabilities are marked `native`;
+generative estimates are `elicited`, not token logprobs. Native OpenRouter answers
+may omit probabilities; use
+`createDecision()` when the selected model cannot supply the distributions required
+by the common API. Jev also supports [bounding boxes](JEV.md#boxes-and-results), which
 return coordinates and confidence. Evaluate accuracy and probability calibration for
 your workload before comparing providers or choosing decision thresholds. See the
 [provider reference](../reference/PROVIDERS.md).

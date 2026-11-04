@@ -17,7 +17,7 @@ export function extractionModel(value = 'clairic') {
     return 'clairic';
 }
 
-function field(spec) {
+export function validateExtractionField(spec, { allowZeroThreshold = false } = {}) {
     check(isRecord(spec) && Object.keys(spec).every(key => FIELD_KEYS.includes(key)) && TYPES.includes(spec.type), 'Invalid extraction field.');
     for (const key of ['instructions', 'unit']) check(spec[key] === undefined || typeof spec[key] === 'string', `${key} must be text.`);
     check(spec.integer === undefined || (['number', 'duration'].includes(spec.type) && typeof spec.integer === 'boolean'), 'Invalid integer option.');
@@ -34,7 +34,8 @@ function field(spec) {
     check(spec.step === undefined || (typeof spec.step === 'number' && spec.step > 0) || ['month', 'year'].includes(spec.step), 'Invalid prediction grid step.');
     check(spec.scale === undefined || ['linear', 'log'].includes(spec.scale), 'Invalid prediction scale.');
     if (spec.scale === 'log') check(typeof spec.min === 'number' && spec.min > 0, 'Log grids require positive numeric bounds.');
-    check(spec.null_threshold === undefined || (typeof spec.null_threshold === 'number' && spec.null_threshold > 0 && spec.null_threshold <= 1), 'Invalid null threshold.');
+    check(spec.null_threshold === undefined || (typeof spec.null_threshold === 'number' &&
+        (allowZeroThreshold ? spec.null_threshold >= 0 : spec.null_threshold > 0) && spec.null_threshold <= 1), 'Invalid null threshold.');
     if (spec.type === 'forecast') {
         check(spec.horizon === undefined || (Number.isSafeInteger(spec.horizon) && spec.horizon > 0), 'Invalid forecast horizon.');
         check(spec.interval === undefined || ['step', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'].includes(spec.interval), 'Invalid forecast interval.');
@@ -49,7 +50,7 @@ export function validateExtractionStructure(input) {
     check(isRecord(request.fields) && Object.keys(request.fields).length > 0, 'Extraction requires named fields.');
     for (const [name, spec] of Object.entries(request.fields)) {
         check(/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name), 'Invalid extraction field name.');
-        field(spec);
+        validateExtractionField(spec);
     }
     check(request.state === undefined || typeof request.state === 'string', 'Extraction state must be text.');
     check((request.state?.length ?? 0) > 0 || (Array.isArray(request.images) && request.images.length > 0), 'Provide text or embedded images.');
@@ -79,13 +80,13 @@ export function validateExtractionRequest(input, options = {}) {
 }
 
 /** Validate established fields without guessing predictive structures or span units. */
-export function validateExtractionResponse(input, request) {
+export function validateExtractionResponse(input, request, { openRouter = false } = {}) {
     const data = cloneJson(input, 'extraction response', 'INVALID_RESPONSE');
     const invalid = (condition, message) => check(condition, message, 'INVALID_RESPONSE');
     invalid(isRecord(data) && typeof data.model === 'string' && data.model.trim() && isRecord(data.answers) &&
-        typeof data.truncated === 'boolean' && isRecord(data.usage), 'Invalid extraction response.');
+        (typeof data.truncated === 'boolean' || openRouter && data.truncated === undefined) && isRecord(data.usage), 'Invalid extraction response.');
     invalid(Object.keys(data.answers).length === Object.keys(request.fields).length, 'Extraction answer count mismatch.');
-    invalid(data.state_text === undefined || typeof data.state_text === 'string', 'Invalid returned state text.');
+    invalid(data.state_text === undefined || typeof data.state_text === 'string' || openRouter && data.state_text === null, 'Invalid returned state text.');
     for (const key of ['input_tokens', 'output_tokens', 'state_tokens', 'image_tokens', 'schema_tokens', 'passes']) {
         if (['input_tokens', 'output_tokens'].includes(key) || own(data.usage, key)) {
             invalid(Number.isSafeInteger(data.usage[key]) && data.usage[key] >= 0, 'Invalid extraction usage.');

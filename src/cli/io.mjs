@@ -72,7 +72,7 @@ export async function readJson(path, context) {
   catch { throw new DecisionError('Input is not valid UTF-8 JSON.', { code: 'VALIDATION_ERROR' }); }
 }
 
-/** Streaming JSONL: provider-specific per-line limit, total 64 MiB; blanks ignored. */
+/** Streaming JSONL: provider-specific per-line limit, bounded total input; blanks ignored. */
 export async function* readJsonLines(path, context) {
   const decoder = new TextDecoder('utf-8', { fatal: true });
   const lineLimit = context.maxInputBytes ?? INPUT_LIMIT;
@@ -83,7 +83,7 @@ export async function* readJsonLines(path, context) {
     catch { return { line, error: { code: 'VALIDATION_ERROR', message: 'Line is not valid JSON.' } }; }
   }
   try {
-    for await (const chunk of chunks(path, context, 64 * 1024 * 1024)) {
+    for await (const chunk of chunks(path, context, Math.max(64 * 1024 * 1024, lineLimit + 2))) {
       pending += decoder.decode(chunk, { stream: true });
       let end;
       while ((end = pending.indexOf('\n')) !== -1) {

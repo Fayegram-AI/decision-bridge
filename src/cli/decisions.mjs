@@ -6,9 +6,16 @@ import { CLOUDFLARE_MAX_REQUEST_LIMIT } from '../providers/cloudflare-profile.mj
 import { resolveOpenAIModel } from '../providers/openai-profile.mjs';
 import { preflightCommonJevDecision, preflightJevDecision, encodeJevDecision } from '../providers/jev-preflight.mjs';
 import { JEV_REQUEST_LIMIT } from '../providers/jev-profile.mjs';
+import { prepareOpenRouterDecision, prepareCommonOpenRouterDecision } from '../providers/openrouter-decisions.mjs';
 
 /** Provider-specific native dispatch is shared by validation, initialization and calls. */
 export function decisionProfile(provider) {
+    if (provider === 'openrouter-decisions') return {
+        common: (input, settings) => prepareCommonOpenRouterDecision(input, settings).request,
+        native: prepareOpenRouterDecision, encode: input => prepareCommonOpenRouterDecision(input).native,
+        models: true, inputLimit: 8 * 1024 * 1024,
+        options: config => ({ model: config.model, maxRequestBytes: config.maxRequestBytes, providerPreferences: config.providerPreferences }),
+    };
     if (provider === 'jev') return {
         common: preflightCommonJevDecision, native: preflightJevDecision, encode: encodeJevDecision,
         models: true, inputLimit: JEV_REQUEST_LIMIT,

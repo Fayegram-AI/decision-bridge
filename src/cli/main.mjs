@@ -13,7 +13,7 @@ import { isModule } from './config-validation.mjs';
 import { loadConfig, configuredProvider } from './config.mjs';
 import { assertDistinctFiles, createWriter, readJson, readJsonLines } from './io.mjs';
 import { mapOrdered } from './ordered.mjs';
-import { validateExtractionRequest } from '../extraction/index.mjs';
+import { extractionProfile } from './extractions.mjs';
 import { runLiveCli } from './live.mjs';
 import { runRoutingCli } from './routing.mjs';
 import { routingSecrets } from './routing-config.mjs';
@@ -22,10 +22,10 @@ const SAMPLE_PATH = fileURLToPath(new URL('../../examples/request.json', import.
 const BOOLS = ['help', 'version', 'pretty', 'compact', 'no-auth', 'force', 'native', 'reject-if-busy', 'no-reject-if-busy',
     'jev-images', 'no-jev-images', 'jev-long-context', 'no-jev-long-context', 'interactive', 'no-interactive', 'no-routing-prompt'];
 const STRINGS = ['config', 'env-file', 'provider', 'preset', 'model', 'base-url', 'api-key-env', 'timeout-ms',
-  'retries', 'max-tokens', 'response-format', 'anthropic-api-version', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind', 'route'];
+  'retries', 'max-tokens', 'response-format', 'anthropic-api-version', 'anthropic-workspace-id', 'token-parameter', 'input', 'output', 'concurrency', 'provider-module', 'account-id', 'gateway-id', 'kind', 'route'];
 const FIELD_MAP = { preset: 'preset', provider: 'provider', model: 'model', 'base-url': 'baseURL', 'api-key-env': 'apiKeyEnv',
   'timeout-ms': 'timeoutMs', retries: 'maxRetries', 'max-tokens': 'maxTokens',
-  'response-format': 'responseFormat', 'anthropic-api-version': 'apiVersion', 'token-parameter': 'tokenParameter', 'provider-module': 'module', 'account-id': 'accountId' };
+  'response-format': 'responseFormat', 'anthropic-api-version': 'apiVersion', 'anthropic-workspace-id': 'workspaceId', 'token-parameter': 'tokenParameter', 'provider-module': 'module', 'account-id': 'accountId' };
 
 export const HELP = `decision-bridge ${VERSION} — typed decisions, Jev by default
 
@@ -45,7 +45,8 @@ Usage:
 
 Command aliases: decision, faye-decision
 
-Native providers: jev, openai-decisions, cloudflare-decisions
+Native decisions: jev, openai-decisions, cloudflare-decisions, openrouter-decisions
+Extraction: cloudflare-extraction, openrouter-extraction
 Custom paths: custom-decision, custom-generative
 Generative presets: openai-compatible, openrouter, anthropic
 
@@ -63,8 +64,8 @@ Options:
   --api-key-env NAME        Read credential from this environment variable
   --no-auth                 Local OpenAI-compatible endpoint only
   --timeout-ms N            End-to-end evaluation/provider deadline
-  --retries N               HTTP retries, 0–10; OpenAI/Cloudflare default 0, Jev 2
-  --native                  Selected decision provider native format (init/evaluate/validate/batch)
+  --retries N               HTTP retries, 0–10; OpenAI/Cloudflare/OpenRouter default 0, Jev 2
+  --native                  Selected provider native format (init/evaluate/validate/batch)
   --jev-images              Enable experimental Jev images and box questions
   --no-jev-images           Explicitly disable Jev images
   --jev-long-context        Enable experimental Jev 262k context
@@ -76,6 +77,7 @@ Options:
   --max-tokens N            Generative output-token budget; default 4096
   --response-format FORMAT  Anthropic: tool (default) or json_schema; chat: json_schema/json_object/text
   --anthropic-api-version V Anthropic: 2023-06-01 (default) or 2026-10-21
+  --anthropic-workspace-id ID Anthropic workspace header for non-scoped keys
   --token-parameter NAME    max_completion_tokens or max_tokens
   --provider-module FILE    Trusted ESM module; explicitly select a custom path
   --input FILE              Alternative to positional request filename
@@ -210,11 +212,9 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
     }
     check(command !== 'inspect' && values.route === undefined && !values.interactive && !values['no-interactive'] && !values['no-routing-prompt'],
       'Routing options and inspect require a schemaVersion: 2 configuration; use init --route auto to create one.', 'USAGE_ERROR');
-    check(extracting === (loaded.config.provider === 'cloudflare-extraction'), 'Selected provider does not match the command operation.', 'CONFIGURATION_ERROR');
-    const profile = extracting ? { common: validateExtractionRequest, inputLimit: 64 * 1024 * 1024,
-      options: config => Object.fromEntries(['model', 'maxRequestBytes', 'maxRetries', 'rejectIfBusy', 'gateway']
-        .filter(key => config[key] !== undefined).map(key => [key, config[key]])) } : decisionProfile(loaded.config.provider);
-    check(!extracting || !values.native, 'Extraction already uses its native field schema.', 'USAGE_ERROR');
+    check(extracting === (loaded.config.provider.endsWith('-extraction')), 'Selected provider does not match the command operation.', 'CONFIGURATION_ERROR');
+    const profile = extracting ? extractionProfile(loaded.config.provider) : decisionProfile(loaded.config.provider);
+    check(!values.native || !!profile?.native, 'This provider does not expose a separate native request format.', 'USAGE_ERROR');
     check(!values.native || (profile && ['init', 'evaluate', 'validate', 'batch'].includes(command)),
       '--native requires a decision provider and init/evaluate/validate/batch.', 'USAGE_ERROR');
     check(!values.native || command === 'init' || values.input || positionals[1],
@@ -279,7 +279,7 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
       const provider = await configuredProvider(loaded, { signal: internal.signal });
       const bridge = extracting ? undefined : createBridge({ provider, timeoutMs: loaded.config.timeoutMs ?? 60000 });
       async function evaluateInput(input) {
-        if (extracting) return provider.extract(input, { signal: internal.signal });
+        if (extracting) return values.native ? provider.createExtraction(input, { signal: internal.signal }) : provider.extract(input, { signal: internal.signal });
         if (!values.native) return bridge.evaluate(input, { signal: internal.signal });
         const budget = deadline(loaded.config.timeoutMs ?? 60000, internal.signal);
         try {

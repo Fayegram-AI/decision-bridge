@@ -117,6 +117,11 @@ implementing and validating them.
 
 ## OpenAI-compatible servers
 
+The [GPT-6.1 Terra configuration](../../examples/openai-terra.config.json) uses
+the chat-completions preset with JSON-schema output. Terra is a general-purpose
+model with [documented chat and structured-output support](https://developers.openai.com/api/docs/models/gpt-6.1-terra);
+the native Decisions provider retains its Luna selectors.
+
 Default base URL: `https://api.openai.com/v1`. Base paths such as `/v1` are preserved;
 provide the API base, not the final `/chat/completions` path.
 
@@ -152,11 +157,15 @@ The preset does not guarantee which upstream host serves a model; use OpenRouter
 routing controls for stricter requirements.
 
 Select a **generative model** that supports the chosen output mode. Other API
-protocols require an explicit [custom provider](CUSTOM_PROVIDERS.md).
+protocols use the [native OpenRouter providers](OPENROUTER_NATIVE.md).
 
 ## Anthropic
 
 The provider sends Messages API headers `x-api-key` and `anthropic-version`.
+Set `workspaceId` for keys that are not workspace-scoped; it sends
+`anthropic-workspace-id` on Messages and model discovery. CLI equivalents are
+`--anthropic-workspace-id` and `DECISION_ANTHROPIC_WORKSPACE_ID`. See the
+[authentication guide](https://platform.claude.com/docs/en/manage-claude/authentication).
 Its defaults are API `2023-06-01` and `responseFormat: 'tool'`. Tool mode defines
 and forces a synthetic `submit_decisions` tool whose input schema is the expected
 answer object. The returned `tool_use.input` carries the data; no tool is executed
@@ -217,3 +226,18 @@ precedence over environment, configuration and defaults. See the
 Refusals, truncated output, unexpected stop reasons, and invalid output fail in
 both modes. `GET /v1/models` uses the selected version and returns the first page
 with `has_more` / `last_id` preserved. Automatic pagination is not implemented.
+
+### Request capacity and cumulative threads
+
+First-party Messages requests can explicitly set `maxRequestBytes` through
+128,000,000 bytes. The default remains 8 MiB; response budgets and custom-origin
+request budgets remain capped at 64 MiB. CLI JSON and JSONL readers honor the
+configured request budget. See the [request limits](https://platform.claude.com/docs/en/api/overview#request-size-limits).
+
+Use [explicit thread objects](ANTHROPIC_THREADS.md) for cumulative state. Thread
+mode is opt-in, retains bounded history, and has its own recovery and retention
+contract. `parameters.thread` is reserved.
+
+Existing configurations using Opus 4.8 with `speed: "fast"` should migrate to
+Opus 5.5 before November 30, 2026. The SDK preserves explicit model and speed
+choices; see [fast-mode availability](https://platform.claude.com/docs/en/build-with-claude/fast-mode#availability).

@@ -15,19 +15,23 @@ ordered `input` or `conversation`. The provider must support the input form you 
 The SDK validates the returned decisions. Extraction and Live have separate APIs and
 request formats. For provider-specific input forms, consult the
 [capability comparison](reference/PROVIDERS.md#common-request-capabilities). The common
-bridge API and dedicated native APIs have separate request shapes; the Jev, OpenAI and
-Cloudflare guides cover both.
+bridge API and dedicated native APIs have separate request shapes; the Jev, OpenAI,
+Cloudflare and OpenRouter guides cover both.
 
 ## Version availability
 
-These guides describe **0.1.5**. Use the documentation bundled with your installed
+These guides describe **0.1.6**. Use the documentation bundled with your installed
 package. For earlier versions, consult the
+[0.1.5 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.5/docs),
 [0.1.4 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.4/docs),
 [0.1.3 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.3/docs)
 and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.2/docs).
 
 | Feature | First supported version |
 | --- | --- |
+| Jev boxes through stable `jev-latest`; native OpenRouter Decisions and Extractions | 0.1.6 |
+| Anthropic workspace headers, larger request budgets and cumulative threads | 0.1.6 |
+| Live startup snapshots, sparse delegation updates, acknowledgement delay, and expanded message/tool items | 0.1.6 |
 | Anthropic JSON-schema output and explicit API-version selection | 0.1.5 |
 | OpenAI JSON content, question content and companion builders; Live JSON/hosted-image items | 0.1.5 |
 | Configurable decision/extraction routing and CLI routing registries; auto mode is experimental | 0.1.4 |
@@ -37,7 +41,7 @@ and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/de
 
 See [installation](guides/GETTING_STARTED.md#install-into-your-application) for setup
 and the [changelog](../CHANGELOG.md) for version history. Earlier APIs remain
-supported in 0.1.5.
+supported in 0.1.6.
 
 ## Use the bridge
 
@@ -48,10 +52,12 @@ supported in 0.1.5.
 | [Platforms](guides/PLATFORMS.md) | Windows, macOS, and Linux setup |
 | [Switching models](guides/SWITCHING_MODELS.md) | Backend and model selection |
 | [Configurable routing](guides/ROUTING.md) | Automatic or direct routes, eligibility, rules, selectors, clarification, recovery and registry configuration |
+| [OpenRouter native](guides/OPENROUTER_NATIVE.md) | Native model IDs, Decisions/Extractions, media, metadata and routing |
+| [Anthropic threads](guides/ANTHROPIC_THREADS.md) | Explicit cumulative evaluations, bounded history and recovery |
 | [Jev](guides/JEV.md) | Common/native images, boxes, experimental long context, model selection, and CLI opt-ins |
 | [OpenAI Decisions](guides/OPENAI_DECISIONS.md) | Model selectors, common/native access, JSON/question content, conversation/tool history, cache controls, and typed values |
 | [Cloudflare Clef / Clef-flash / Clef-omni](guides/CLOUDFLARE_DECISIONS.md) | Common/native decisions, embedded images and Omni audio/video, REST and Workers AI binding, busy-mode compatibility, and optional Gateway |
-| [Clairic extraction](guides/EXTRACTION.md) | Nine extraction/prediction types, REST/binding, native results and extraction CLI |
+| [Clairic extraction](guides/EXTRACTION.md) | Nine extraction/prediction types, REST/binding, native results, extraction CLI and shared validation/batch contracts |
 | [Live Decisions](guides/LIVE_DECISIONS.md) | Existing-connection controller, JSON/hosted-image content, acknowledgements, correlation, and offline replay |
 | [Customization](guides/CUSTOMIZATION.md) | Questions, templates, extensions, and policies |
 | [Custom providers](guides/CUSTOM_PROVIDERS.md) | Common classified contract and explicit CLI module loading |

@@ -58,3 +58,11 @@ checks and optional service checks.
 - [Scoped public npm packages](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/)
 - [npm staged publishing](https://docs.npmjs.com/staged-publishing/) and [stage commands](https://docs.npmjs.com/cli/v12/commands/npm-stage/)
 - [GitHub private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository)
+
+## Native OpenRouter and Anthropic thread contracts
+
+- [OpenRouter OpenAPI](https://openrouter.ai/openapi.json)
+- [OpenRouter multimodal Decisions](https://openrouter.ai/docs/guides/community/multimodal-decisions)
+- [Anthropic authentication](https://platform.claude.com/docs/en/manage-claude/authentication)
+- [Anthropic request limits](https://platform.claude.com/docs/en/api/overview#request-size-limits)
+- [Anthropic message threads](https://platform.claude.com/docs/en/build-with-claude/message-threads)

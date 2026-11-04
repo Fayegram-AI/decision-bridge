@@ -136,13 +136,15 @@ export class JsonResponseTransport {
 
     constructor({ secrets = [], timeoutMs = 30000, maxRetries = 2,
         maxRequestBytes = 8 * 1024 * 1024, maxResponseBytes = 8 * 1024 * 1024,
-        errorDecoder, responseMetadata } = {}) {
+        errorDecoder, responseMetadata, requestByteCeiling = MAX_BYTES } = {}) {
         check(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= 2147483647,
             'timeoutMs must be a positive 32-bit integer.', 'CONFIGURATION_ERROR');
         check(Number.isSafeInteger(maxRetries) && maxRetries >= 0 && maxRetries <= 10,
             'maxRetries must be an integer from 0 to 10.', 'CONFIGURATION_ERROR');
-        for (const bytes of [maxRequestBytes, maxResponseBytes]) check(Number.isSafeInteger(bytes) &&
-            bytes > 0 && bytes <= MAX_BYTES, 'Byte limits must be integers in [1, 67108864].', 'CONFIGURATION_ERROR');
+        for (const [bytes, ceiling] of [[maxRequestBytes, requestByteCeiling], [maxResponseBytes, MAX_BYTES]]) {
+            check(Number.isSafeInteger(bytes) && bytes > 0 && bytes <= ceiling,
+                'Byte limit exceeds the configured transport ceiling.', 'CONFIGURATION_ERROR');
+        }
         this.#options = { timeoutMs, maxRetries, maxRequestBytes, maxResponseBytes };
         this.#secrets = [...secrets];
         this.#errorDecoder = errorDecoder;

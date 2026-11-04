@@ -17,9 +17,10 @@ for (const responseFormat of ['tool', 'json_schema']) for (const apiVersion of [
         const calls = [];
         const model = { id: 'catalog-model', capabilities: { example: true } };
         const provider = createGenerativeProvider({ type: 'anthropic', apiKey: 'fixture', model: 'selected',
-            responseFormat, apiVersion, parameters: { output_config: { effort: 'medium' } }, fetchImpl: async (url, init) => {
+            responseFormat, apiVersion, workspaceId: 'wrkspc_fixture', parameters: { output_config: { effort: 'medium' } }, fetchImpl: async (url, init) => {
                 calls.push({ url, ...init });
                 assert.equal(init.headers['anthropic-version'], apiVersion);
+                assert.equal(init.headers['anthropic-workspace-id'], 'wrkspc_fixture');
                 return Response.json(init.method === 'GET' ? { data: [model], has_more: true, last_id: model.id } : message(responseFormat));
             } });
         const result = await createBridge({ provider }).evaluate(request);

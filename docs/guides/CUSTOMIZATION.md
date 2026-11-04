@@ -138,7 +138,7 @@ cannot replace tests, permission checks, or human approval for consequential wor
 
 When a provider declares `probabilityDecimalPlaces` through
 `getResultValidationOptions(model)`, pass that precision to `decideChoice` for
-rounded distributions. Cloudflare declares four-decimal precision; the helper
+rounded distributions. Cloudflare and native OpenRouter declare four-decimal precision; the helper
 otherwise keeps the baseline 0.001 tolerance. See the
 [Cloudflare policy example](CLOUDFLARE_DECISIONS.md#embedded-images-and-limits)
 and [SDK validation contract](../reference/SDK.md#additional-exports).

@@ -25,7 +25,7 @@ export function validateRoutingConfig(input) {
         check(isRecord(route.config) && route.config.schemaVersion !== 2 && typeof route.config.provider === 'string', 'Concrete route requires provider configuration.', 'CONFIGURATION_ERROR');
         route.config = validateConfig(route.config, { complete: route.enabled !== false });
         check(route.operation === undefined || ['decision', 'extraction'].includes(route.operation), 'Unknown route operation.', 'CONFIGURATION_ERROR');
-        check(route.operation === undefined || (route.operation === 'extraction') === (route.config.provider === 'cloudflare-extraction'), 'Route operation mismatch.', 'CONFIGURATION_ERROR');
+        check(route.operation === undefined || (route.operation === 'extraction') === (route.config.provider.endsWith('-extraction')), 'Route operation mismatch.', 'CONFIGURATION_ERROR');
         for (const key of ['enabled', 'required', 'singleDispatch', 'allowGenerative']) check(route[key] === undefined || typeof route[key] === 'boolean', 'Route flags must be boolean.', 'CONFIGURATION_ERROR');
         check(route.description === undefined || (typeof route.description === 'string' && route.description.length <= 2000), 'Invalid route description.', 'CONFIGURATION_ERROR');
         check(route.cooldownGroup === undefined || (typeof route.cooldownGroup === 'string' && route.cooldownGroup.length > 0 && route.cooldownGroup.length <= 100), 'Invalid cooldownGroup.', 'CONFIGURATION_ERROR');

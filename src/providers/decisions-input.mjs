@@ -51,22 +51,24 @@ function outputPart(part) {
 }
 
 /** Keep strings, item order, explicit nulls and tool arguments verbatim. */
-export function validateDecisionInput(input) {
+export function validateDecisionInput(input, { live = false, pairTools = true } = {}) {
     if (typeof input === 'string') return;
     check(Array.isArray(input) && input.length > 0, 'input must be text or a nonempty item array.');
     const calls = new Map();
     for (const item of input) {
         if (isRecord(item) && own(item, 'role')) {
-            fields(item, ['type', 'role', 'content', 'phase'], ['role', 'content'], 'message');
+            fields(item, ['type', 'role', 'content', 'phase', ...(live ? ['id'] : [])], ['role', 'content'], 'message');
+            if (live && own(item, 'id')) check(item.id === null || typeof item.id === 'string' && item.id.length > 0, 'Invalid message ID.');
             check(item.type === undefined || item.type === 'message', 'Invalid message type.');
             check(['user', 'developer', 'system', 'assistant'].includes(item.role), 'Unsupported message role.');
             check(item.phase === undefined || item.phase === null ||
                 ['commentary', 'final_answer'].includes(item.phase), 'Invalid assistant phase.');
+            if (live && own(item, 'phase')) check(item.role === 'assistant', 'Only assistant messages accept phase.');
             if (typeof item.content !== 'string') {
                 check(Array.isArray(item.content) && item.content.length > 0, 'Message requires ordered content.');
                 for (const part of item.content) {
                     if (item.role === 'assistant') outputPart(part);
-                    else validateDecisionContentPart(part, { textOnly: item.role !== 'user', json: item.role === 'user' });
+                    else validateDecisionContentPart(part, { textOnly: item.role !== 'user', json: item.role === 'user', cache: !live });
                 }
             }
             continue;
@@ -86,10 +88,10 @@ export function validateDecisionInput(input) {
             text(item[payload], payload);
             calls.set(item.call_id, item.type);
         } else {
-            check(calls.get(item.call_id) === item.type.replace('_output', ''), 'Tool output requires a matching preceding call.');
+            if (pairTools) check(calls.get(item.call_id) === item.type.replace('_output', ''), 'Tool output requires a matching preceding call.');
             if (typeof item.output !== 'string') {
                 check(Array.isArray(item.output) && item.output.length > 0, 'Tool output requires text or ordered content.');
-                item.output.forEach(part => validateDecisionContentPart(part));
+                item.output.forEach(part => validateDecisionContentPart(part, { cache: !live }));
             }
         }
     }

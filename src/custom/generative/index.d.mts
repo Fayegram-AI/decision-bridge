@@ -1,4 +1,4 @@
-import type { Provider, TransportOptions, JsonValue, Questions, EvaluationRequest, ProviderCallOptions, ProviderResult, Capabilities, ModelList, ResolvedRequest, Usage } from '../../index.mjs';
+import type { Provider, TransportOptions, JsonValue, State, Questions, EvaluationRequest, ProviderCallOptions, ProviderResult, Capabilities, ModelList, ResolvedRequest, Usage } from '../../index.mjs';
 
 export interface GenerativeProvider extends Provider { readonly kind: 'generative'; }
 export type GenerativeProviderDefinition = Omit<Provider, 'kind' | 'probabilitySource'> & { readonly probabilitySource?: 'elicited' };
@@ -12,7 +12,7 @@ export interface OpenAICompatibleOptions extends TransportOptions {
 }
 export interface OpenRouterOptions extends Omit<OpenAICompatibleOptions, 'baseURL' | 'apiKey'> { apiKey?: string; }
 export interface AnthropicOptions extends TransportOptions {
-  apiKey?: string; model?: string; baseURL?: string; maxTokens?: number;
+  apiKey?: string; model?: string; baseURL?: string; workspaceId?: string; maxTokens?: number;
   /** Independent opt-ins; omitted settings preserve the legacy tool protocol. */
   responseFormat?: 'tool' | 'json_schema'; apiVersion?: '2023-06-01' | '2026-10-21';
   parameters?: Readonly<Record<string, JsonValue>>;
@@ -25,9 +25,18 @@ export class OpenAICompatibleProvider implements GenerativeProvider {
   getCapabilities(model?: string): Capabilities;
 }
 export class OpenRouterProvider extends OpenAICompatibleProvider { constructor(options?: OpenRouterOptions); }
+export interface AnthropicThreadOptions<Q extends Questions = Questions> {
+    readonly questions: Q; readonly model?: string; readonly maxTurns?: number; readonly maxHistoryBytes?: number;
+}
+export interface AnthropicThread<Q extends Questions = Questions> {
+    evaluate(state: State, options?: ProviderCallOptions): Promise<ProviderResult<Q>>;
+    reset(): void;
+    dispose(): void;
+}
 export class AnthropicProvider implements GenerativeProvider {
   readonly kind: 'generative'; readonly name: string; readonly probabilitySource: 'elicited'; readonly defaultModel?: string;
   constructor(options?: AnthropicOptions);
+  createThread<const Q extends Questions>(options: AnthropicThreadOptions<Q>): AnthropicThread<Q>;
   evaluate<const Q extends Questions>(request: EvaluationRequest<Q>, options?: ProviderCallOptions): Promise<ProviderResult<Q>>;
   listModels(options?: ProviderCallOptions): Promise<ModelList>;
   getCapabilities(model?: string): Capabilities;
@@ -35,6 +44,7 @@ export class AnthropicProvider implements GenerativeProvider {
 
 export type GenerativeProviderConfig = ({ type: 'openai-compatible' } & OpenAICompatibleOptions)
     | ({ type: 'openrouter' } & OpenRouterOptions) | ({ type: 'anthropic' } & AnthropicOptions);
+export function createGenerativeProvider(options: { type: 'anthropic' } & AnthropicOptions): AnthropicProvider;
 export function createGenerativeProvider(options: GenerativeProviderConfig): GenerativeProvider;
 export function buildResponseSchema(questions: Questions): Readonly<Record<string, JsonValue>>;
 /** Validates shared state and legacy questions; richer input/capabilities are rejected. */

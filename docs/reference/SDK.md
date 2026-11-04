@@ -6,7 +6,7 @@ JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source chec
 the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
 declarations in `src/index.d.mts`.
 
-This reference covers **0.1.5**.
+This reference covers **0.1.6**.
 See [version availability](../README.md#version-availability).
 
 ## Create a bridge
@@ -49,8 +49,8 @@ guides. These are SDK options, not per-evaluation bridge options.
 | Option | Default and behavior |
 | --- | --- |
 | `timeoutMs` | 30,000 ms; positive integer through 2,147,483,647; one transport budget for dispatch, retries, backoff, and response reading |
-| `maxRetries` | Additional eligible attempts, 0–10; Jev and generative presets default to 2, native OpenAI and Cloudflare to 0 |
-| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB; Jev defaults to 32 MiB, with explicit client budgets through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
+| `maxRetries` | Additional eligible attempts, 0–10; Jev and ordinary generative calls default to 2; native OpenAI, Cloudflare and OpenRouter default to 0; Anthropic thread transport retries are disabled |
+| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB (first-party Anthropic Messages: 128,000,000 bytes); Jev defaults to 32 MiB, with explicit client budgets through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
 | `maxResponseBytes` | 8 MiB; configurable from 1 byte through 64 MiB; applies while reading the response body |
 | `fetchImpl` | Optional `(url: string, init?: RequestInit) => Promise<Response>`; defaults to the runtime's `fetch` |
 
@@ -94,10 +94,11 @@ see [conversation and prompt caching](../guides/OPENAI_DECISIONS.md#conversation
 JSON `data` accepts an object or array of objects. JSON parts require `jsonInput`
 and do not accept cache breakpoints. User conversation content uses the native
 `input_json` spelling.
-Audio/video are supported by Cloudflare Clef-omni and explicitly capable custom providers; other
-built-ins reject them before dispatch. Cloudflare requires images → audio →
+Audio/video are supported by Cloudflare Clef-omni, its native OpenRouter profile,
+and explicitly capable custom providers. Cloudflare requires images → audio →
 videos → text. Its media use embedded data URLs, with format and client-budget
 checks described in the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video).
+OpenRouter preserves ordered parts; see its [media profiles](../guides/OPENROUTER_NATIVE.md#common-media-and-capability-profiles).
 
 The bridge makes a read-only copy of the request, runs preparation hooks for its input
 form, calls the provider once, and validates the response. It then passes the read-only
@@ -210,10 +211,10 @@ Native selections are retained after validation.
 Typed choice questions instead return a typed string/boolean selection and an
 array of `{ value, probability }` entries. See the [Decisions guide](../guides/OPENAI_DECISIONS.md).
 
-Cloudflare selects four-decimal probability validation. Distributions aligned to
+Cloudflare and native OpenRouter select four-decimal probability validation. Distributions aligned to
 that precision allow `max(0.001, optionCount * 0.00005)`, plus a small floating-point
-allowance. Other Cloudflare distributions and existing providers retain the 0.001
-baseline. The bridge selects this policy from the provider contract, never from
+allowance. Distributions outside that precision and providers without this policy
+use the 0.001 baseline. The bridge selects this policy from the provider contract, never from
 response metadata, and preserves all returned numbers.
 
 **Noul:** `{ type: 'noul', noul }`, with a number in [0,1]. The library never
@@ -232,7 +233,7 @@ top-left, with `top < bottom` and `left < right`. Confidence, when present, is i
 for model requirements and handling an absent target.
 
 **Usage:** `input_tokens` and `output_tokens` are nonnegative integers or null.
-Jev accepts explicitly null counts as unknown; OpenAI Decisions and Cloudflare
+Jev accepts explicitly null counts as unknown; OpenAI Decisions, Cloudflare and native OpenRouter
 require reported integer counts. OpenAI and
 Anthropic cache creation/read counts are preserved separately when provided;
 Cloudflare forwards reported usage without estimating additional fields. The SDK
@@ -253,6 +254,7 @@ does not calculate prices, cache savings or token estimates.
 | `attempts`, `requestId` | Transport diagnostics when supplied |
 | `gatewayLogId` | Cloudflare Gateway response identifier when reported |
 | `openaiDecisions`, `cloudflareDecisions` | Provider-specific reported usage and native answer/confidence metadata |
+| `openRouter`, `upstreamProvider`, `responseId` | Native OpenRouter usage, serving provider and response identity when reported |
 | `durationMs` | Provider transport duration, including retries and body reading |
 | `totalDurationMs` | Bridge duration through observation |
 | `observerDurationMs` | Observation phase duration; initially zero inside observers |
@@ -388,8 +390,9 @@ for complete policy, callback, selector, recovery and diagnostic behavior.
 ## Additional exports
 
 - `createProvider(config)`: factory requiring an explicit `type` equal to `jev`,
-  `openai-decisions`, or `cloudflare-decisions`.
-- `JevProvider`, `OpenAIDecisionsProvider`, `CloudflareDecisionsProvider`: native provider classes.
+  `openai-decisions`, `cloudflare-decisions`, or `openrouter-decisions`.
+- `JevProvider`, `OpenAIDecisionsProvider`, `CloudflareDecisionsProvider`,
+  `OpenRouterDecisionsProvider`: native provider classes.
 - `box(instructions)` and `JevProvider.createDecision(request, options?)`:
   bounding boxes and native JSON assets; see the [Jev guide](../guides/JEV.md).
 - `scoreLevels(instructions, levels)` and the array overload of `choice`:
@@ -398,6 +401,8 @@ for complete policy, callback, selector, recovery and diagnostic behavior.
   access returning `{ decision, meta }`; see the [Decisions guide](../guides/OPENAI_DECISIONS.md).
 - `CloudflareDecisionsProvider.createDecision(request, options?)`: dedicated native
   Clef access returning `{ decision, meta }`; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md).
+- `OpenRouterDecisionsProvider.createDecision(request, options?)`: native Decisions
+  access preserving optional probabilities and confidence; see the [OpenRouter guide](../guides/OPENROUTER_NATIVE.md).
 - `validateRequest(input, defaultModel?)`: snapshot and validate. Requires
   an own `input.model` property or an explicitly supplied default; inherited
   models are ignored, and it never selects a Jev model.
@@ -436,6 +441,11 @@ The options are independent and apply through `createGenerativeProvider` too.
 See [Anthropic output and version settings](../guides/CUSTOM_GENERATIVE.md#json-output-and-api-versions)
 for parameter restrictions, thinking-block handling and canonical result semantics.
 
+`workspaceId` selects an Anthropic workspace for a key that is not workspace-scoped.
+`AnthropicProvider.createThread({ questions, model?, maxTurns?, maxHistoryBytes? })`
+returns a typed `AnthropicThread` with `evaluate(state, { signal }?)`, `reset()`
+and `dispose()`. See [thread semantics and retention](../guides/ANTHROPIC_THREADS.md).
+
 Import these as package subpaths under `@fayegram-ai/decision-bridge/`. All SDK
 entry points are browser-safe ESM. Definition helpers preserve callback receivers
 and validate/freeze wrappers; they do not implement a new protocol. Both kinds
@@ -473,7 +483,7 @@ Providers can declare a pure synchronous `getResultValidationOptions(model)` hoo
 its policy is validated before inference and is not read from response metadata.
 Returning a Promise is a configuration error; its rejection is observed without
 calling inference or reading a custom `then` accessor.
-Cloudflare selects four-decimal rounding; other built-ins retain the 0.001 sum tolerance.
+Cloudflare and native OpenRouter select four-decimal rounding; other built-ins retain the 0.001 sum tolerance.
 Unknown keys, accessors, symbol keys, non-enumerable fields, a non-boolean `native`,
 or invalid probability precision are rejected as `CONFIGURATION_ERROR`.
 An omitted or explicitly undefined `native` value keeps the default `false`.
@@ -497,16 +507,33 @@ by the root `createProvider` factory or implements the bridge's `evaluate` contr
 
 | Export | Runtime API | Result / integration |
 | --- | --- | --- |
-| `extraction` | `CloudflareExtractionProvider`, `validateExtractionRequest`, `extractBatch` | Immutable `{ extraction, meta }`, with native values and model/transport diagnostics; [extraction guide](../guides/EXTRACTION.md) |
+| `extraction` | `createExtractionProvider`, `CloudflareExtractionProvider`, `OpenRouterExtractionProvider`, `validateExtractionRequest`, `extractBatch` | Immutable `{ extraction, meta }`, with native values and model/transport diagnostics; [extraction guide](../guides/EXTRACTION.md) |
 | `live` | `createLiveDecisions`, `validateLiveConfiguration`, `validateLiveCommand`, `validateLiveEvent` | Commands, acknowledgements and event subscriptions over a caller-owned connection; [Live guide](../guides/LIVE_DECISIONS.md) |
 
 Both export their request, result, configuration and transport types. Extraction
-supports REST or a Workers AI binding; Live owns no authentication, audio,
-connection establishment or reconnection. See the [CLI reference](CLI.md) for
-their command namespaces.
+also exports `ExtractionProvider`, `CommonExtractionRequest`, `AnyExtractionResult`,
+and provider-specific types. Cloudflare
+extraction supports REST or a Workers AI binding; OpenRouter extraction uses REST.
+`validateExtractionRequest()` validates Clairic requests; use the configured
+provider's `validate()` for provider-specific validation.
+
+| Extraction method | Contract |
+| --- | --- |
+| `provider.validate(request)` | Validates a common request offline; returns an immutable common request with a resolved model, retaining common images for subsequent calls |
+| `provider.extract(request, { signal }?)` | Evaluates a common extraction request and returns `{ extraction, meta }` |
+| `provider.validateResult(result, request)` | Validates a saved envelope offline against provider/model provenance and the common request's field contract |
+| `OpenRouterExtractionProvider.createExtraction(request, { signal }?)` | Native OpenRouter request with image/PDF assets and request metadata; returns `{ extraction, meta }` |
+
+Validated common requests can be reused with extraction, `extractBatch` and
+extraction routers. Field limits and response requirements remain provider-specific;
+see [shared extraction contracts](../guides/EXTRACTION.md#provider-neutral-extraction)
+and [native OpenRouter assets](../guides/OPENROUTER_NATIVE.md#extractions).
+
+Applications own Live authentication, audio, connection setup and reconnection.
+See the [CLI reference](CLI.md) for extraction and Live command namespaces.
 
 Each service checks its own quotas, request-count limits, model context, media limits
 and Gateway acceptance. Offline validation checks request structure and configured local
 resource limits. The SDK and CLI do not estimate token counts or enforce
 requests-per-minute or tokens-per-minute limits. Explicit transport budgets can select
-up to 64 MiB. See [provider transport options](#provider-transport-options) for defaults.
+up to 64 MiB for these dedicated operations. See [provider transport options](#provider-transport-options) for defaults.

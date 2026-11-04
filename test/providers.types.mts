@@ -1,6 +1,7 @@
 import { createGenerativeProvider } from '../src/custom/generative/index.mjs';
 import { createBridge, createProvider, evaluateBatch, choice, noul, validateRequest, validateResult, type DecisionProvider, type JsonValue } from '../src/index.mjs';
 import { OpenAICompatibleProvider, OpenRouterProvider, AnthropicProvider, buildResponseSchema } from '../src/custom/generative/index.mjs';
+import { OpenRouterExtractionProvider } from '../src/extraction/index.mjs';
 
 const options = { type: 'openai-compatible', apiKey: null, model: 'local', baseURL: 'http://127.0.0.1:8000/v1' } as const;
 const provider = createGenerativeProvider(options);
@@ -54,3 +55,17 @@ createBridge({ provider: custom });
 noul('True?', null);
 // @ts-expect-error Only choice descriptions permit raw null.
 noul('True?', { true: null });
+
+async function nativeForecastTypes() {
+    const extractor = new OpenRouterExtractionProvider({ model: 'vendor/model' });
+    const validated = extractor.validate({ state: 'Evidence', fields: { name: { type: 'text' } } });
+    const images: import('../src/extraction/index.mjs').CommonExtractionRequest['images'] = validated.images;
+    await extractor.extract(validated);
+    const result = await extractor.extract({ state: 'Evidence',
+        fields: { forecast: { type: 'forecast', min: 0, max: 10, horizon: 2, interval: 'day' } } });
+    const values: readonly (number | string)[] | null = result.extraction.answers.forecast.value;
+    // @ts-expect-error Native forecasts contain arrays or null, never scalar values.
+    const invalid: typeof result.extraction.answers.forecast.value = 1;
+    return { values, invalid, images };
+}
+void nativeForecastTypes;

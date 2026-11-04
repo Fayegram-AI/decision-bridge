@@ -1,3 +1,4 @@
+import { VERSION } from '../src/version.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -25,7 +26,7 @@ async function invoke(args, context = {}) {
 
 test('help, version and offline validation need no credentials', async () => {
   assert.equal((await child(['--help'])).code, 0);
-  assert.equal((await child(['--version'])).stdout.trim(), '0.1.5');
+  assert.equal((await child(['--version'])).stdout.trim(), VERSION);
   const result = await child(['validate']);
   assert.equal(result.code, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).valid, true);

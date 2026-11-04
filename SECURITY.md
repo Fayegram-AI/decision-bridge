@@ -15,6 +15,17 @@ configuration. Review that configuration as part of your data-handling policy; G
 is disabled until selected. See the
 [Cloudflare guide](docs/guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
 
+OpenRouter forwards requests to upstream providers. Native routing preferences
+default to `allow_fallbacks: false`; applications may explicitly configure upstream
+selection and fallback. Include those destinations and their data-handling policies
+when deciding what to send. See [OpenRouter routing](docs/guides/OPENROUTER_NATIVE.md#cli-and-routing).
+
+Anthropic threads retain accepted states and response blocks in bounded local
+memory and use server-side continuation storage. `reset()` and `dispose()` clear
+local history; they do not delete server storage. Review the
+[thread retention and recovery contract](docs/guides/ANTHROPIC_THREADS.md)
+before enabling cumulative evaluations. Ordinary evaluations do not create threads.
+
 When routing uses a decision model, the selector receives task text, question or field
 definitions, eligible target descriptions and caller labels. Recognized media URLs and
 payloads are replaced with metadata; arbitrary JSON state remains task content.
