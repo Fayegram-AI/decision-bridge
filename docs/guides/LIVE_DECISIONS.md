@@ -66,15 +66,20 @@ Configuration accepts Decisions `delegation` and transcript `triggers`. Each
 trigger specifies `type: 'decisions'`, `event_type` as input or output transcript
 delta, and `decisions: { questions }`. Trigger arrays replace the trigger list;
 an empty list disables them. Omitted fields preserve server configuration.
-Questions use the native predicate/choice/score representation.
+Questions use the native predicate/choice/score representation. A sparse Decisions
+delegation update can omit `decisions` and set `acknowledgement_delay_ms` from
+0 through 800. `session.started` and `session.updated` carry resolved snapshots.
 
-Decision items are user messages containing text, images, or `input_json` parts.
+Decision items include system, developer, user and assistant messages containing
+text, images or `input_json` parts, plus function/custom tool calls and outputs.
+Assistant messages may carry `phase`. IDs, tool namespaces and statuses retain
+their native meaning; calls and outputs can arrive in separate events.
 Images use embedded data URLs or publicly accessible HTTP(S) URLs. JSON
 `data` accepts an object or array of objects. Questions also accept ordered
 `input_text`, `input_image` and `input_json` instruction parts, using the
 [native content contract](OPENAI_DECISIONS.md#json-and-question-content).
 These forms are validated in commands, acknowledgements and session snapshots.
-Live items remain user messages and accept no cache controls.
+Live items accept no REST prompt-cache controls.
 Item creation appends evidence for later evaluations; it does
 not itself request evaluation. IDs are generated uniquely for commands.
 

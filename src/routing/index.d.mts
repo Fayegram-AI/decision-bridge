@@ -1,5 +1,5 @@
 import type { EvaluationRequest, EvaluationResult, Questions, Provider, ProviderConfig, Usage, ErrorDetails, JsonValue } from '../index.mjs';
-import type { CloudflareExtractionProvider, CloudflareExtractionOptions, ExtractionRequest, ExtractionResult, ExtractionFields } from '../extraction/index.mjs';
+import type { ExtractionProvider, ExtractionProviderConfig, CommonExtractionRequest as ExtractionRequest, AnyExtractionResult as ExtractionResult, ExtractionFields } from '../extraction/index.mjs';
 
 export type RoutingOperation = 'decision' | 'extraction';
 export type RoutingMethod = 'direct' | 'single' | 'rule' | 'priority' | 'clarification' | 'selector' | 'selector-fallback' | 'failover';
@@ -97,10 +97,10 @@ export interface ConcreteRouteSettings {
     allowGenerative?: boolean;
     cooldownGroup?: string;
 }
-export type NativeRouteConfig = ProviderConfig | ({ type: 'cloudflare-extraction' } & CloudflareExtractionOptions);
+export type NativeRouteConfig = ProviderConfig | ExtractionProviderConfig;
 export type ConcreteRoute = ConcreteRouteSettings & (
     | { operation?: 'decision'; provider: Provider; config?: never; factory?: never; kind?: 'decision' | 'generative' }
-    | { operation: 'extraction'; provider: CloudflareExtractionProvider; config?: never; factory?: never; kind?: never }
+    | { operation: 'extraction'; provider: ExtractionProvider; config?: never; factory?: never; kind?: never }
     | { operation?: RoutingOperation; config: NativeRouteConfig; provider?: never; factory?: never; kind?: never }
     | { operation?: 'decision'; factory: (context: { readonly signal: AbortSignal }) => Provider | Promise<Provider>;
         kind: 'decision' | 'generative'; provider?: never; config?: never }

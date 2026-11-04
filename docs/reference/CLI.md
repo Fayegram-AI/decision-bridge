@@ -1,12 +1,11 @@
 # Command runner reference
 
-The optional command runner evaluates decision files, runs Clairic extraction,
+The optional command runner evaluates decision files, runs Cloudflare or OpenRouter extraction,
 and validates or replays Live protocol records offline. For application
 integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
 
-Routing registries and inspection require **0.1.4 or later**. Extraction and Live commands
-require **0.1.3 or later**; see
-[version availability](../README.md#version-availability).
+This reference describes 0.1.6. See
+[version availability](../README.md#version-availability) for earlier command support.
 
 After [installing the package](../guides/GETTING_STARTED.md#install-into-your-application)
 in your project, run:
@@ -50,6 +49,12 @@ Successful common and native calls include `meta.requestedModel` and
 Cloudflare CLI execution uses REST. The Workers AI binding is an SDK transport;
 there is no CLI binding selector. Gateway settings route the selected REST request.
 
+`--provider openrouter-decisions` selects native OpenRouter Decisions and supports
+`--native` and model listing. In the `extraction` namespace, select
+`--provider openrouter-extraction`; `--native` enables its asset-based request
+shape. Both OpenRouter providers require a model in the request or configuration.
+See the [OpenRouter guide](../guides/OPENROUTER_NATIVE.md#cli-and-routing).
+
 | Command | Behavior |
 | --- | --- |
 | `init [DIRECTORY]` | Create config and schema, sample request, environment template, and gitignore; generate a custom module when needed; never overwrite |
@@ -77,7 +82,8 @@ When using a single-provider profile, omitting the input file for `evaluate`, `v
 or `schema` uses the bundled sample. Pass `-` to read from stdin. Empty invocation
 prints help. Configuration and credential errors do not cause fallback to another
 backend. Extraction and Live file operations require an explicit filename or `-`.
-Extraction rejects `--native` because its request already uses native fields.
+Cloudflare extraction rejects `--native` because its request already uses native
+fields. OpenRouter extraction accepts it for native image/PDF assets and request metadata.
 
 ```bash
 cat request.json | decision-bridge evaluate - --env-file .env --compact
@@ -152,9 +158,9 @@ See the [routing guide](../guides/ROUTING.md) for policy and selector requiremen
 | `--route ID` | Select `auto` or a concrete route in a routing registry; `init --route auto` creates a registry template |
 | `--interactive` | Enable terminal clarification when needed; requires terminal stdin/stderr and a request file |
 | `--no-interactive`, `--no-routing-prompt` | Suppress routing clarification and enforce unattended selector requirements |
-| `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `cloudflare-extraction` (extraction namespace), `custom-decision`, `custom-generative` |
+| `--provider NAME` | `jev`, `openai-decisions`, `cloudflare-decisions`, `openrouter-decisions`, `cloudflare-extraction` or `openrouter-extraction` (extraction namespace), `custom-decision`, `custom-generative` |
 | `--preset NAME` | custom-generative preset: `openai-compatible`, `openrouter`, or `anthropic`; exclusive with module |
-| `--native` | Explicit native Decisions input/output; init/evaluate/validate/batch only |
+| `--native` | Native Decisions or OpenRouter Extractions input/output; init/evaluate/run/validate/batch as applicable |
 | `--jev-images`, `--no-jev-images` | Enable/disable experimental Jev images and boxes |
 | `--jev-long-context`, `--no-jev-long-context` | Enable/disable experimental Jev 262k context |
 | `--model SELECTOR` | Model selector or supported upstream ID; overrides input JSON model and configured default |
@@ -165,9 +171,10 @@ See the [routing guide](../guides/ROUTING.md) for policy and selector requiremen
 | `--gateway-id ID` | Existing Cloudflare Gateway; richer settings in config |
 | `--no-auth` | Only for a loopback OpenAI-compatible endpoint |
 | `--timeout-ms N` | Single-provider HTTP and bridge deadline for each evaluation/listing; registry budgets belong in configuration |
-| `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare default to 0, Jev and generative presets to 2 |
+| `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare/OpenRouter default to 0, Jev and generative presets to 2 |
 | `--max-tokens N` | Generative output budget; default 4096 |
 | `--response-format MODE` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic modes: `tool` (default), `json_schema` |
+| `--anthropic-workspace-id ID` | Anthropic workspace header for non-scoped keys |
 | `--anthropic-api-version VERSION` | Anthropic option: `2023-06-01` (default) or `2026-10-21` |
 | `--token-parameter NAME` | Compatible presets: `max_completion_tokens` or `max_tokens` |
 | `--provider-module FILE` | Explicit trusted ESM module; requires custom-decision or custom-generative |
@@ -247,16 +254,19 @@ Cancellation also interrupts a blocked stdout write.
 Single JSON input normally uses **8 MiB**. JSONL normally uses **8 MiB per line,
 64 MiB total**. Jev defaults to **32 MiB** for a single JSON input or JSONL record,
 then checks serialized requests against its configured ceiling (32 MiB by default).
-An explicit larger client request budget raises the input reader budget through 64 MiB.
+An explicit larger client request budget raises the input reader budget through
+64 MiB, or 128,000,000 bytes for first-party Anthropic Messages.
 Config:
 **1 MiB**. Environment file: **64 KiB**. Provider request and response default to
-8 MiB each, configurable to at most 64 MiB. Cloudflare reads single JSON inputs
+8 MiB each, configurable to at most 64 MiB, except for first-party Anthropic's
+128,000,000-byte request ceiling. Cloudflare reads single JSON inputs
 and individual JSONL records within 64 MiB, then applies model-specific serialized
 request validation: Clef/Clef-flash default 13 MiB, configurable through 64 MiB; Omni default 36 MiB,
 configurable through 64 MiB; Clairic defaults to 8 MiB, configurable through 64 MiB.
 Explicit smaller ceilings remain in force. Request
 model overrides and mixed-model JSONL batches use each effective model's budget.
-The 64 MiB JSONL total remains. These are client limits, not a promise
+The JSONL total is the larger of 64 MiB and the per-record input budget plus
+two delimiter bytes. These are client limits, not a promise
 that every remote model has an equivalent context window.
 
 Per-line limits exclude LF or CRLF delimiters, regardless of stream chunking.

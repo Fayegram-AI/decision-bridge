@@ -29,6 +29,7 @@ Application / CLI
         +-- Jev: native systemone
         +-- OpenAI Decisions: native /v1/decisions
         +-- Cloudflare Clef / Clef-flash / Clef-omni: REST or Workers AI binding
+        +-- OpenRouter Decisions: native /api/alpha/decisions or /api/v1/systemone
         +-- custom/decision: new native decision protocol
         +-- custom/generative: OpenAI-compatible / OpenRouter / Anthropic or new protocol
         |
@@ -39,7 +40,7 @@ Application / CLI
   application policy / storage / downstream action
 ```
 
-Native Jev, OpenAI and Cloudflare providers also expose `createDecision` directly.
+Native Jev, OpenAI, Cloudflare and OpenRouter providers also expose `createDecision` directly.
 Common and native paths share provider validation, codecs, and bounded transport.
 Direct native calls use provider deadlines; bridge calls additionally enforce the
 shared evaluation deadline and extension lifecycle.
@@ -81,13 +82,15 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/custom/decision.mjs` | Explicit native decision definition helper |
 | `src/custom/generative/` | Opt-in protocol presets, schema, prompts, and result derivation |
 | `src/custom/generative/anthropic-options.mjs` | Anthropic output/version settings and parameter restrictions shared by SDK construction and CLI validation |
+| `src/custom/generative/anthropic-thread.mjs` | Explicit cumulative history, continuation state, replay validation and bounded recovery |
 | `schemas/decision.config.schema.json` | Shipped CLI configuration structure and editor support |
 | `src/providers/` | API orchestration, model profiles, preflight, codecs, bounded image/audio/video inspection, and transports |
 | `src/providers/openai-profile.mjs`, `src/providers/decisions-preflight.mjs` | Release-owned OpenAI selection, capabilities, and preparation of selected and outgoing requests |
 | `src/providers/jev-profile.mjs`, `src/providers/jev-preflight.mjs`, `src/providers/jev-images.mjs` | Jev experimental policy, common/native assets, and image preflight |
 | `src/providers/decisions-input.mjs`, `src/providers/decisions-codec.mjs` | Context-specific Decisions content/cache validation and lossless common/native encoding |
 | `src/providers/cloudflare-transport.mjs` | Shared decision/extraction REST and binding authentication, dispatch and diagnostics |
-| `src/extraction/` | Clairic native field/request/response validation, provider, ordered batches and declarations |
+| `src/providers/openrouter-*.mjs` | Native Decisions, common projection, model profiles, assets, routing preferences and shared transport |
+| `src/extraction/` | Cloudflare and OpenRouter providers, field/request/response validation, common batches and declarations |
 | `src/live/` | Live protocol validation, bounded correlation state, supplied-connection controller and declarations |
 | `src/routing/` | Registry snapshots, eligibility, selection, budgets, recovery, diagnostics and routed batches |
 | `src/embedded.mjs` | Shared embedded data URL and canonical base64 checks |
@@ -135,7 +138,7 @@ confidence. Result metadata identifies the probability source so applications ca
 interpret each provider's output appropriately.
 
 The bridge takes result-validation policy from the provider contract. Cloudflare
-uses an allowance for four-decimal distributions; other built-ins retain the
+and native OpenRouter use an allowance for four-decimal distributions; other built-ins retain the
 baseline. Jev additionally permits explicitly unknown token counts while requiring
 native confidence. Response metadata cannot relax validation. See the [SDK reference](../reference/SDK.md).
 Application code passes that precision explicitly when using `decideChoice`; the
@@ -156,8 +159,8 @@ Cancellation bounds waiting for custom promises; custom code must honor signals
 to release its own resources. Observations use a separate bounded budget.
 
 Retries cover selected explicit transient responses, with machine-code
-classification preventing billing/allocation retries. OpenAI Decisions and
-Clairic default to zero retries. Valid Retry-After hints share the total deadline;
+classification preventing billing/allocation retries. Native OpenAI, Cloudflare and
+OpenRouter default to zero retries. Valid Retry-After hints share the total deadline;
 attempt counts describe adapter dispatches, not hidden Gateway retries.
 Malformed rejection bodies retain known safe HTTP diagnostics. Ambiguous failures
 and failed observers do not trigger another inference. CLI atomic files protect previous
@@ -166,6 +169,12 @@ output but cannot undo remote work or emitted stdout.
 JSON configuration is explicit. Custom ESM executes only when selected. Custom
 origins do not inherit unrelated ambient credentials. Gateway settings remain
 provider configuration, and do not replace the bridge's total deadline.
+
+Anthropic threads are explicit objects with fixed questions/model and bounded
+accepted history. Only validated turns commit to history. Continuation recovery
+can replay accepted history once for documented cursor errors, within the original
+deadline; ordinary transport retries are disabled. Independent evaluations remain
+stateless. See [threads](../guides/ANTHROPIC_THREADS.md).
 
 ## Extension boundaries
 
@@ -184,10 +193,16 @@ management, or automatic model discovery. Cross-route recovery is available only
 through explicitly configured router failover. SDK arrays and CLI JSONL batches
 provide bounded client-side concurrency.
 
-Extraction owns its request/result contract and uses shared Cloudflare dispatch. Its
-inference options remain in model input; binding execution options use the third
-`ai.run` argument. Native nulls, empty lists, predictive JSON and truncation are
-preserved in an immutable `{ extraction, meta }` envelope. Live validates protocol
+Extraction owns its request/result contract. Cloudflare uses shared REST/binding
+dispatch: inference options remain in model input, and binding execution options
+use the third `ai.run` argument. OpenRouter uses its native Extractions endpoint,
+asset validation and routing preferences. Each provider validates saved-result
+provenance and its own response contract. Native values, predictive JSON and
+reported truncation are preserved in an immutable `{ extraction, meta }` envelope.
+Common extraction preflight returns a reusable common request; conversion to
+native assets is separate from that public validation result.
+
+Live validates protocol
 messages and tracks how results relate to source events within a fixed history limit.
 Its controller uses a connection supplied by the application. Offline replay uses the
 same state reducer. Their dedicated exports do not widen the existing

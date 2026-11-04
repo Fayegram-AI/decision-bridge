@@ -1,3 +1,4 @@
+import { VERSION } from '../src/version.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -200,7 +201,7 @@ test('structured read-only templates can be reused without mutation', async () =
   } } });
   const result = await client.evaluate({ state: { nested: ['data'] }, questions });
   assert.equal(result.meta.probabilitySource, 'unspecified');
-  assert.equal(result.meta.bridgeVersion, '0.1.5');
+  assert.equal(result.meta.bridgeVersion, VERSION);
   assert.equal(Object.isFrozen(result.answers.yes), true);
 });
 

@@ -16,7 +16,7 @@ async function invoke(args, request, context = {}) {
 }
 
 test('Jev CLI validates native and common images offline with explicit opt-in', async () => {
-    const common = { model: 'jev-preview', input: [{ type: 'image', dataUrl: image }], questions: native.questions };
+    const common = { model: 'jev-latest', input: [{ type: 'image', dataUrl: image }], questions: native.questions };
     for (const [request, flags] of [[native, ['--native']], [common, []]]) {
         const result = await invoke(['validate', '-', '--jev-images', ...flags], JSON.stringify(request));
         assert.equal(result.code, 0, result.stderr);
@@ -80,7 +80,7 @@ test('Jev CLI native evaluate, ordered batch, models and initialization share th
     const server = createServer(async (req, res) => {
         assert.equal(req.headers.authorization, 'Bearer fixture-key');
         res.setHeader('content-type', 'application/json');
-        if (req.method === 'GET') { res.end(JSON.stringify({ models: [{ name: 'jev-preview' }] })); return; }
+        if (req.method === 'GET') { res.end(JSON.stringify({ models: [{ name: 'jev-latest' }] })); return; }
         assert.equal(req.url, '/v1/systemone');
         assert.equal(req.headers['typesafe-danger-zone-images'], 'true');
         assert.equal(req.headers['typesafe-danger-zone-long-context'], 'true');
@@ -102,9 +102,9 @@ test('Jev CLI native evaluate, ordered batch, models and initialization share th
     assert.equal(bodies.length, 3);
     const models = await invoke(['models', ...flags], undefined, context);
     assert.equal(models.code, 0, models.stderr);
-    assert.equal(JSON.parse(models.stdout).models[0].name, 'jev-preview');
+    assert.equal(JSON.parse(models.stdout).models[0].name, 'jev-latest');
     const cwd = await temporaryWorkspace(t);
-    const initialized = await invoke(['init', '--native', '--model', 'jev-preview', '--jev-images'], undefined, { cwd });
+    const initialized = await invoke(['init', '--native', '--model', 'jev-latest', '--jev-images'], undefined, { cwd });
     assert.equal(initialized.code, 0, initialized.stderr);
     const config = JSON.parse(await readFile(join(cwd, 'decision.config.json'), 'utf8'));
     assert.equal(config.dangerZone.images, true);

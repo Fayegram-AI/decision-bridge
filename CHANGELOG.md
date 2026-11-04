@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.6
+
+- Add native OpenRouter Decisions and Extractions with explicit model IDs,
+  provider routing preferences, dedicated native envelopes, multimodal mappings,
+  CLI profiles, extraction validation and common routing integration. Preserve
+  optional native probabilities and extraction fields.
+- Enable Jev boxes on stable `jev-latest` while retaining the images opt-in.
+- Extend Live Decisions to resolved startup snapshots, sparse delegation and
+  acknowledgement delay settings, all message roles and tool call/output items.
+- Add Anthropic workspace headers and explicit first-party request budgets through
+  128,000,000 bytes while preserving the 8 MiB default and response limits.
+- Add opt-in cumulative Anthropic threads with bounded history, cancellation,
+  refusal rollback and one documented continuation-recovery replay.
+- Classify native OpenRouter rate/capacity rejections for local failover, preserve
+  configured routing in generated native requests, and validate extraction
+  forecast payloads, precision limits and normalized saved-result model IDs.
+- Validate Anthropic thread iteration metadata before committing accepted history
+  and retain cumulative attempt counts when continuation recovery fails.
+- Inspect OpenRouter image assets with reserved property names, and validate native
+  score legend values before returning them.
+- Validate Anthropic workspace IDs before header construction and reject malformed
+  thread replay blocks while preserving valid thinking signatures and redacted data.
+- Count native OpenRouter session and user identifier limits in Unicode characters,
+  preserving valid identifiers containing supplementary characters.
+- Keep validated OpenRouter extraction requests reusable across extraction, batching,
+  routing and saved-result validation. Reject explicit invalid native model values
+  before dispatch instead of silently using the configured model.
+
 ## 0.1.5
 
 - Add native OpenAI `input_json` and ordered text/image/JSON question content

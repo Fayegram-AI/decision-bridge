@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "provider": "custom-generative",
+    "preset": "openai-compatible",
+    "model": "gpt-6.1-terra",
+    "responseFormat": "json_schema",
+    "tokenParameter": "max_completion_tokens"
+}

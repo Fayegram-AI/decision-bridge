@@ -8,8 +8,8 @@ extension path that matches the service you are integrating:
 | [Custom decision](CUSTOM_DECISION.md) | `defineDecisionProvider` from `custom/decision` | `custom-decision` with `module` | A new decision model protocol |
 | [Custom generative](CUSTOM_GENERATIVE.md) | `defineGenerativeProvider` from `custom/generative` | `custom-generative` with `preset` or `module` | Elicit structured decisions from a general-purpose model |
 
-The root `createProvider()` factory supports native Jev, OpenAI Decisions, and
-Cloudflare only. `createGenerativeProvider()` selects maintained generative
+The root `createProvider()` factory supports native Jev, OpenAI Decisions,
+Cloudflare and OpenRouter Decisions. `createGenerativeProvider()` selects maintained generative
 presets. Select the corresponding custom entry point explicitly for either
 extension path.
 

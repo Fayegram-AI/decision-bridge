@@ -1,7 +1,7 @@
 # Jev images, boxes, and long context
 
 Jev uses TypeSafe's native `POST /v1/systemone` endpoint. The SDK defaults to
-`jev-latest`; `jev-preview` and explicit version IDs are also accepted. Model listing
+`jev-latest`, the stable Jev 1.14 alias; `jev-preview` and explicit version IDs are also accepted. Model listing
 depends on your account and may show aliases without versioned IDs. The returned `model`
 records the service-reported version independently of `meta.requestedModel`.
 
@@ -15,7 +15,7 @@ their accuracy, formats, and limits can change.
 import { createBridge, JevProvider, box, noul } from '@fayegram-ai/decision-bridge';
 
 const provider = new JevProvider({
-    model: 'jev-1.14.0',
+    model: 'jev-latest',
     dangerZone: { images: true, longContext: true },
 });
 const bridge = createBridge({ provider });
@@ -36,10 +36,8 @@ console.log(result.answers.present.noul, result.answers.mug.box);
 
 `dangerZone.images` sends `TypeSafe-Danger-Zone-Images: true` and enables common
 image input and boxes. It works with Jev 1.13 and 1.14 for images. Boxes require
-`jev-preview` or a pinned Jev version of 1.14.0 or newer. Local box capability
-lookup remains conservative for moving stable aliases and unknown model names;
-use a supported pinned ID or `jev-preview` for boxes. Account access and hosted
-model availability are still checked by the service.
+`jev-latest`, `jev-preview`, or a pinned Jev version of 1.14.0 or newer.
+Account access and hosted model availability are checked by the service.
 
 `dangerZone.longContext` sends `TypeSafe-Danger-Zone-Long-Context: true`. TypeSafe
 documents 262k tokens for both the per-request and per-question contexts with
@@ -141,7 +139,7 @@ limit SDK resource use; TypeSafe's service quotas apply separately.
 ```shell
 decision-bridge validate request.json --config decision.config.json
 decision-bridge evaluate request.json --config decision.config.json --env-file .env
-decision-bridge validate native.json --native --model jev-preview --jev-images
+decision-bridge validate native.json --native --model jev-latest --jev-images
 decision-bridge batch native.jsonl --native --config decision.config.json --env-file .env
 ```
 

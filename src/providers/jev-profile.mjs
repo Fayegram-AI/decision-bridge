@@ -14,10 +14,10 @@ export function jevDangerZone(value = {}) {
     return Object.freeze({ images: images ?? false, longContext: longContext ?? false });
 }
 
-/** Moving stable aliases stay conservative; pin a supported version for boxes. */
+/** Both current aliases resolve to Jev 1.14; image features remain explicit opt-ins. */
 export function jevFeatures(model, dangerZone = {}) {
     const version = /^jev-(\d+)\.(\d+)\.(\d+)$/.exec(model ?? '');
-    const boxes = model === 'jev-preview' || (version !== null &&
+    const boxes = ['jev-latest', 'jev-preview'].includes(model) || (version !== null &&
         (Number(version[1]) > 1 || (Number(version[1]) === 1 && Number(version[2]) >= 14)));
     const images = Object.hasOwn(dangerZone, 'images') && dangerZone.images === true;
     return { orderedInput: true, images, boxes: images && boxes, maxImages: null };

@@ -1,17 +1,22 @@
 import type { CallOptions, ErrorDetails, JsonValue } from '../index.mjs';
-import type { NativeDecisionQuestion, NativeDecisionQuestionPart, NativeDecisionAnswer, OpenAIDecisionResponse } from '../decisions.mjs';
+import type { NativeDecisionQuestion, NativeDecisionQuestionPart, NativeDecisionAnswer, NativeDecisionInputItem, OpenAIDecisionResponse } from '../decisions.mjs';
 
 export type LiveTranscriptType = 'session.input_transcript.delta' | 'session.output_transcript.delta';
 export interface LiveDecisionsConfiguration {
-    readonly delegation?: { readonly type: 'decisions'; readonly decisions: {
+    readonly delegation?: { readonly type: 'decisions'; readonly acknowledgement_delay_ms?: number; readonly decisions?: {
         readonly model?: 'gpt-6-luna'; readonly questions?: readonly NativeDecisionQuestion[] } };
     readonly triggers?: readonly { readonly type: 'decisions'; readonly event_type: LiveTranscriptType;
         readonly decisions: { readonly questions: readonly NativeDecisionQuestion[] } }[];
 }
-export interface LiveDecisionItem {
-    readonly id?: string | null; readonly role: 'user'; readonly type?: 'message';
-    readonly content: string | readonly NativeDecisionQuestionPart[];
-}
+/** Live items carry local IDs and never accept REST cache breakpoints. */
+type LiveItem<I> = I extends { readonly role: infer R; readonly content: infer C }
+    ? Omit<I, 'content' | 'phase'> & { readonly id?: string | null;
+        readonly content: R extends 'user' ? string | readonly NativeDecisionQuestionPart[]
+            : R extends 'assistant' ? C : string | readonly { readonly type: 'input_text'; readonly text: string }[];
+    } & (R extends 'assistant' ? { readonly phase?: 'commentary' | 'final_answer' | null } : { readonly phase?: never })
+    : I extends { readonly output: unknown } ? Omit<I, 'output'> & {
+        readonly output: string | readonly Exclude<NativeDecisionQuestionPart, { readonly type: 'input_json' }>[] } : I;
+export type LiveDecisionItem = LiveItem<NativeDecisionInputItem>;
 export type LiveCommand = (
     | { readonly type: 'session.update'; readonly session: LiveDecisionsConfiguration }
     | { readonly type: 'decision.item.create'; readonly item: LiveDecisionItem }

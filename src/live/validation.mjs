@@ -1,22 +1,27 @@
 import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
-import { fields, validateDecisionQuestions, validateDecisionContentPart } from '../providers/decisions-input.mjs';
+import { fields, validateDecisionQuestions, validateDecisionInput } from '../providers/decisions-input.mjs';
 import { validateDecisionResponse } from '../providers/decisions-validation.mjs';
 
 export const TRANSCRIPTS = ['session.input_transcript.delta', 'session.output_transcript.delta'];
 const text = value => typeof value === 'string' && value.length > 0;
 const nullableId = value => value === null || text(value);
 
-export function validateLiveConfiguration(input) {
+export function validateLiveConfiguration(input, { resolved = false } = {}) {
     const config = cloneJson(input, 'Live Decisions configuration');
     fields(config, ['delegation', 'triggers'], [], 'Live configuration');
     if (config.delegation !== undefined) {
-        fields(config.delegation, ['type', 'decisions'], ['type', 'decisions'], 'delegation');
+        fields(config.delegation, ['type', 'decisions', 'acknowledgement_delay_ms'],
+            ['type', ...(resolved ? ['decisions'] : [])], 'delegation');
         check(config.delegation.type === 'decisions', 'This controller configures Decisions delegation.');
-        fields(config.delegation.decisions, ['model', 'questions'], [], 'delegation decisions');
+        const delay = config.delegation.acknowledgement_delay_ms;
+        check(delay === undefined || Number.isInteger(delay) && delay >= 0 && delay <= 800, 'Invalid acknowledgement delay.');
         const decisions = config.delegation.decisions;
-        check(decisions.model === undefined || decisions.model === 'gpt-6-luna', 'Unsupported Live Decisions model.');
-        if (decisions.questions !== undefined) validateDecisionQuestions(decisions.questions);
+        if (decisions !== undefined) {
+            fields(decisions, ['model', 'questions'], [], 'delegation decisions');
+            check(decisions.model === undefined || decisions.model === 'gpt-6-luna', 'Unsupported Live Decisions model.');
+            if (decisions.questions !== undefined) validateDecisionQuestions(decisions.questions);
+        }
     }
     if (config.triggers !== undefined) {
         check(Array.isArray(config.triggers), 'triggers must be an array.');
@@ -31,13 +36,8 @@ export function validateLiveConfiguration(input) {
 }
 
 function item(input, created = false) {
-    fields(input, ['id', 'type', 'role', 'content'], ['role', 'content', ...(created ? ['id'] : [])], 'Decision input item');
-    check(input.role === 'user' && (input.type === undefined || input.type === 'message'), 'Live Decision items are user messages.');
+    validateDecisionInput([input], { live: true, pairTools: false });
     check(created ? text(input.id) : input.id === undefined || input.id === null || text(input.id), 'Invalid item ID.');
-    if (typeof input.content !== 'string') {
-        check(Array.isArray(input.content) && input.content.length > 0, 'Live item requires content.');
-        input.content.forEach(part => validateDecisionContentPart(part, { json: true, cache: false }));
-    }
 }
 
 export function validateLiveCommand(input) {
@@ -70,7 +70,7 @@ export function configurationFromSession(session) {
     const result = {};
     if (session.delegation?.type === 'decisions') result.delegation = session.delegation;
     if (Array.isArray(session.triggers)) result.triggers = session.triggers.filter(trigger => trigger.type === 'decisions');
-    return validateLiveConfiguration(result);
+    return validateLiveConfiguration(result, { resolved: true });
 }
 
 export function validateLiveEvent(input) {
@@ -99,7 +99,7 @@ function validateServerEvent(input) {
     } else if (TRANSCRIPTS.includes(event.type)) {
         invalid(typeof event.delta === 'string' && Number.isFinite(event.start_ms) && Number.isFinite(event.end_ms) &&
             event.start_ms >= 0 && event.end_ms >= event.start_ms, 'Invalid transcript delta.');
-    } else if (['session.created', 'session.updated', 'session.closed'].includes(event.type)) {
+    } else if (['session.started', 'session.created', 'session.updated', 'session.closed'].includes(event.type)) {
         invalid(isRecord(event.session), 'Missing Live session snapshot.');
         configurationFromSession(event.session);
     } else if (event.type === 'decision.item.created') item(event.item, true);

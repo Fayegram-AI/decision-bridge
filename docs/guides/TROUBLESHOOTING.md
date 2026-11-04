@@ -3,16 +3,10 @@
 ## An export or command from these guides is missing
 
 Run `npm exec -- decision-bridge --version` in the consuming project and compare
-it with [version availability](../README.md#version-availability). The `/extraction`
-and `/live` exports, their CLI commands, and OpenAI conversation/tool history and
-cache controls require 0.1.3 or later. See [installation options](GETTING_STARTED.md#install-into-your-application)
-to install a compatible version.
-The `/routing` export, `inspect`, routing flags, and routing registries require
-0.1.4 or later. Use the [installation options](GETTING_STARTED.md#install-into-your-application)
-if your installed package does not include them.
-
-OpenAI JSON/question content, the companion `WithParts` builders, Live
-JSON/hosted-image items, and Anthropic output/version settings require 0.1.5 or later.
+it with [version availability](../README.md#version-availability). These guides
+describe 0.1.6, including native OpenRouter providers, stable-alias Jev boxes and
+Anthropic threads. Follow the [installation options](GETTING_STARTED.md#install-into-your-application)
+to install this version, or use the documentation bundled with an older package.
 
 ## The command cannot find a key
 
@@ -93,6 +87,11 @@ Decisions or Cloudflare choice/score answers. Read `meta.probabilitySource`. A n
 token count means the server did not report it. Neither absence should be silently
 converted to a number.
 
+Native OpenRouter also permits absent confidence. Its common API still requires
+choice/score probabilities; a response without them raises `UNSUPPORTED_CAPABILITY`
+after inference. Use `provider.createDecision()` to consume native answers without
+those distributions. See [native result semantics](OPENROUTER_NATIVE.md#decisions).
+
 ## Cloudflare needs an account ID as well as a token
 
 REST inference targets an account-specific URL. Supply `CLOUDFLARE_ACCOUNT_ID`
@@ -104,9 +103,8 @@ See the [Cloudflare guide](CLOUDFLARE_DECISIONS.md#supported-inference-paths).
 ## Cloudflare REST busy mode is unavailable
 
 The bridge rejects enabled Clef REST busy mode locally with
-`UNSUPPORTED_CAPABILITY` before inference. Direct hosted requests were observed
-to reject the execution field with HTTP 422/code `5012`. Leave `rejectIfBusy`
-disabled for REST, or use the Workers AI binding for the enabled setting.
+`UNSUPPORTED_CAPABILITY` before inference. Leave `rejectIfBusy` disabled for REST,
+or use the Workers AI binding for the enabled setting.
 This differs from a capacity rejection (`3040`) or an allocation limit (`3036`);
 increasing client retries does not fix unsupported
 execution options. See [capacity and Gateway settings](CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway).
@@ -130,11 +128,18 @@ designing resumability.
 ## Extraction or Live does not behave like bridge evaluation
 
 For Clairic, use `CloudflareExtractionProvider` from the `/extraction` export or
-the `extraction` CLI namespace with `cloudflare-extraction`. The root decision
+the `extraction` CLI namespace with `cloudflare-extraction`. For OpenRouter, use
+`OpenRouterExtractionProvider` or `--provider openrouter-extraction`; add `--native`
+for its image/PDF assets and request metadata. The root decision
 factory and `createBridge` do not accept extraction providers. An explicit
 provider from config or environment overrides the namespace default and must
 match the operation. A null value, empty list or `truncated: true` can be a valid
 native result; inspect it according to your application's needs.
+
+Use `provider.validate(request)` for offline extraction preflight and reuse its
+returned common request with extraction, batching or routing. For a saved
+`{ extraction, meta }` envelope, call `provider.validateResult(result, request)`
+with the corresponding common request. See [shared extraction contracts](EXTRACTION.md#provider-neutral-extraction).
 
 For Live, `requestDecision` and `appendCommentary` resolve on submission. Consume
 completed decisions through `subscribe`. An unmatched result indicates missing or

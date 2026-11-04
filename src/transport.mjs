@@ -39,10 +39,16 @@ export class JsonTransport {
         this.#responses = new JsonResponseTransport(options);
     }
 
-    async request(method, path, body, callOptions = {}) {
+    async request(method, path, body, callOptions = {}, query = {}) {
         check(typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') &&
             !/[\\?#]/.test(path), 'Invalid provider request path.', 'CONFIGURATION_ERROR');
-        return this.#responses.request(body, (serialized, signal) => this.#fetch(`${this.#baseURL}${path}`, {
+        const parameters = new URLSearchParams();
+        for (const [key, value] of Object.entries(query)) {
+            check(typeof value === 'string', 'Query values must be strings.', 'CONFIGURATION_ERROR');
+            parameters.set(key, value);
+        }
+        const suffix = parameters.size ? `?${parameters}` : '';
+        return this.#responses.request(body, (serialized, signal) => this.#fetch(`${this.#baseURL}${path}${suffix}`, {
             method, headers: { accept: 'application/json', ...this.#headers,
                 ...(serialized === undefined ? {} : { 'content-type': 'application/json' }) },
             body: serialized, signal, redirect: 'error',

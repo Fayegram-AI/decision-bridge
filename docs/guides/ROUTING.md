@@ -62,7 +62,7 @@ allocation or availability.
 Concrete decision routes accept exactly one of:
 
 - `config`: native provider options with `type` (`jev`, `openai-decisions`, or
-  `cloudflare-decisions`), including REST or Workers binding options.
+  `cloudflare-decisions` or `openrouter-decisions`), including REST or Workers binding options.
 - `provider`: an existing Provider, without bridge preparation extensions.
 - `factory`: an asynchronous or synchronous function receiving `{ signal }`, with
   an explicit `kind: 'decision' | 'generative'` and optional `model` and `ready`.
@@ -71,9 +71,11 @@ Concrete decision routes accept exactly one of:
 
 Generative providers/factories require `allowGenerative: true`; results retain
 elicited probability provenance. Extraction routes use
-`config: { type: 'cloudflare-extraction', ... }` or an existing
-`CloudflareExtractionProvider` with `operation: 'extraction'`. They use the
-established Clairic request and result contract. A registry may include both
+`config` with type `cloudflare-extraction` or `openrouter-extraction`, or an existing
+extraction provider with `operation: 'extraction'`. Providers implement request
+and saved-result validation alongside `extract()`. OpenRouter routes with local
+failover require `providerPreferences.allow_fallbacks: false`; transport retries
+must also remain zero. A registry may include both
 operations; each router filters candidates to its operation.
 
 The router copies its configuration when you create it. Create a new router to change
@@ -84,7 +86,7 @@ registry supports up to 256 concrete routes. The router rejects targets it can i
 as duplicates.
 
 For extraction, create a router with `createExtractionRouter` from the same
-subpath and call `router.extract(request)`. The request contains Clairic
+subpath and call `router.extract(request)`. The request contains common extraction
 `fields` and `state`/`images`; the result remains `{ extraction, meta }` with
 `meta.routing` added. See the [extraction guide](EXTRACTION.md) for field types.
 Routing does not apply to Live connections or native decision envelopes.

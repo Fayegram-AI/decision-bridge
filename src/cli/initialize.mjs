@@ -5,7 +5,7 @@ import { validateRequest } from '../validation.mjs';
 import { decisionProfile } from './decisions.mjs';
 import { validateConfig, KEY_ENVS } from './config-validation.mjs';
 import { OPENAI_DEFAULT_MODEL } from '../providers/openai-profile.mjs';
-import { validateExtractionRequest } from '../extraction/validation.mjs';
+import { extractionProfile } from './extractions.mjs';
 
 /** Templates are honest edit points for an unknown protocol, never fake inference. */
 function providerTemplate(kind) {
@@ -43,7 +43,7 @@ export async function initialize(directory, config, native = false, moduleBase =
         ...(config.provider === 'openai-decisions' && config.model === undefined ? { model: OPENAI_DEFAULT_MODEL } : {}),
         ...(custom && config.model === undefined ? { model: 'YOUR_MODEL' } : {}),
     }, { complete: true });
-    const request = config.provider === 'cloudflare-extraction' ? {
+    const request = config.provider.endsWith('-extraction') ? {
         state: 'Invoice total: 1080 USD. Due date: 2026-11-01.',
         fields: { total: { type: 'number', unit: 'USD' }, due_date: { type: 'date' } },
     } : { state: "ModuleNotFoundError: No module named 'pytest'", questions: {
@@ -53,11 +53,15 @@ export async function initialize(directory, config, native = false, moduleBase =
         missing_dependency: { type: 'noul', instructions: 'Does this indicate a missing Python package?' },
     } };
     const profile = decisionProfile(config.provider);
-    const sample = config.provider === 'cloudflare-extraction' ? validateExtractionRequest(request, { model: template.model })
+    const sample = config.provider.endsWith('-extraction') ? (config.provider === 'openrouter-extraction' && !native
+        ? (extractionProfile(config.provider).common(request, { model: template.model }), request)
+        : extractionProfile(config.provider)[native ? 'native' : 'common'](request, { model: template.model }))
         : native ? profile.native(profile.encode(validateRequest(request, template.model)), profile.options(template)) : request;
     // OpenAI request files inherit selection from configuration, including after later edits.
     const generated = { ...sample };
     if (config.provider === 'openai-decisions') delete generated.model;
+    // Generated native defaults must not override the user's configured routing policy.
+    if (['openrouter-decisions', 'openrouter-extraction'].includes(config.provider)) delete generated.provider;
     const schema = await readFile(new URL('../../schemas/decision.config.schema.json', import.meta.url), 'utf8');
     const files = {
         'decision.config.json': JSON.stringify(template, null, 2) + '\n',

@@ -20,17 +20,17 @@ From your application's directory, install the latest version published to npm:
 npm install @fayegram-ai/decision-bridge
 ```
 
-To pin the documented **0.1.5** release:
+To install the **0.1.6** version covered by these guides:
 
 ```bash
-npm install @fayegram-ai/decision-bridge@0.1.5
+npm install @fayegram-ai/decision-bridge@0.1.6
 ```
 
 To download and install the same version as a package archive:
 
 ```bash
-npm pack @fayegram-ai/decision-bridge@0.1.5
-npm install ./fayegram-ai-decision-bridge-0.1.5.tgz
+npm pack @fayegram-ai/decision-bridge@0.1.6
+npm install ./fayegram-ai-decision-bridge-0.1.6.tgz
 ```
 
 The installed package contains the SDK, declarations, command runner, examples,

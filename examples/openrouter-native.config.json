@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "provider": "openrouter-decisions",
+    "model": "cloudflare/clef",
+    "providerPreferences": {
+        "allow_fallbacks": false
+    }
+}

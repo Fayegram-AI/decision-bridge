@@ -27,6 +27,44 @@ const completed = (id, source, type = 'session.input_transcript.delta', decision
 });
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+test('current startup and delay-only updates retain resolved question correlation', async () => {
+    const f = fixture();
+    try {
+        f.emit({ type: 'session.started', event_id: 'started', session: config });
+        f.emit(delta('initial')); f.emit(completed('initial-result', 'initial'));
+        assert.equal(f.events.at(-1).correlation.matched, true);
+        const pending = f.controller.configure({ delegation: { type: 'decisions', acknowledgement_delay_ms: 400 } });
+        await tick();
+        assert.equal(f.sent[0].session.delegation.decisions, undefined);
+        f.emit({ type: 'session.updated', event_id: 'delay-ack', client_event_id: f.sent[0].event_id,
+            session: { ...config, delegation: { ...config.delegation, acknowledgement_delay_ms: 400 } } });
+        assert.equal((await pending).configuration.delegation.acknowledgement_delay_ms, 400);
+        f.emit(delta('after-delay')); f.emit(completed('after-result', 'after-delay'));
+        assert.equal(f.events.at(-1).correlation.matched, true);
+        for (const delay of [-1, 801, 0.5, null]) assert.throws(() => validateLiveCommand({
+            type: 'session.update', session: { delegation: { type: 'decisions', acknowledgement_delay_ms: delay } },
+        }), { code: 'VALIDATION_ERROR' });
+    } finally { f.controller.dispose(); }
+});
+
+test('Live items support all message roles and independently acknowledged tool outputs', () => {
+    const items = [
+        { role: 'developer', content: 'Use this policy.' }, { role: 'system', content: [{ type: 'input_text', text: 'Policy' }] },
+        { role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: 'Done' }] },
+        { type: 'function_call', call_id: 'f', name: 'lookup', arguments: '{}', namespace: 'tools', status: 'completed' },
+        { type: 'function_call_output', call_id: 'f', output: 'Found' },
+        { type: 'custom_tool_call', call_id: 'c', name: 'search', input: 'text', namespace: null },
+        { type: 'custom_tool_call_output', call_id: 'c', output: [{ type: 'input_text', text: 'Result' }] },
+    ];
+    for (const item of items) {
+        assert.deepEqual(validateLiveCommand({ type: 'decision.item.create', item }).item, item);
+        assert.deepEqual(validateLiveEvent({ type: 'decision.item.created', event_id: 'ack', item: { ...item, id: 'local' } }).item,
+            { ...item, id: 'local' });
+    }
+    assert.throws(() => validateLiveCommand({ type: 'decision.item.create', item: { role: 'user', content: 'x', phase: 'commentary' } }),
+        { code: 'VALIDATION_ERROR' });
+});
+
 test('Live configuration/items resolve only from matching acknowledgements; manual calls return receipts', async () => {
     const f = fixture();
     try {
@@ -360,7 +398,7 @@ test('synchronous connection closure isolates cleanup failures and releases once
 
 test('nested malformed Live server content always reports safe response errors', () => {
     const malformed = [
-        { type: 'decision.item.created', event_id: 'bad-item', item: { id: 'item', role: 'assistant', content: 'private input' } },
+        { type: 'decision.item.created', event_id: 'bad-item', item: { id: 'item', role: 'unsupported', content: 'private input' } },
         { type: 'session.updated', event_id: 'bad-config', session: { triggers: [
             { type: 'decisions', event_type: 'session.input_transcript.delta', decisions: { questions: [] } },
         ] } },

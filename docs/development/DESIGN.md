@@ -10,8 +10,9 @@ opt-in custom strategies with their own public subpath. Every provider declares 
 decision/generative kind. Not every model can satisfy this contract reliably;
 compatibility and quality must be tested separately.
 
-Extraction and Live are dedicated operations. Clairic keeps its native fields
-and predictive response envelope; Live attaches commands and events to an
+Extraction and Live are dedicated operations. Cloudflare Clairic and OpenRouter
+keep provider-specific fields and predictive responses within a common extraction
+envelope; Live attaches commands and events to an
 application-owned connection. Each has its own API and result contract, separate
 from the bridge's `evaluate` interface.
 
@@ -40,7 +41,9 @@ and models. Services may truncate input without reporting it; local byte limits 
 guarantee token fit. Invalid results fail explicitly so applications can apply their
 own error-handling policy.
 
-Clairic preserves additional safe native JSON and its truncation flag. Live
+Clairic preserves additional safe native JSON and its truncation flag. Native
+OpenRouter responses retain optional distributions and confidence; common
+evaluation requires the distributions needed by its result contract. Live
 preserves native refusal events and marks ambiguous correlation as unmatched.
 
 ## Service admission and client resources

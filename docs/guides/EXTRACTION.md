@@ -7,6 +7,9 @@ Import `@fayegram-ai/decision-bridge/extraction` to extract typed values and pre
 statistics with Cloudflare Clairic. Connect through REST or supply a Workers AI binding.
 Extraction has its own field definitions and result format, separate from the bridge's
 questions and answers.
+For OpenRouter extraction, use the same package export with
+[`OpenRouterExtractionProvider`](OPENROUTER_NATIVE.md#extractions). The field limits,
+assets and response requirements below describe Clairic.
 
 ```javascript
 import { CloudflareExtractionProvider } from '@fayegram-ai/decision-bridge/extraction';
@@ -84,7 +87,7 @@ rejection of an execution setting is reported without dropping the setting.
 
 ## Validation, batching and errors
 
-`validateExtractionRequest(request, options?)` is credential-free offline validation.
+`validateExtractionRequest(request, options?)` is credential-free offline Clairic validation.
 `provider.validate(request)` uses the configured provider settings. Both check request
 structure and configured size limits. Passing local validation does not guarantee that
 the service will accept a request.
@@ -115,8 +118,8 @@ decision extraction run request.json --env-file .env
 decision extraction batch requests.jsonl --concurrency 4 --env-file .env
 ```
 
-The namespace defaults to `cloudflare-extraction`; incompatible explicit
-providers are rejected. Configure the Cloudflare account, credential, Gateway,
+The namespace defaults to `cloudflare-extraction`. Select `openrouter-extraction`
+explicitly for OpenRouter; other provider kinds are rejected. Configure the Cloudflare account, credential, Gateway,
 timeout and retry settings in a
 [single-provider profile](../reference/CONFIGURATION.md#single-provider-profiles-version-1).
 Inference options belong in request JSON. Validation is offline and reports `fieldCount`.
@@ -132,3 +135,21 @@ added. See [configurable routing](ROUTING.md).
 See the [runnable extraction example](../../examples/extraction.mjs), the
 [official model schema](https://developers.cloudflare.com/workers-ai/models/clairic/)
 and [extraction concepts](https://developers.cloudflare.com/workers-ai/concepts/extraction-models/).
+
+## Provider-neutral extraction
+
+`createExtractionProvider({ type, ...options })` selects `cloudflare-extraction`
+or `openrouter-extraction`. Both accept named `fields` with text `state`, embedded
+`images` or both, plus optional `reference_date` and `model`. Field and
+inference-option support depends on the selected provider.
+
+`provider.validate(request)` performs offline preflight and returns an immutable
+common request with a resolved model. The returned request can be validated again
+or passed to `extract`, `extractBatch` and extraction routing; images retain their
+common representation. `validateResult(result, request)` checks a saved envelope
+against the provider/model and common request's field contract without inference.
+
+Cloudflare responses require `truncated`. OpenRouter preserves optional
+`truncated` and nullable `state_text`. See
+[OpenRouter Extractions](OPENROUTER_NATIVE.md#extractions) for native assets and
+provider-specific options.

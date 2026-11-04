@@ -43,7 +43,9 @@ also verify cancellation from a native Windows console.
 - `deadlines.test.mjs`: synchronous preparation/dispatch/completion and inherited budgets.
 - `result-validation.test.mjs`: provider-selected precision and policy-hook boundaries.
 - `decisions*.test.mjs`: native/common OpenAI codecs, explicit JSON/question content, builders, selectors and model identities, boundaries, preflight, CLI, and smoke-helper fixtures.
-- `anthropic*.test.mjs`: tool/JSON output, API versions, response blocks, parameter restrictions, SDK/CLI/schema parity, and loopback commands.
+- `anthropic*.test.mjs`: tool/JSON output, API versions, workspace headers, request budgets, cumulative threads/recovery, response blocks, SDK/CLI/schema parity, and loopback commands.
+- `openrouter*.test.mjs`: native Decisions/Extractions, assets, optional results, forecast validation, routing preferences, common projection, reusable extraction validation, saved provenance and model/identifier boundaries.
+- `provider-refresh-boundaries.test.mjs`: OpenRouter CLI common/native initialization, validation and batching, routed fallback ownership, and Anthropic SDK/CLI request budgets above 64 MiB.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
 - `jev*.test.mjs`: native/common assets, reference substitution, boxes, opt-ins, nullable usage and CLI behavior.
 - `capability-expansion.test.mjs`: conversation/tool history, remote images, cache controls, extension revalidation, service-limit ownership and safe rejection diagnostics.
@@ -63,6 +65,10 @@ also verify cancellation from a native Windows console.
 - `cloudflare-worker.types.mts`: compatibility with official Workers binding declarations.
 - `expansion.types.mts`: conversation/cache inputs, extraction value inference, unions, batches and Live transport/notification contracts.
 - `routing.types.mts`: router options, decision/extraction inference, prepared schema replacement and routed batch records.
+
+Installed-consumer scenarios in `scripts/package/provider-refresh-scenario.mjs`
+also exercise reusable extraction validation and compile native OpenRouter,
+generic extraction and Anthropic thread contracts.
 
 ### OpenAI model-selector coverage
 

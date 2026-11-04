@@ -1,3 +1,4 @@
+import type { OpenRouterRequestMetadata } from '../openrouter.mjs';
 import type { JsonValue, TransportOptions, ProviderCallOptions, BatchOptions, ErrorDetails } from '../index.mjs';
 import type { CloudflareGatewayOptions, CloudflareBindingGatewayOptions, CloudflareTransportMetadata } from '../cloudflare-decisions.mjs';
 
@@ -60,7 +61,50 @@ export class CloudflareExtractionProvider {
     constructor(options?: CloudflareExtractionOptions);
     validate<const F extends ExtractionFields>(request: ExtractionRequest<F>): ExtractionRequest<F> & { readonly model: 'clairic' };
     extract<const F extends ExtractionFields>(request: ExtractionRequest<F>, options?: ProviderCallOptions): Promise<ExtractionResult<F>>;
+    validateResult<const F extends ExtractionFields>(result: unknown, request: ExtractionRequest<F>): ExtractionResult<F>;
 }
 export type ExtractionBatchRecord = { readonly index: number; readonly ok: true; readonly result: ExtractionResult }
     | { readonly index: number; readonly ok: false; readonly error: ErrorDetails };
 export function extractBatch(provider: CloudflareExtractionProvider, inputs: readonly ExtractionRequest[], options?: BatchOptions): Promise<readonly ExtractionBatchRecord[]>;
+
+export type CommonExtractionRequest<F extends ExtractionFields = ExtractionFields> = Omit<ExtractionRequest<F>, 'model'> & { readonly model?: string };
+export interface ExtractionProvider<R = CommonExtractionRequest, T = AnyExtractionResult> {
+    readonly name: string; readonly kind: 'extraction'; readonly defaultModel?: string;
+    validate(request: R): R & { readonly model: string };
+    extract(request: R, options?: ProviderCallOptions): Promise<T>;
+    validateResult(result: unknown, request: R): T;
+}
+export type OpenRouterExtractionOptions = import('../openrouter.mjs').OpenRouterNativeOptions;
+export type OpenRouterExtractionAsset = import('../openrouter.mjs').OpenRouterImageAsset
+    | { readonly type?: 'document'; readonly format: 'pdf'; readonly data_base64: string };
+export interface OpenRouterExtractionRequest<F extends ExtractionFields = ExtractionFields> extends OpenRouterRequestMetadata {
+    readonly model?: string; readonly state: string; readonly fields: F; readonly reference_date?: string;
+    readonly assets?: Readonly<Record<string, OpenRouterExtractionAsset>>;
+}
+type OpenRouterFieldValue<T extends ExtractionFieldType, I> = T extends 'forecast' ? readonly (number | string)[] | null : FieldValue<T, I>;
+export type OpenRouterExtractionResponse<F extends ExtractionFields = ExtractionFields> = Pick<ExtractionResponse<F>, 'model' | 'usage'> & {
+    readonly answers: { readonly [K in keyof F]: ExtractionAnswer & {
+        readonly type: F[K]['type']; readonly value: OpenRouterFieldValue<F[K]['type'], F[K]['items']>;
+    } };
+    readonly truncated?: boolean; readonly state_text?: string | null; readonly id?: string; readonly provider?: string;
+};
+export interface OpenRouterExtractionResult<F extends ExtractionFields = ExtractionFields> {
+    readonly extraction: OpenRouterExtractionResponse<F>;
+    readonly meta: import('../openrouter.mjs').OpenRouterTransportMetadata & { readonly provider: 'openrouter-extraction' };
+}
+export type AnyExtractionResult<F extends ExtractionFields = ExtractionFields> = ExtractionResult<F> | OpenRouterExtractionResult<F>;
+export class OpenRouterExtractionProvider implements ExtractionProvider {
+    readonly name: 'openrouter-extraction'; readonly kind: 'extraction'; readonly defaultModel?: string;
+    constructor(options?: OpenRouterExtractionOptions);
+    validate<const F extends ExtractionFields>(request: CommonExtractionRequest<F>): CommonExtractionRequest<F> & { readonly model: string };
+    extract<const F extends ExtractionFields>(request: CommonExtractionRequest<F>, options?: ProviderCallOptions): Promise<OpenRouterExtractionResult<F>>;
+    validateResult<const F extends ExtractionFields>(result: unknown, request: CommonExtractionRequest<F>): OpenRouterExtractionResult<F>;
+    createExtraction<const F extends ExtractionFields>(request: OpenRouterExtractionRequest<F>, options?: ProviderCallOptions): Promise<OpenRouterExtractionResult<F>>;
+}
+export type ExtractionProviderConfig = ({ type: 'cloudflare-extraction' } & CloudflareExtractionOptions)
+    | ({ type: 'openrouter-extraction' } & OpenRouterExtractionOptions);
+export function createExtractionProvider(options: { type: 'cloudflare-extraction' } & CloudflareExtractionOptions): CloudflareExtractionProvider;
+export function createExtractionProvider(options: { type: 'openrouter-extraction' } & OpenRouterExtractionOptions): OpenRouterExtractionProvider;
+export function createExtractionProvider(options: ExtractionProviderConfig): CloudflareExtractionProvider | OpenRouterExtractionProvider;
+export function extractBatch<R, T>(provider: ExtractionProvider<R, T>, inputs: readonly R[], options?: BatchOptions):
+    Promise<readonly ({ readonly index: number; readonly ok: true; readonly result: T } | { readonly index: number; readonly ok: false; readonly error: ErrorDetails })[]>;

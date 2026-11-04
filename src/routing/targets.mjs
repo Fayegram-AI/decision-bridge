@@ -4,8 +4,12 @@ import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { cloneJson, freezeJson } from '../validation.mjs';
 import { providerContract } from '../provider-contract.mjs';
 import { createBridge } from '../bridge.mjs';
-import { createProvider, JevProvider, OpenAIDecisionsProvider, CloudflareDecisionsProvider } from '../providers/index.mjs';
-import { CloudflareExtractionProvider } from '../extraction/index.mjs';
+import { createProvider, JevProvider, OpenAIDecisionsProvider, CloudflareDecisionsProvider, OpenRouterDecisionsProvider } from '../providers/index.mjs';
+import { createExtractionProvider, CloudflareExtractionProvider, OpenRouterExtractionProvider } from '../extraction/index.mjs';
+import { extractionProviderContract } from '../extraction/result.mjs';
+import { prepareCommonOpenRouterExtraction } from '../extraction/openrouter.mjs';
+import { prepareCommonOpenRouterDecision } from '../providers/openrouter-decisions.mjs';
+import { openRouterSettings } from '../providers/openrouter-shared.mjs';
 import { validateExtractionRequest, extractionModel } from '../extraction/validation.mjs';
 import { preflightCommonJevDecision } from '../providers/jev-preflight.mjs';
 import { preflightCommonDecision } from '../providers/decisions-preflight.mjs';
@@ -16,8 +20,8 @@ import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 import { validateApiKey, parseBaseURL } from '../transport.mjs';
 import { ROUTE_FIELDS, integer } from './configuration.mjs';
 
-const NATIVE = ['jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction'];
-const pure = { jev: preflightCommonJevDecision, 'openai-decisions': preflightCommonDecision,
+const NATIVE = ['openrouter-decisions', 'openrouter-extraction', 'jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction'];
+const pure = { 'openrouter-decisions': (request, options) => prepareCommonOpenRouterDecision(request, options).request, 'openrouter-extraction': prepareCommonOpenRouterExtraction, jev: preflightCommonJevDecision, 'openai-decisions': preflightCommonDecision,
     'cloudflare-decisions': preflightCommonCloudflareDecision, 'cloudflare-extraction': validateExtractionRequest };
 const modelDefault = { jev: 'jev-latest', 'openai-decisions': 'default', 'cloudflare-decisions': 'clef', 'cloudflare-extraction': 'clairic' };
 const normalize = { 'openai-decisions': resolveOpenAIModel, 'cloudflare-decisions': cloudflareModel, 'cloudflare-extraction': extractionModel };
@@ -28,7 +32,7 @@ function nativeConfig(input) {
     const cloudflare = type.startsWith('cloudflare-');
     optionsObject(input, ['type', 'apiKey', 'baseURL', 'model', ...TRANSPORT_FIELDS,
         ...(cloudflare ? ['transport', 'accountId', 'ai', 'rejectIfBusy', 'gateway'] : []),
-        ...(type === 'jev' ? ['dangerZone'] : [])], 'Route provider config');
+        ...(type === 'jev' ? ['dangerZone'] : []), ...(type.startsWith('openrouter-') ? ['api', 'providerPreferences'] : [])], 'Route provider config');
     // Snapshot JSON settings, retaining only the explicitly supported opaque handles.
     const { fetchImpl, ai, ...json } = input;
     const config = { ...cloneJson(Object.fromEntries(Object.entries(json).filter(([, value]) => value !== undefined)), 'route config', 'CONFIGURATION_ERROR'),
@@ -43,6 +47,7 @@ function nativeConfig(input) {
     if (config.baseURL !== undefined) {
         parseBaseURL(config.baseURL, { originOnly: true });
     }
+    if (type.startsWith('openrouter-')) Object.assign(config, openRouterSettings(withoutType(config), { extraction: type.endsWith('-extraction') }));
     if (type === 'jev') { config.dangerZone = jevDangerZone(config.dangerZone); jevRequestLimit(config.maxRequestBytes); }
     if (cloudflare) {
         config.transport ??= 'rest';
@@ -75,20 +80,22 @@ export function target(id, input, recovery) {
     check(input.cooldownGroup === undefined || (typeof input.cooldownGroup === 'string' && input.cooldownGroup.length > 0 && input.cooldownGroup.length <= 100), 'Invalid cooldownGroup.', 'CONFIGURATION_ERROR');
     check(input.model === undefined || (typeof input.model === 'string' && input.model.trim()), 'Invalid route model.', 'CONFIGURATION_ERROR');
     let config = input.config === undefined ? undefined : nativeConfig(input.config);
-    const operation = input.operation ?? (config?.type === 'cloudflare-extraction' ? 'extraction' : 'decision');
+    const operation = input.operation ?? (config?.type.endsWith('-extraction') ? 'extraction' : 'decision');
     check(input.kind === undefined || !config && operation === 'decision' && ['decision', 'generative'].includes(input.kind),
         'kind applies only to supplied decision providers or factories.', 'CONFIGURATION_ERROR');
-    check(!config || (config.type === 'cloudflare-extraction') === (operation === 'extraction'), 'Provider operation mismatch.', 'CONFIGURATION_ERROR');
+    check(!config || (config.type.endsWith('-extraction')) === (operation === 'extraction'), 'Provider operation mismatch.', 'CONFIGURATION_ERROR');
     check(input.factory === undefined || (operation === 'decision' && typeof input.factory === 'function' && ['decision', 'generative'].includes(input.kind)),
         'Factories require an explicit decision or generative kind.', 'CONFIGURATION_ERROR');
-    check(operation !== 'extraction' || config || input.provider instanceof CloudflareExtractionProvider,
-        'Extraction routes require the Cloudflare extraction adapter.', 'CONFIGURATION_ERROR');
+    check(operation !== 'extraction' || config || extractionProviderContract(input.provider),
+        'Extraction routes require an extraction provider.', 'CONFIGURATION_ERROR');
     let provider = input.provider;
     check(input.provider === undefined || !!provider, 'A supplied provider must be an object.', 'CONFIGURATION_ERROR');
     const providerType = () => config?.type ?? (provider instanceof JevProvider ? 'jev'
         : provider instanceof OpenAIDecisionsProvider ? 'openai-decisions'
             : provider instanceof CloudflareDecisionsProvider ? 'cloudflare-decisions'
-                : provider instanceof CloudflareExtractionProvider ? 'cloudflare-extraction' : undefined);
+                : provider instanceof CloudflareExtractionProvider ? 'cloudflare-extraction'
+                    : provider instanceof OpenRouterDecisionsProvider ? 'openrouter-decisions'
+                        : provider instanceof OpenRouterExtractionProvider ? 'openrouter-extraction' : undefined);
     const contract = provider && operation === 'decision' ? providerContract(provider) : undefined;
     const kind = contract?.kind ?? input.kind ?? (operation === 'extraction' ? 'extraction' : 'decision');
     check(input.kind === undefined || input.kind === (contract?.kind ?? kind), 'Provider kind mismatch.', 'CONFIGURATION_ERROR');
@@ -97,6 +104,8 @@ export function target(id, input, recovery) {
         if (config) {
             check((config.maxRetries ?? 0) === 0 && (config.gateway?.retries?.maxAttempts ?? 1) === 1,
                 'Failover requires maxRetries: 0 and Gateway maxAttempts: 1.', 'CONFIGURATION_ERROR');
+            check(!config.type.startsWith('openrouter-') || config.providerPreferences.allow_fallbacks === false,
+                'Local failover requires OpenRouter allow_fallbacks: false.', 'CONFIGURATION_ERROR');
             config = Object.freeze({ ...config, maxRetries: 0 });
         } else check(input.singleDispatch === true, 'Failover requires singleDispatch: true for supplied providers and factories.', 'CONFIGURATION_ERROR');
     }
@@ -124,8 +133,8 @@ export function target(id, input, recovery) {
             // Failures are never cached; one caller's cancellation cannot poison future calls.
             let initialized;
             try {
-                initialized = config ? config.type === 'cloudflare-extraction'
-                    ? new CloudflareExtractionProvider(withoutType(config)) : createProvider(config)
+                initialized = config ? config.type.endsWith('-extraction')
+                    ? createExtractionProvider(config) : createProvider(config)
                     : await input.factory(Object.freeze({ signal }));
             } catch (error) {
                 if (config && error instanceof DecisionError) throw error;
@@ -145,7 +154,7 @@ export function target(id, input, recovery) {
 function withoutType(config) { const { type: _type, ...rest } = config; return rest; }
 function canonical(type, value) { return normalize[type] ? normalize[type](value) : value; }
 function preflightOptions(config) {
-    return Object.fromEntries(['model', 'maxRequestBytes', ...(config.type === 'jev' ? ['dangerZone'] : []),
+    return Object.fromEntries(['model', 'maxRequestBytes', 'providerPreferences', ...(config.type === 'jev' ? ['dangerZone'] : []),
         ...(config.type.startsWith('cloudflare-') ? ['transport', 'gateway', 'maxRetries', 'rejectIfBusy'] : [])]
         .filter(key => config[key] !== undefined).map(key => [key, config[key]]));
 }
