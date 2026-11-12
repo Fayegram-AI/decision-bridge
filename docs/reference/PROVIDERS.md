@@ -8,8 +8,9 @@
 | `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `default` | Native Decisions with common and dedicated access |
 | `cloudflare-decisions` | Workers AI REST model route or `AI.run` binding | `CLOUDFLARE_API_TOKEN` and account ID for REST | `clef` | Native Clef decisions with common and dedicated access |
 | `openrouter-decisions` | OpenRouter `/api/alpha/decisions` or explicit `/api/v1/systemone` | `OPENROUTER_API_KEY` | Explicit model required | Native Decisions; optional fields preserved |
+| `gemini-decisions` | Google `POST /v1beta/decisions` | `DECISION_BRIDGE_GEMINI_API_KEY` | `gemini-decision-1` | Native probabilities with common and dedicated access |
 
-`createProvider()` and the root SDK export these four native providers. Custom
+`createProvider()` and the root SDK export these five native providers. Custom
 decision services use `defineDecisionProvider` from `custom/decision`. General-purpose
 models use the maintained presets in `custom/generative`. Import that entry point when
 you want to prompt a model for decisions. See
@@ -49,6 +50,7 @@ contract. The following additional forms are checked before dispatch:
 | Cloudflare Clef / Clef-flash | Supported; images before text | Supported | Supported; ordered levels | Unsupported | Unsupported |
 | Cloudflare Clef-omni | Supported; images before audio/video/text | Supported | Supported; ordered levels | Unsupported | Unsupported |
 | OpenRouter native | Ordered text; media per verified model profile | Per profile | Per profile | Unsupported | Decisions catalog |
+| Gemini Decisions | Ordered text, images, audio, video and PDFs; supported remote references | Supported | Supported | Unsupported | Supported model metadata |
 | OpenAI-compatible / OpenRouter generative / Anthropic | Unsupported | Unsupported | Unsupported | Unsupported | Supported; service-specific catalog |
 
 `bridge.getCapabilities(model)` reports the local profile, and
@@ -75,14 +77,28 @@ OpenAI additionally supports `conversation`, `toolHistory`, `remoteImages` and
 custom providers. Built-in quantitative limits use `null` where admission is
 left to the service; explicit custom-provider limits remain enforced.
 
-OpenAI also supports `jsonInput` and `questionContent`. Both optional flags default to false and are
-enabled only by OpenAI among built-in providers. `jsonInput` covers explicit JSON
+OpenAI and Gemini also support `jsonInput` and `questionContent`. Both optional flags default to false.
+Gemini converts JSON to text and accepts text/JSON question parts only. `jsonInput` covers explicit JSON
 parts in input, conversations and questions; `questionContent` covers the
 `instructionParts` question form. Image and remote-image capabilities apply to
 question images, and `maxImages` counts shared-input and question images together.
+`questionContentTypes` narrows supported question parts; omission preserves legacy
+custom-provider behavior when `questionContent` is enabled.
+
+Gemini adds `documents`, `remoteAudio`, `remoteVideos`, `remoteDocuments` and
+`maxDocuments`. These normalize to false/zero for legacy profiles. Remote audio/video
+requires explicit `mimeType`; documents are PDFs. Gemini also requires MIME metadata
+for remote images. See the [Gemini guide](../guides/GEMINI_DECISIONS.md).
+
+`imageResolutions` and `videoResolutions` list supported common `resolution` values;
+both default to empty arrays. Gemini supports image `low`, `medium`, `high` and
+`ultra_high`, and video `low`, `medium` and `high`. Other built-ins reject these
+explicit controls. `maxJsonNodes` sets the request snapshot budget: normally
+200,000 nodes, or 1,000,000 for Gemini. Custom providers can declare a budget up
+to 1,000,000; response validation has its own [policy hook](SDK.md#validation-guarantees).
 
 Dedicated `createDecision()` access is available on Jev, OpenAI Decisions,
-Cloudflare and OpenRouter providers. It uses each service's native request/response shape and
+Cloudflare, OpenRouter and Gemini providers. It uses each service's native request/response shape and
 bypasses bridge preparation and observation hooks.
 
 ## Native Jev

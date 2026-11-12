@@ -2,6 +2,8 @@ import { requireCondition as check } from './errors.mjs';
 import { validateOrderedInput } from './input.mjs';
 import { validateCacheOptions, validateCacheBreakpoint, validateDecisionInput } from './providers/decisions-input.mjs';
 import { validateProbabilitySum, validateResultOptions } from './probabilities.mjs';
+import { jsonNodeLimit } from './json-limits.mjs';
+import { optionsObject } from './options.mjs';
 
 const own = (value, key) => Object.hasOwn(value, key);
 export const isRecord = value => value !== null && typeof value === 'object' &&
@@ -20,11 +22,12 @@ function equalJson(left, right) {
 }
 
 /** Reject lossy JSON conversion: cycles, NaN, undefined, Date, getters, etc. */
-export function cloneJson(value, label = 'value', code = 'VALIDATION_ERROR') {
+export function cloneJson(value, label = 'value', code = 'VALIDATION_ERROR', maxJsonNodes) {
+  const nodeLimit = jsonNodeLimit(maxJsonNodes);
   const ancestors = new Set();
   let visited = 0;
   function visit(item, depth) {
-    check(++visited <= 200000, `${label}: JSON exceeds 200000 nodes.`, code);
+    check(++visited <= nodeLimit, `${label}: JSON exceeds ${nodeLimit} nodes.`, code);
     check(depth <= 100, `${label}: JSON nesting exceeds 100 levels.`, code);
     if (item === null || ['string', 'boolean'].includes(typeof item)) return item;
     if (typeof item === 'number') {
@@ -80,8 +83,11 @@ function allowedKeys(value, expected, label, code = 'VALIDATION_ERROR') {
 }
 
 /** Validate the common contract without inventing a model before route selection. */
-export function validateRequestStructure(input) {
-  const request = cloneJson(input, 'request');
+export function validateRequestStructure(input, options = {}) {
+  const configured = optionsObject(options, ['maxJsonNodes'], 'Request-validation options');
+  // Inherited policy fields must neither select a budget nor execute getters.
+  const maxJsonNodes = own(configured, 'maxJsonNodes') ? configured.maxJsonNodes : undefined;
+  const request = cloneJson(input, 'request', 'VALIDATION_ERROR', maxJsonNodes);
   check(isRecord(request), 'request must be an object.');
   allowedKeys(request, ['state', 'input', 'conversation', 'questions', 'model', 'safetyIdentifier',
     'promptCacheKey', 'promptCacheOptions'], 'request');
@@ -160,8 +166,8 @@ export function validateRequestStructure(input) {
   return request;
 }
 
-export function validateRequest(input, defaultModel) {
-    const request = validateRequestStructure(input);
+export function validateRequest(input, defaultModel, options = {}) {
+    const request = validateRequestStructure(input, options);
     const model = own(request, 'model') ? request.model : defaultModel;
     check(nonempty(model), 'model must be a nonempty string.');
     return { ...request, model };
@@ -180,10 +186,10 @@ function distribution(value, labels, decimalPlaces) {
 
 /** Validate, but do not invent, round, or normalize model results. */
 export function validateResult(input, questions, options = {}) {
-  const { native, nullableUsage, probabilityDecimalPlaces } = validateResultOptions(options);
-  const result = cloneJson(input, 'response', 'INVALID_RESPONSE');
+  const { native, nullableUsage, probabilityDecimalPlaces, maxJsonNodes } = validateResultOptions(options);
+  const result = cloneJson(input, 'response', 'INVALID_RESPONSE', maxJsonNodes);
   // Snapshot both sides so rubric comparison uses JSON values without executing accessors.
-  const questionSnapshot = cloneJson(questions, 'questions');
+  const questionSnapshot = cloneJson(questions, 'questions', 'VALIDATION_ERROR', maxJsonNodes);
   check(isRecord(result), 'Response must be an object.', 'INVALID_RESPONSE');
   allowedKeys(result, ['model', 'answers', 'usage', 'meta'], 'response', 'INVALID_RESPONSE');
   check(isRecord(questionSnapshot) && Object.keys(questionSnapshot).length > 0, 'questions must be a nonempty object.');

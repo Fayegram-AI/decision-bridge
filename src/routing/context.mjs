@@ -12,8 +12,10 @@ function media(type, source) {
 export function taskContext(request, operation, description) {
     const attachments = [];
     const part = item => {
-        if (['image', 'audio', 'video', 'input_image'].includes(item.type)) {
-            const info = media(item.type === 'input_image' ? 'image' : item.type, item.dataUrl ?? item.url ?? item.image_url);
+        if (['image', 'audio', 'video', 'document', 'input_image'].includes(item.type)) {
+            const info = { ...media(item.type === 'input_image' ? 'image' : item.type, item.dataUrl ?? item.url ?? item.image_url),
+                ...(item.resolution ? { resolution: item.resolution } : {}),
+                ...(item.mimeType ? { mimeType: item.mimeType } : item.type === 'document' ? { mimeType: 'application/pdf' } : {}) };
             attachments.push(info);
             return { media: info };
         }

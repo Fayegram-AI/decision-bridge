@@ -14,7 +14,7 @@ with the result.
 
 Try the [Decision Playground](https://decision-pg.fayegram.com/).
 
-The main SDK supports Jev through TypeSafe, OpenAI Decisions, Cloudflare Clef, and OpenRouter native Decisions. These
+The main SDK supports Jev through TypeSafe, OpenAI Decisions, Cloudflare Clef, OpenRouter native Decisions and Gemini Decisions. These
 services provide native decision APIs. Use `custom/decision` to integrate another
 decision service, or `custom/generative` to ask a general-purpose model for structured
 decisions. The generative entry point includes OpenAI-compatible, OpenRouter, and
@@ -31,9 +31,9 @@ additionally supports embedded WAV/MP3 audio and MP4/WebM video, ordered images 
 → videos → text. The shared API checks that the selected provider and model support your
 request before sending it. A provider refusal returns an error.
 
-**Version 0.1.6 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.7 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
-These docs cover 0.1.6.
+These docs cover 0.1.7.
 For feature requirements and version history, see
 [version availability](docs/README.md#version-availability) and the
 [changelog](CHANGELOG.md). Start with the
@@ -56,6 +56,7 @@ Use these model selectors with the built-in decision providers:
 | Decision provider | Model selectors | Provider default |
 | --- | --- | --- |
 | OpenRouter native (`openrouter-decisions`) | Explicit native model ID; [verified profiles](docs/guides/OPENROUTER_NATIVE.md) | No default |
+| Gemini Decisions (`gemini-decisions`) | `gemini-decision-1` | `gemini-decision-1` |
 | Jev through TypeSafe (`jev`) | `jev-latest`, `jev-preview`, available pinned IDs such as `jev-1.14.0` | `jev-latest` |
 | OpenAI Decisions (`openai-decisions`) | `default`, `luna`, `gpt-6-luna` | `default` |
 | Cloudflare (`cloudflare-decisions`) | `clef`, `@cf/cloudflare/clef` | `clef` |
@@ -107,6 +108,7 @@ All native providers support shared state and the common `choice`, `noul`, and
 
 | Provider | Additional supported features | Guide |
 | --- | --- | --- |
+| Gemini Decisions | Native/common text, images, audio, video and PDFs, image/video resolution controls, remote media, typed choices and labelled scores | [Gemini Decisions](docs/guides/GEMINI_DECISIONS.md) |
 | Jev | Native decisions, opt-in images, boxes, and long context through TypeSafe | [Jev guide](docs/guides/JEV.md) |
 | OpenAI Decisions | Ordered text/image/JSON input, question content, conversation/tool history, remote images, prompt caching, typed choices, labelled scores, safety identifiers, native access | [OpenAI Decisions](docs/guides/OPENAI_DECISIONS.md) |
 | Cloudflare Clef / Clef-flash | Embedded images before text, typed choices, labelled scores, native access, Workers AI binding, optional Gateway | [Cloudflare decisions](docs/guides/CLOUDFLARE_DECISIONS.md) |

@@ -3,6 +3,8 @@ import { cloneJson, freezeJson, isRecord } from './validation.mjs';
 import { CLOUDFLARE_MODELS } from './providers/cloudflare-profile.mjs';
 import { openaiModelProfile } from './providers/openai-profile.mjs';
 import { jevFeatures } from './providers/jev-profile.mjs';
+import { geminiCapabilities } from './providers/gemini-profile.mjs';
+import { DEFAULT_JSON_NODES, jsonNodeLimit } from './json-limits.mjs';
 
 /** Conservative defaults preserve the pre-existing custom-provider contract. */
 export const LEGACY_CAPABILITIES = freezeJson({
@@ -13,6 +15,9 @@ export const LEGACY_CAPABILITIES = freezeJson({
     boxes: false,
     conversation: false, toolHistory: false, remoteImages: false, promptCaching: false,
     jsonInput: false, questionContent: false,
+    documents: false, remoteAudio: false, remoteVideos: false, remoteDocuments: false, maxDocuments: 0,
+    questionContentTypes: [],
+    imageResolutions: [], videoResolutions: [], maxJsonNodes: DEFAULT_JSON_NODES,
 });
 
 const CLOUDFLARE_CAPABILITIES = freezeJson({
@@ -21,6 +26,7 @@ const CLOUDFLARE_CAPABILITIES = freezeJson({
 });
 
 export function builtInCapabilities(type, model, options = {}) {
+    if (type === 'gemini-decisions') return freezeJson({ ...LEGACY_CAPABILITIES, ...geminiCapabilities(model) });
     if (type === 'jev') return freezeJson({ ...LEGACY_CAPABILITIES,
         ...jevFeatures(model, Object.hasOwn(options, 'dangerZone') ? options.dangerZone : undefined),
         maxChoiceOptions: null, maxScoreLevels: null });
@@ -33,7 +39,8 @@ export function builtInCapabilities(type, model, options = {}) {
     }
     if (type !== 'openai-decisions') return LEGACY_CAPABILITIES;
     const profile = openaiModelProfile(model);
-    return freezeJson({ ...LEGACY_CAPABILITIES, ...profile, supported: !!profile });
+    return freezeJson({ ...LEGACY_CAPABILITIES, ...profile, supported: !!profile,
+        questionContentTypes: profile?.questionContent ? ['text', 'image', 'json'] : [] });
 }
 
 export function providerCapabilities(provider, model) {
@@ -52,11 +59,25 @@ export function providerCapabilities(provider, model) {
     check(isRecord(profile) && Object.keys(profile).every(key => Object.hasOwn(LEGACY_CAPABILITIES, key)),
         'Invalid capability profile.', 'CONFIGURATION_ERROR');
     const result = { ...LEGACY_CAPABILITIES, ...profile };
+    result.maxJsonNodes = jsonNodeLimit(result.maxJsonNodes);
+    for (const [key, allowed] of [['imageResolutions', ['low', 'medium', 'high', 'ultra_high']],
+        ['videoResolutions', ['low', 'medium', 'high']]]) {
+        check(Array.isArray(result[key]) && result[key].every(value => allowed.includes(value)) &&
+            new Set(result[key]).size === result[key].length,
+        'Invalid media resolution capabilities.', 'CONFIGURATION_ERROR');
+    }
+    if (!Object.hasOwn(profile, 'questionContentTypes')) result.questionContentTypes =
+        result.questionContent ? ['text', 'image', 'json'] : [];
     for (const key of ['supported', 'orderedInput', 'images', 'typedChoices', 'labeledScores', 'safetyIdentifier', 'audio', 'videos', 'boxes',
-        'conversation', 'toolHistory', 'remoteImages', 'promptCaching', 'jsonInput', 'questionContent']) {
+        'conversation', 'toolHistory', 'remoteImages', 'promptCaching', 'jsonInput', 'questionContent',
+        'documents', 'remoteAudio', 'remoteVideos', 'remoteDocuments']) {
         check(typeof result[key] === 'boolean', 'Capability flags must be boolean.', 'CONFIGURATION_ERROR');
     }
-    for (const key of ['maxImages', 'maxChoiceOptions', 'maxScoreLevels', 'maxAudioClips', 'maxVideos']) {
+    check(Array.isArray(result.questionContentTypes) && result.questionContentTypes.every(value =>
+        ['text', 'image', 'json'].includes(value)) && new Set(result.questionContentTypes).size === result.questionContentTypes.length &&
+        (result.questionContent || result.questionContentTypes.length === 0),
+    'Invalid question content capabilities.', 'CONFIGURATION_ERROR');
+    for (const key of ['maxImages', 'maxChoiceOptions', 'maxScoreLevels', 'maxAudioClips', 'maxVideos', 'maxDocuments']) {
         check(result[key] === null || (Number.isSafeInteger(result[key]) && result[key] >= 0),
             'Capability limits must be nonnegative integers or null.', 'CONFIGURATION_ERROR');
     }
@@ -76,6 +97,10 @@ export function assertCapabilities(request, capabilities) {
     const historyParts = conversationParts(request);
     const questionParts = Object.values(request.questions).flatMap(q => q.instructionParts ?? []);
     const parts = [...(request.input ?? []), ...historyParts, ...questionParts];
+    for (const part of parts) if (Object.hasOwn(part, 'resolution')) {
+        const supported = part.type === 'image' ? capabilities.imageResolutions : capabilities.videoResolutions;
+        requireFeature(supported?.includes(part.resolution), 'this media resolution');
+    }
     const images = parts.filter(part => ['image', 'input_image'].includes(part.type));
     if (images.length) requireFeature(capabilities.images, 'image input');
     requireFeature(capabilities.maxImages === null || images.length <= capabilities.maxImages, 'this image count');
@@ -92,8 +117,11 @@ export function assertCapabilities(request, capabilities) {
         request.input?.some(part => Object.hasOwn(part, 'promptCacheBreakpoint'))) requireFeature(capabilities.promptCaching, 'prompt caching');
     if (Object.hasOwn(request, 'input')) {
         requireFeature(capabilities.orderedInput, 'ordered input');
-        for (const [kind, flag, limit] of [['audio', 'audio', 'maxAudioClips'], ['video', 'videos', 'maxVideos']]) {
-            const count = request.input.filter(part => part.type === kind).length;
+        for (const [kind, flag, limit, remote] of [['audio', 'audio', 'maxAudioClips', 'remoteAudio'],
+            ['video', 'videos', 'maxVideos', 'remoteVideos'], ['document', 'documents', 'maxDocuments', 'remoteDocuments']]) {
+            const media = request.input.filter(part => part.type === kind);
+            const count = media.length;
+            if (media.some(part => Object.hasOwn(part, 'url'))) requireFeature(capabilities[remote], 'remote ' + kind + ' input');
             if (count) {
                 requireFeature(capabilities[flag], kind + ' input');
                 requireFeature(capabilities[limit] === null || count <= (capabilities[limit] ?? 0), 'this ' + kind + ' count');
@@ -103,6 +131,8 @@ export function assertCapabilities(request, capabilities) {
     if (Object.hasOwn(request, 'safetyIdentifier')) requireFeature(capabilities.safetyIdentifier, 'safetyIdentifier');
     for (const q of Object.values(request.questions)) {
         if (Object.hasOwn(q, 'instructionParts')) requireFeature(capabilities.questionContent, 'question content');
+        if (q.instructionParts) requireFeature(q.instructionParts.every(part =>
+            (capabilities.questionContentTypes ?? ['text', 'image', 'json']).includes(part.type)), 'this question content type');
         if (q.type === 'box') requireFeature(capabilities.boxes, 'box questions');
         if (q.options) requireFeature(capabilities.typedChoices, 'typed choices');
         if (q.levels) requireFeature(capabilities.labeledScores, 'labelled scores');
@@ -115,6 +145,9 @@ export function assertCapabilities(request, capabilities) {
 }
 
 export function commonSchemaVersion(request) {
+    if (request.input?.some(part => Object.hasOwn(part, 'resolution'))) return 8;
+    if (request.input?.some(part => part.type === 'document' || Object.hasOwn(part, 'mimeType') ||
+        ['audio', 'video'].includes(part.type) && Object.hasOwn(part, 'url'))) return 7;
     if (Object.values(request.questions).some(q => Object.hasOwn(q, 'instructionParts')) ||
         request.input?.some(part => part.type === 'json') || conversationParts(request).some(part => part.type === 'input_json')) return 6;
     if (Object.hasOwn(request, 'conversation') || Object.hasOwn(request, 'promptCacheKey') ||

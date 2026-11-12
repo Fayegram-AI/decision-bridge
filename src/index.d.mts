@@ -60,14 +60,27 @@ export interface LabeledScoreQuestion<L extends ScoreLevels = ScoreLevels> {
     readonly type: 'score'; readonly instructions: Instructions; readonly levels: L; readonly criteria?: never;
 }
 export type DecisionConversationItem = import('./decisions.mjs').NativeDecisionInputItem;
+export type DecisionMediaSource =
+    { readonly dataUrl: string; readonly url?: never; readonly mimeType?: never }
+    | { readonly url: string; readonly mimeType: string; readonly dataUrl?: never };
+export type DecisionImageResolution = 'low' | 'medium' | 'high' | 'ultra_high';
+export type DecisionVideoResolution = 'low' | 'medium' | 'high';
+/** Image detail and explicit resolution are alternative controls. */
+export type DecisionImageControls =
+    { readonly detail?: 'low' | 'high' | 'auto' | 'original' | null; readonly resolution?: never }
+    | { readonly resolution: DecisionImageResolution; readonly detail?: null };
 export type DecisionInputPart = { readonly type: 'text'; readonly text: string;
         readonly promptCacheBreakpoint?: import('./decisions.mjs').DecisionCacheBreakpoint | null }
-    | ({ readonly type: 'image'; readonly detail?: 'low' | 'high' | 'auto' | 'original' | null;
+    | ({ readonly type: 'image';
         readonly promptCacheBreakpoint?: import('./decisions.mjs').DecisionCacheBreakpoint | null }
-        & ({ readonly dataUrl: string; readonly url?: never } | { readonly url: string; readonly dataUrl?: never }))
+        & DecisionImageControls
+        & ({ readonly dataUrl: string; readonly url?: never; readonly mimeType?: never }
+            | { readonly url: string; readonly dataUrl?: never; readonly mimeType?: string }))
     | { readonly type: 'json'; readonly data: DecisionJsonData; readonly promptCacheBreakpoint?: never }
-    | { readonly type: 'audio'; readonly dataUrl: string }
-    | { readonly type: 'video'; readonly dataUrl: string };
+    | ({ readonly type: 'audio' } & DecisionMediaSource)
+    | ({ readonly type: 'video'; readonly resolution?: DecisionVideoResolution } & DecisionMediaSource)
+    | ({ readonly type: 'document' } & (
+        { readonly dataUrl: string; readonly url?: never } | { readonly url: string; readonly dataUrl?: never }));
 export type OrderedInput = readonly DecisionInputPart[];
 /** Content is explicit; legacy instruction arrays always remain JSON values. */
 export type QuestionInstructionPart =
@@ -126,7 +139,8 @@ export interface ProviderResult<Q extends Questions = Questions> {
   readonly model: string;
   readonly answers: { readonly [K in keyof Q]: AnswerFor<Q[K]> };
   readonly usage: Usage;
-  readonly meta?: Readonly<Record<string, JsonValue>> & { readonly openaiDecisions?: OpenAIDecisionsMetadata; readonly cloudflareDecisions?: CloudflareDecisionsMetadata };
+  readonly meta?: Readonly<Record<string, JsonValue>> & { readonly openaiDecisions?: OpenAIDecisionsMetadata; readonly cloudflareDecisions?: CloudflareDecisionsMetadata;
+      readonly geminiDecisions?: import('./gemini-decisions.mjs').GeminiDecisionsMetadata };
 }
 export interface Metadata {
   readonly provider: string; readonly providerKind: ProviderKind; readonly requestedModel: string;
@@ -140,6 +154,7 @@ export interface Metadata {
   readonly observerFailures: readonly string[];
   readonly durationMs?: number; readonly attempts?: number; readonly requestId?: string;
   readonly openaiDecisions?: OpenAIDecisionsMetadata;
+  readonly geminiDecisions?: import('./gemini-decisions.mjs').GeminiDecisionsMetadata;
   readonly cloudflareDecisions?: CloudflareDecisionsMetadata; readonly gatewayLogId?: string;
   readonly [key: string]: unknown;
 }
@@ -151,7 +166,10 @@ export interface ModelList {
     readonly release_date?: string; readonly [key: string]: unknown }[];
   readonly has_more?: boolean; readonly last_id?: string;
 }
-export interface ResultValidationOptions { readonly native?: boolean; readonly nullableUsage?: boolean; readonly probabilityDecimalPlaces?: number; }
+export interface RequestValidationOptions { readonly maxJsonNodes?: number; }
+export interface ResultValidationOptions extends RequestValidationOptions {
+    readonly native?: boolean; readonly nullableUsage?: boolean; readonly probabilityDecimalPlaces?: number;
+}
 export type ProviderKind = 'decision' | 'generative';
 export interface Provider {
   readonly kind: ProviderKind;
@@ -166,6 +184,12 @@ export interface Provider {
 }
 export interface DecisionProvider extends Provider { readonly kind: 'decision'; }
 export interface Capabilities {
+    readonly maxJsonNodes?: number;
+    readonly imageResolutions?: readonly DecisionImageResolution[];
+    readonly videoResolutions?: readonly DecisionVideoResolution[];
+    readonly documents?: boolean; readonly remoteAudio?: boolean; readonly remoteVideos?: boolean; readonly remoteDocuments?: boolean;
+    readonly maxDocuments?: number | null;
+    readonly questionContentTypes?: readonly ('text' | 'image' | 'json')[];
     readonly jsonInput?: boolean; readonly questionContent?: boolean;
     readonly conversation?: boolean; readonly toolHistory?: boolean; readonly remoteImages?: boolean; readonly promptCaching?: boolean;
     readonly boxes?: boolean;
@@ -242,7 +266,13 @@ export { OpenRouterDecisionsProvider } from './openrouter.mjs';
 export type { OpenRouterDecisionsOptions, OpenRouterNativeOptions, OpenRouterPreferences, OpenRouterDecisionRequest,
     OpenRouterDecisionResponse, OpenRouterDecisionQuestions, OpenRouterImageAsset, OpenRouterTransportMetadata } from './openrouter.mjs';
 export type OpenRouterDecisionsConfig = { type: 'openrouter-decisions' } & import('./openrouter.mjs').OpenRouterDecisionsOptions;
-export type ProviderConfig = JevConfig | OpenRouterDecisionsConfig
+export { GeminiDecisionsProvider } from './gemini-decisions.mjs';
+export type { GeminiDecisionsOptions, GeminiDecisionModel, GeminiDecisionRequest, GeminiDecisionResponse,
+    GeminiDecisionQuestions, GeminiDecisionQuestion, GeminiContent, GeminiTextContent, GeminiInstructions,
+    GeminiMediaSource, GeminiImageMime, GeminiAudioMime, GeminiVideoMime, GeminiDecisionUsage,
+    GeminiNoulAnswer, GeminiChoiceAnswer, GeminiScoreAnswer, GeminiTransportMetadata, GeminiDecisionsMetadata } from './gemini-decisions.mjs';
+export type GeminiDecisionsConfig = { type: 'gemini-decisions' } & import('./gemini-decisions.mjs').GeminiDecisionsOptions;
+export type ProviderConfig = JevConfig | OpenRouterDecisionsConfig | GeminiDecisionsConfig
   | ({ type: 'openai-decisions' } & OpenAIDecisionsOptions)
   | CloudflareDecisionsConfig;
 export type OpenAIDecisionsConfig = { type: 'openai-decisions' } & OpenAIDecisionsOptions;
@@ -250,6 +280,7 @@ export function createProvider(options: JevConfig): JevProvider;
 export function createProvider(options: OpenAIDecisionsConfig): OpenAIDecisionsProvider;
 export function createProvider(options: CloudflareDecisionsConfig): CloudflareDecisionsProvider;
 export function createProvider(options: OpenRouterDecisionsConfig): import('./openrouter.mjs').OpenRouterDecisionsProvider;
+export function createProvider(options: GeminiDecisionsConfig): import('./gemini-decisions.mjs').GeminiDecisionsProvider;
 export function createProvider(options: ProviderConfig | OpenAIDecisionsConfig): DecisionProvider;
 export function createProvider(options: ProviderConfig): DecisionProvider;
 export function choice<const O extends readonly ChoiceOption[]>(instructions: Instructions, options: O): TypedChoiceQuestion<O>;
@@ -289,8 +320,8 @@ export class DecisionError extends Error {
   toJSON(): ErrorDetails;
 }
 export function publicError(error: unknown): ErrorDetails;
-export function validateRequest<const Q extends Questions>(input: EvaluationRequest<Q>, defaultModel?: string): ResolvedRequest<Q>;
-export function validateRequest(input: unknown, defaultModel?: string): ResolvedRequest;
+export function validateRequest<const Q extends Questions>(input: EvaluationRequest<Q>, defaultModel?: string, options?: RequestValidationOptions): ResolvedRequest<Q>;
+export function validateRequest(input: unknown, defaultModel?: string, options?: RequestValidationOptions): ResolvedRequest;
 export function validateResult<const Q extends Questions>(input: unknown, questions: Q, options?: ResultValidationOptions): ProviderResult<Q>;
 export type BatchRecord<Q extends Questions = Questions> =
   | { index: number; ok: true; result: EvaluationResult<Q> }

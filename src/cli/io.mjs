@@ -76,32 +76,46 @@ export async function readJson(path, context) {
 export async function* readJsonLines(path, context) {
   const decoder = new TextDecoder('utf-8', { fatal: true });
   const lineLimit = context.maxInputBytes ?? INPUT_LIMIT;
-  let pending = '';
+  let pending = [];
+  let pendingBytes = 0;
+  let trailingCR = false;
   let line = 0;
   function parse(text) {
     try { return { line, input: JSON.parse(text) }; }
     catch { return { line, error: { code: 'VALIDATION_ERROR', message: 'Line is not valid JSON.' } }; }
   }
+  // Retain decoded chunks until a delimiter, avoiding repeated copies of large records.
+  function append(text) {
+    if (text) {
+      pending.push(text);
+      pendingBytes += Buffer.byteLength(text);
+      trailingCR = text.endsWith('\r');
+    }
+    check(pendingBytes - (trailingCR ? 1 : 0) <= lineLimit,
+      'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
+  }
+  function* records(text) {
+    let start = 0;
+    let end;
+    while ((end = text.indexOf('\n', start)) !== -1) {
+      append(text.slice(start, end));
+      const record = pending.join('').replace(/\r$/, '');
+      pending = []; pendingBytes = 0; trailingCR = false;
+      line++;
+      if (record.trim()) yield parse(record);
+      start = end + 1;
+    }
+    append(text.slice(start));
+  }
   try {
     for await (const chunk of chunks(path, context, Math.max(64 * 1024 * 1024, lineLimit + 2))) {
-      pending += decoder.decode(chunk, { stream: true });
-      let end;
-      while ((end = pending.indexOf('\n')) !== -1) {
-        const text = pending.slice(0, end).replace(/\r$/, '');
-        pending = pending.slice(end + 1);
-        line++;
-        check(Buffer.byteLength(text) <= lineLimit, 'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
-        if (text.trim()) yield parse(text);
-      }
-      // A trailing CR may be half of a split CRLF delimiter, not record content.
-      const delimiterBytes = pending.endsWith('\r') ? 1 : 0;
-      check(Buffer.byteLength(pending) - delimiterBytes <= lineLimit,
-        'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
+      yield* records(decoder.decode(chunk, { stream: true }));
     }
-    pending += decoder.decode();
+    yield* records(decoder.decode());
     // At EOF an unpaired CR is content; it cannot enlarge the record ceiling.
-    check(Buffer.byteLength(pending) <= lineLimit, 'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
-    if (pending.trim()) { line++; yield parse(pending); }
+    check(pendingBytes <= lineLimit, 'A JSONL line exceeds the byte limit.', 'INPUT_TOO_LARGE');
+    const final = pending.join('');
+    if (final.trim()) { line++; yield parse(final); }
   } catch (error) {
     if (error instanceof DecisionError) throw error;
     throw new DecisionError('JSONL input contains invalid UTF-8.', { code: 'VALIDATION_ERROR' });

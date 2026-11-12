@@ -6,7 +6,7 @@ JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source chec
 the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
 declarations in `src/index.d.mts`.
 
-This reference covers **0.1.6**.
+This reference covers **0.1.7**.
 See [version availability](../README.md#version-availability).
 
 ## Create a bridge
@@ -50,7 +50,7 @@ guides. These are SDK options, not per-evaluation bridge options.
 | --- | --- |
 | `timeoutMs` | 30,000 ms; positive integer through 2,147,483,647; one transport budget for dispatch, retries, backoff, and response reading |
 | `maxRetries` | Additional eligible attempts, 0–10; Jev and ordinary generative calls default to 2; native OpenAI, Cloudflare and OpenRouter default to 0; Anthropic thread transport retries are disabled |
-| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB (first-party Anthropic Messages: 128,000,000 bytes); Jev defaults to 32 MiB, with explicit client budgets through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
+| `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB. Gemini accepts explicit budgets through 160 MiB; first-party Anthropic Messages through 128,000,000 bytes. Jev defaults to 32 MiB, with explicit client budgets through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
 | `maxResponseBytes` | 8 MiB; configurable from 1 byte through 64 MiB; applies while reading the response body |
 | `fetchImpl` | Optional `(url: string, init?: RequestInit) => Promise<Response>`; defaults to the runtime's `fetch` |
 
@@ -86,6 +86,16 @@ independent transport timeout, including Workers AI binding calls.
 Ordered parts are `{ type: 'text', text }`, `{ type: 'image', dataUrl, detail? }`,
 `{ type: 'image', url, detail? }`, `{ type: 'json', data }`,
 `{ type: 'audio', dataUrl }`, or `{ type: 'video', dataUrl }`.
+Document-capable providers also accept `{ type: 'document', dataUrl }` or
+`{ type: 'document', url }` for PDFs. Remote audio/video parts use `url` and
+`mimeType`; remote image input may include `mimeType`, which Gemini requires.
+Each media part has exactly one source. New remote audio/video/document inputs
+require HTTPS without credentials or fragments and are forwarded without fetching.
+Image parts may also specify `resolution: 'low' | 'medium' | 'high' | 'ultra_high'`;
+video parts accept `'low' | 'medium' | 'high'`. These controls require matching
+`imageResolutions` or `videoResolutions` capabilities, supplied by Gemini Decisions.
+Image `resolution` and a non-null `detail` are mutually exclusive. Resolution is
+unsupported on audio, documents and question content.
 Image `url` and `dataUrl` are exclusive. Text/image
 parts may carry `promptCacheBreakpoint`. Remote HTTP(S) images and cache controls
 require their respective capabilities and are forwarded without URL fetching or
@@ -94,7 +104,7 @@ see [conversation and prompt caching](../guides/OPENAI_DECISIONS.md#conversation
 JSON `data` accepts an object or array of objects. JSON parts require `jsonInput`
 and do not accept cache breakpoints. User conversation content uses the native
 `input_json` spelling.
-Audio/video are supported by Cloudflare Clef-omni, its native OpenRouter profile,
+Audio/video are supported by Gemini Decisions, Cloudflare Clef-omni, its native OpenRouter profile,
 and explicitly capable custom providers. Cloudflare requires images → audio →
 videos → text. Its media use embedded data URLs, with format and client-budget
 checks described in the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md#omni-audio-and-video).
@@ -133,7 +143,14 @@ throw `UNSUPPORTED_OPERATION`.
 a top-level number, or a top-level boolean. Values nested within objects/arrays can
 be any JSON values. JSON snapshots reject `undefined`, cycles, non-finite numbers,
 functions, dates, class instances, accessors, symbols, sparse arrays, and extra or
-non-enumerable array/object properties. Limits: nesting depth 100, 200,000 nodes.
+non-enumerable array/object properties. Limits: nesting depth 100 and normally
+200,000 nodes. Gemini allows 1,000,000 nodes for requests and results. Providers
+can advertise a bounded `maxJsonNodes` capability, from 1 through 1,000,000;
+omitting it retains the 200,000-node default. The bridge applies the selected
+provider's limit again after preparation.
+For custom providers, response and question snapshots use the separate
+`getResultValidationOptions().maxJsonNodes` setting. Configure both policies when
+raising request and response limits.
 
 `questions` is a nonempty object keyed by application-owned identifiers. Legacy
 questions require non-null `instructions`: nonempty text, a JSON object, or an
@@ -233,8 +250,9 @@ top-left, with `top < bottom` and `left < right`. Confidence, when present, is i
 for model requirements and handling an absent target.
 
 **Usage:** `input_tokens` and `output_tokens` are nonnegative integers or null.
-Jev accepts explicitly null counts as unknown; OpenAI Decisions, Cloudflare and native OpenRouter
-require reported integer counts. OpenAI and
+Jev accepts explicitly null counts as unknown; OpenAI Decisions, Cloudflare, Gemini and native OpenRouter
+require reported integer counts. Gemini requires zero output tokens and retains
+native modality counts in `meta.geminiDecisions.usage`. OpenAI and
 Anthropic cache creation/read counts are preserved separately when provided;
 Cloudflare forwards reported usage without estimating additional fields. The SDK
 does not calculate prices, cache savings or token estimates.
@@ -267,7 +285,9 @@ are immutable. Standalone common `validateRequest` and `validateResult` return
 snapshots without freezing them; dedicated extraction and Live validators return
 frozen snapshots.
 
-`schemaVersion` is selected by the highest applicable feature: 6 for explicit JSON
+`schemaVersion` is selected by the highest applicable feature: 8 for explicit image
+or video `resolution`; 7 for document input,
+remote audio/video or explicit remote MIME metadata; 6 for explicit JSON
 parts or `instructionParts`; 5 for conversation,
 remote-image URLs or prompt-cache controls; 4 for boxes; 3 for audio/video; 2 for
 ordered images/text, typed choices, labelled scores or a safety identifier; and
@@ -390,9 +410,9 @@ for complete policy, callback, selector, recovery and diagnostic behavior.
 ## Additional exports
 
 - `createProvider(config)`: factory requiring an explicit `type` equal to `jev`,
-  `openai-decisions`, `cloudflare-decisions`, or `openrouter-decisions`.
+  `openai-decisions`, `cloudflare-decisions`, `openrouter-decisions`, or `gemini-decisions`.
 - `JevProvider`, `OpenAIDecisionsProvider`, `CloudflareDecisionsProvider`,
-  `OpenRouterDecisionsProvider`: native provider classes.
+  `OpenRouterDecisionsProvider`, `GeminiDecisionsProvider`: native provider classes.
 - `box(instructions)` and `JevProvider.createDecision(request, options?)`:
   bounding boxes and native JSON assets; see the [Jev guide](../guides/JEV.md).
 - `scoreLevels(instructions, levels)` and the array overload of `choice`:
@@ -403,11 +423,15 @@ for complete policy, callback, selector, recovery and diagnostic behavior.
   Clef access returning `{ decision, meta }`; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md).
 - `OpenRouterDecisionsProvider.createDecision(request, options?)`: native Decisions
   access preserving optional probabilities and confidence; see the [OpenRouter guide](../guides/OPENROUTER_NATIVE.md).
-- `validateRequest(input, defaultModel?)`: snapshot and validate. Requires
+- `GeminiDecisionsProvider.createDecision(request, options?)`: native Google
+  input, questions, probabilities and usage; see the [Gemini guide](../guides/GEMINI_DECISIONS.md).
+- `validateRequest(input, defaultModel?, { maxJsonNodes = 200000 }?)`: snapshot and validate. Requires
   an own `input.model` property or an explicitly supplied default; inherited
   models are ignored, and it never selects a Jev model.
   Question builders and schema generation validate without selecting an inference model.
-- `validateResult(input, questions, { native = false, nullableUsage = false, probabilityDecimalPlaces })`: snapshot supplied
+  Validation options use own data fields; inherited fields are ignored. Supplying
+  options preserves the inferred question types.
+- `validateResult(input, questions, { native = false, nullableUsage = false, probabilityDecimalPlaces, maxJsonNodes = 200000 })`: snapshot supplied
   questions and validate the canonical result; native mode requires confidence
   and reported counts unless the provider explicitly enables nullable usage.
 - `decideChoice(answer, { minProbability, minMargin = 0, abstainOptions = [], probabilityDecimalPlaces })`:
@@ -475,8 +499,9 @@ the answer. `evaluateBatch()` validates array holes as invalid requests before a
 item is dispatched.
 
 The optional third argument to `validateResult()` must be a plain options object
-with optional boolean `native`, boolean `nullableUsage`, and integer
-`probabilityDecimalPlaces` (1–15) fields. Both booleans default to false.
+with optional boolean `native`, boolean `nullableUsage`, integer
+`probabilityDecimalPlaces` (1–15), and integer `maxJsonNodes` (1–1,000,000) fields.
+Both booleans default to false; `maxJsonNodes` defaults to 200,000.
 `nullableUsage: true` permits null token counts when native validation is enabled;
 it does not relax the native confidence requirement.
 Providers can declare a pure synchronous `getResultValidationOptions(model)` hook;
@@ -485,7 +510,7 @@ Returning a Promise is a configuration error; its rejection is observed without
 calling inference or reading a custom `then` accessor.
 Cloudflare and native OpenRouter select four-decimal rounding; other built-ins retain the 0.001 sum tolerance.
 Unknown keys, accessors, symbol keys, non-enumerable fields, a non-boolean `native`,
-or invalid probability precision are rejected as `CONFIGURATION_ERROR`.
+or invalid probability precision/node limits are rejected as `CONFIGURATION_ERROR`.
 An omitted or explicitly undefined `native` value keeps the default `false`.
 Extension arrays must be dense; a hole is not an omitted extension.
 

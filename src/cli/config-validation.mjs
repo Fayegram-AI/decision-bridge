@@ -6,8 +6,9 @@ import { generationOptions } from '../custom/generative/shared.mjs';
 import { anthropicOptions, anthropicRequestCeiling, ANTHROPIC_API_VERSIONS } from '../custom/generative/anthropic-options.mjs';
 import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 import { validateRoutingConfig } from './routing-config.mjs';
+import { GEMINI_REQUEST_CEILING } from '../providers/gemini-profile.mjs';
 
-export const PROVIDERS = ['jev', 'openrouter-decisions', 'openrouter-extraction', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
+export const PROVIDERS = ['jev', 'gemini-decisions', 'openrouter-decisions', 'openrouter-extraction', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction', 'custom-decision', 'custom-generative'];
 export const PRESETS = ['openai-compatible', 'openrouter', 'anthropic'];
 export const TRANSPORT = ['baseURL', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes'];
 export const GENERATION = ['maxTokens', 'responseFormat', 'apiVersion', 'tokenParameter', 'parameters', 'noAuth', 'workspaceId'];
@@ -15,7 +16,7 @@ export const PROVIDER_FIELDS = [...TRANSPORT, ...GENERATION, 'apiKeyEnv', 'model
     'options', 'accountId', 'rejectIfBusy', 'gateway', 'dangerZone', 'api', 'providerPreferences'];
 const FIELDS = new Set(['$schema', 'schemaVersion', 'provider', 'timeoutMs', ...PROVIDER_FIELDS]);
 export const NUMERIC = new Set(['timeoutMs', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes', 'maxTokens']);
-export const KEY_ENVS = { 'openrouter-decisions': 'OPENROUTER_API_KEY', 'openrouter-extraction': 'OPENROUTER_API_KEY', jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
+export const KEY_ENVS = { 'gemini-decisions': 'DECISION_BRIDGE_GEMINI_API_KEY', 'openrouter-decisions': 'OPENROUTER_API_KEY', 'openrouter-extraction': 'OPENROUTER_API_KEY', jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
     'cloudflare-decisions': 'CLOUDFLARE_API_TOKEN', 'cloudflare-extraction': 'CLOUDFLARE_API_TOKEN', 'openai-compatible': 'OPENAI_API_KEY',
     openrouter: 'OPENROUTER_API_KEY', anthropic: 'ANTHROPIC_API_KEY' };
 export const isModule = config => ['custom-decision', 'custom-generative'].includes(config.provider) && config.module !== undefined;
@@ -43,7 +44,8 @@ export function validateConfig(input, { complete = false } = {}) {
         if (config[field] === undefined) continue;
         const min = field === 'maxRetries' ? 0 : 1;
         const max = field === 'maxRetries' ? 10 : field === 'maxTokens' ? 1048576
-            : field === 'maxRequestBytes' && config.preset === 'anthropic' ? anthropicRequestCeiling(config.baseURL) : field.endsWith('Bytes') ? 67108864 : 2147483647;
+            : field === 'maxRequestBytes' && config.provider === 'gemini-decisions' ? GEMINI_REQUEST_CEILING
+                : field === 'maxRequestBytes' && config.preset === 'anthropic' ? anthropicRequestCeiling(config.baseURL) : field.endsWith('Bytes') ? 67108864 : 2147483647;
         check(Number.isSafeInteger(config[field]) && config[field] >= min && config[field] <= max,
             'Numeric configuration field is out of range.', 'CONFIGURATION_ERROR');
     }

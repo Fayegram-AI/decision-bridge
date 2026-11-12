@@ -61,7 +61,7 @@ export interface RoutingRule {
     effect: 'require' | 'prefer';
     when: {
         operation?: RoutingOperation;
-        modalities?: readonly ('text' | 'image' | 'audio' | 'video')[];
+        modalities?: readonly ('text' | 'image' | 'audio' | 'video' | 'document')[];
         questionTypes?: readonly ('choice' | 'noul' | 'score' | 'box')[];
         fieldTypes?: readonly import('../extraction/index.mjs').ExtractionFieldType[];
         labels?: readonly string[];

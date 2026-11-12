@@ -45,7 +45,7 @@ Usage:
 
 Command aliases: decision, faye-decision
 
-Native decisions: jev, openai-decisions, cloudflare-decisions, openrouter-decisions
+Native decisions: jev, openai-decisions, cloudflare-decisions, openrouter-decisions, gemini-decisions
 Extraction: cloudflare-extraction, openrouter-extraction
 Custom paths: custom-decision, custom-generative
 Generative presets: openai-compatible, openrouter, anthropic

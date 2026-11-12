@@ -16,12 +16,13 @@ The SDK validates the returned decisions. Extraction and Live have separate APIs
 request formats. For provider-specific input forms, consult the
 [capability comparison](reference/PROVIDERS.md#common-request-capabilities). The common
 bridge API and dedicated native APIs have separate request shapes; the Jev, OpenAI,
-Cloudflare and OpenRouter guides cover both.
+Cloudflare, OpenRouter and Gemini guides cover both.
 
 ## Version availability
 
-These guides describe **0.1.6**. Use the documentation bundled with your installed
+These guides describe **0.1.7**. Use the documentation bundled with your installed
 package. For earlier versions, consult the
+[0.1.6 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.6/docs),
 [0.1.5 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.5/docs),
 [0.1.4 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.4/docs),
 [0.1.3 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.3/docs)
@@ -29,6 +30,7 @@ and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/de
 
 | Feature | First supported version |
 | --- | --- |
+| Native Gemini Decisions, common image/video resolution, larger opt-in Gemini budgets; common PDF and remote audio/video inputs; explicit remote-image MIME metadata | 0.1.7 |
 | Jev boxes through stable `jev-latest`; native OpenRouter Decisions and Extractions | 0.1.6 |
 | Anthropic workspace headers, larger request budgets and cumulative threads | 0.1.6 |
 | Live startup snapshots, sparse delegation updates, acknowledgement delay, and expanded message/tool items | 0.1.6 |
@@ -41,7 +43,7 @@ and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/de
 
 See [installation](guides/GETTING_STARTED.md#install-into-your-application) for setup
 and the [changelog](../CHANGELOG.md) for version history. Earlier APIs remain
-supported in 0.1.6.
+supported in 0.1.7.
 
 ## Use the bridge
 
@@ -53,6 +55,7 @@ supported in 0.1.6.
 | [Switching models](guides/SWITCHING_MODELS.md) | Backend and model selection |
 | [Configurable routing](guides/ROUTING.md) | Automatic or direct routes, eligibility, rules, selectors, clarification, recovery and registry configuration |
 | [OpenRouter native](guides/OPENROUTER_NATIVE.md) | Native model IDs, Decisions/Extractions, media, metadata and routing |
+| [Gemini Decisions](guides/GEMINI_DECISIONS.md) | Native/common decisions, scoped credentials, multimodal inputs, PDFs, metadata and routing |
 | [Anthropic threads](guides/ANTHROPIC_THREADS.md) | Explicit cumulative evaluations, bounded history and recovery |
 | [Jev](guides/JEV.md) | Common/native images, boxes, experimental long context, model selection, and CLI opt-ins |
 | [OpenAI Decisions](guides/OPENAI_DECISIONS.md) | Model selectors, common/native access, JSON/question content, conversation/tool history, cache controls, and typed values |

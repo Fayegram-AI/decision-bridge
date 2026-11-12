@@ -4,12 +4,14 @@ import { DecisionError, requireCondition as check } from '../errors.mjs';
 import { cloneJson, freezeJson } from '../validation.mjs';
 import { providerContract } from '../provider-contract.mjs';
 import { createBridge } from '../bridge.mjs';
-import { createProvider, JevProvider, OpenAIDecisionsProvider, CloudflareDecisionsProvider, OpenRouterDecisionsProvider } from '../providers/index.mjs';
+import { createProvider, JevProvider, OpenAIDecisionsProvider, CloudflareDecisionsProvider, OpenRouterDecisionsProvider, GeminiDecisionsProvider } from '../providers/index.mjs';
 import { createExtractionProvider, CloudflareExtractionProvider, OpenRouterExtractionProvider } from '../extraction/index.mjs';
 import { extractionProviderContract } from '../extraction/result.mjs';
 import { prepareCommonOpenRouterExtraction } from '../extraction/openrouter.mjs';
 import { prepareCommonOpenRouterDecision } from '../providers/openrouter-decisions.mjs';
 import { openRouterSettings } from '../providers/openrouter-shared.mjs';
+import { prepareCommonGeminiDecision } from '../providers/gemini-codec.mjs';
+import { GEMINI_MODEL, GEMINI_REQUEST_CEILING, geminiModel } from '../providers/gemini-profile.mjs';
 import { validateExtractionRequest, extractionModel } from '../extraction/validation.mjs';
 import { preflightCommonJevDecision } from '../providers/jev-preflight.mjs';
 import { preflightCommonDecision } from '../providers/decisions-preflight.mjs';
@@ -20,11 +22,12 @@ import { jevDangerZone, jevRequestLimit } from '../providers/jev-profile.mjs';
 import { validateApiKey, parseBaseURL } from '../transport.mjs';
 import { ROUTE_FIELDS, integer } from './configuration.mjs';
 
-const NATIVE = ['openrouter-decisions', 'openrouter-extraction', 'jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction'];
-const pure = { 'openrouter-decisions': (request, options) => prepareCommonOpenRouterDecision(request, options).request, 'openrouter-extraction': prepareCommonOpenRouterExtraction, jev: preflightCommonJevDecision, 'openai-decisions': preflightCommonDecision,
+const NATIVE = ['gemini-decisions', 'openrouter-decisions', 'openrouter-extraction', 'jev', 'openai-decisions', 'cloudflare-decisions', 'cloudflare-extraction'];
+const pure = { 'gemini-decisions': (request, options) => prepareCommonGeminiDecision(request, options).request,
+    'openrouter-decisions': (request, options) => prepareCommonOpenRouterDecision(request, options).request, 'openrouter-extraction': prepareCommonOpenRouterExtraction, jev: preflightCommonJevDecision, 'openai-decisions': preflightCommonDecision,
     'cloudflare-decisions': preflightCommonCloudflareDecision, 'cloudflare-extraction': validateExtractionRequest };
-const modelDefault = { jev: 'jev-latest', 'openai-decisions': 'default', 'cloudflare-decisions': 'clef', 'cloudflare-extraction': 'clairic' };
-const normalize = { 'openai-decisions': resolveOpenAIModel, 'cloudflare-decisions': cloudflareModel, 'cloudflare-extraction': extractionModel };
+const modelDefault = { 'gemini-decisions': GEMINI_MODEL, jev: 'jev-latest', 'openai-decisions': 'default', 'cloudflare-decisions': 'clef', 'cloudflare-extraction': 'clairic' };
+const normalize = { 'gemini-decisions': geminiModel, 'openai-decisions': resolveOpenAIModel, 'cloudflare-decisions': cloudflareModel, 'cloudflare-extraction': extractionModel };
 
 function nativeConfig(input) {
     const type = Object.getOwnPropertyDescriptor(input ?? {}, 'type')?.value;
@@ -41,7 +44,11 @@ function nativeConfig(input) {
     if (config.model !== undefined) check(typeof config.model === 'string' && config.model.trim(), 'Invalid route model.', 'CONFIGURATION_ERROR');
     config.model ??= modelDefault[type];
     if (normalize[type]) normalize[type](config.model);
-    for (const key of ['timeoutMs', 'maxResponseBytes', 'maxRequestBytes']) if (config[key] !== undefined) integer(config[key], key, key.endsWith('Bytes') ? 67108864 : 2147483647);
+    for (const key of ['timeoutMs', 'maxResponseBytes', 'maxRequestBytes']) if (config[key] !== undefined) {
+        const ceiling = key === 'maxRequestBytes' && type === 'gemini-decisions' ? GEMINI_REQUEST_CEILING
+            : key.endsWith('Bytes') ? 67108864 : 2147483647;
+        integer(config[key], key, ceiling);
+    }
     check(config.maxRetries === undefined || (Number.isSafeInteger(config.maxRetries) && config.maxRetries >= 0 && config.maxRetries <= 10), 'Invalid maxRetries.', 'CONFIGURATION_ERROR');
     check(config.apiKey === undefined || typeof config.apiKey === 'string', 'apiKey must be text.', 'CONFIGURATION_ERROR');
     if (config.baseURL !== undefined) {
@@ -90,7 +97,7 @@ export function target(id, input, recovery) {
         'Extraction routes require an extraction provider.', 'CONFIGURATION_ERROR');
     let provider = input.provider;
     check(input.provider === undefined || !!provider, 'A supplied provider must be an object.', 'CONFIGURATION_ERROR');
-    const providerType = () => config?.type ?? (provider instanceof JevProvider ? 'jev'
+    const providerType = () => config?.type ?? (provider instanceof GeminiDecisionsProvider ? 'gemini-decisions' : provider instanceof JevProvider ? 'jev'
         : provider instanceof OpenAIDecisionsProvider ? 'openai-decisions'
             : provider instanceof CloudflareDecisionsProvider ? 'cloudflare-decisions'
                 : provider instanceof CloudflareExtractionProvider ? 'cloudflare-extraction'

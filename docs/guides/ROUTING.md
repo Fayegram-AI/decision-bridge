@@ -61,8 +61,8 @@ allocation or availability.
 
 Concrete decision routes accept exactly one of:
 
-- `config`: native provider options with `type` (`jev`, `openai-decisions`, or
-  `cloudflare-decisions` or `openrouter-decisions`), including REST or Workers binding options.
+- `config`: native provider options with `type` (`jev`, `openai-decisions`,
+  `cloudflare-decisions`, `openrouter-decisions` or `gemini-decisions`), including REST or Workers binding options.
 - `provider`: an existing Provider, without bridge preparation extensions.
 - `factory`: an asynchronous or synchronous function receiving `{ signal }`, with
   an explicit `kind: 'decision' | 'generative'` and optional `model` and `ready`.
@@ -175,6 +175,10 @@ sent. Arbitrary JSON state remains task content. Supply call `routingDescription
 to replace task content with an application-provided description. The serialized
 context defaults to 32 KiB and is never silently truncated.
 
+Modalities are `text`, `image`, `audio`, `video` and `document`. PDF parts contribute
+to `document`; capability checks exclude providers that cannot accept them.
+Recognized remote media includes its MIME hint, and PDF references identify
+`application/pdf`, while selector context omits their URLs and payloads.
 Explicit JSON parts contribute to the `text` modality and question images contribute to
 `image`. Recognized images in `instructionParts` receive the same metadata
 replacement, including when `routingDescription` replaces shared task content.

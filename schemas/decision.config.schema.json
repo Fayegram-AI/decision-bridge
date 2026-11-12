@@ -238,7 +238,8 @@
                             "text",
                             "image",
                             "audio",
-                            "video"
+                            "video",
+                            "document"
                         ]
                     }
                 },
@@ -1355,6 +1356,47 @@
                         },
                         "providerPreferences": {
                             "$ref": "#/$defs/openRouterPreferences"
+                        }
+                    },
+                    "required": [
+                        "provider"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "$schema": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "schemaVersion": {
+                            "const": 1
+                        },
+                        "model": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "apiKeyEnv": {
+                            "$ref": "#/$defs/keyEnv"
+                        },
+                        "timeoutMs": {
+                            "$ref": "#/$defs/timeout"
+                        },
+                        "baseURL": {
+                            "$ref": "#/$defs/text"
+                        },
+                        "maxRetries": {
+                            "$ref": "#/$defs/retries"
+                        },
+                        "maxRequestBytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 167772160
+                        },
+                        "maxResponseBytes": {
+                            "$ref": "#/$defs/bytes"
+                        },
+                        "provider": {
+                            "const": "gemini-decisions"
                         }
                     },
                     "required": [
