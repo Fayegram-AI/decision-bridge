@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.7
+
+- Add native Gemini Decisions with `gemini-decision-1`, common and native SDK
+  access, CLI profiles, model metadata discovery, local batches and routing.
+- Support Gemini text, image, audio, video and PDF input, including remote media
+  references with explicit MIME metadata. New common media forms use result
+  schema version 7; existing request forms retain their schema versions.
+- Preserve native probabilities, confidence, modality usage and prompt feedback.
+  Validate response correlation and classify explicit safety refusals.
+- Add scoped `DECISION_BRIDGE_GEMINI_API_KEY` credential lookup, provider
+  capability checks and TypeScript contracts without runtime dependencies.
+- Infer native Gemini choice IDs as strings when criteria use numeric property names.
+- Reject invalid Unicode native Gemini option IDs during local preflight.
+- Keep Gemini textual safety diagnostics in `upstreamErrorCode`, preserving the
+  numeric `upstreamCode` contract.
+- Expose all Gemini image/video resolutions through common input and capabilities,
+  with result schema version 8 for explicit resolution controls.
+- Allow explicit Gemini request budgets through 160 MiB, retaining the 8 MiB
+  default and existing response limits. Apply configured budgets to CLI and routing
+  input, and read large JSONL records without repeated whole-record copies.
+- Support larger Gemini question and answer sets with bounded 1,000,000-node
+  snapshots. Preserve the 200,000-node default for other providers and standalone
+  validation unless a larger contract is selected explicitly.
+- Ignore inherited request-validation node policies without invoking getters,
+  and preserve literal question types when validation options are supplied.
+
 ## 0.1.6
 
 - Add native OpenRouter Decisions and Extractions with explicit model IDs,

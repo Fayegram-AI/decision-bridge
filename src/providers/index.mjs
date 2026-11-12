@@ -5,8 +5,9 @@ import { JevProvider } from './jev.mjs';
 import { OpenAIDecisionsProvider } from './openai-decisions.mjs';
 import { CloudflareDecisionsProvider } from './cloudflare-decisions.mjs';
 import { OpenRouterDecisionsProvider } from './openrouter-decisions.mjs';
+import { GeminiDecisionsProvider } from './gemini-decisions.mjs';
 
-export { JevProvider, OpenAIDecisionsProvider, CloudflareDecisionsProvider, OpenRouterDecisionsProvider };
+export { JevProvider, OpenAIDecisionsProvider, CloudflareDecisionsProvider, OpenRouterDecisionsProvider, GeminiDecisionsProvider };
 
 /** Programmatic factory. Custom providers are passed directly to createBridge. */
 export function createProvider(configuration) {
@@ -23,6 +24,7 @@ export function createProvider(configuration) {
     case 'openai-decisions': return new OpenAIDecisionsProvider(options);
     case 'cloudflare-decisions': return new CloudflareDecisionsProvider(options);
     case 'openrouter-decisions': return new OpenRouterDecisionsProvider(options);
+    case 'gemini-decisions': return new GeminiDecisionsProvider(options);
     default: throw new DecisionError('Unknown native decision provider. General-purpose adapters require custom-generative presets.', { code: 'CONFIGURATION_ERROR' });
   }
 }

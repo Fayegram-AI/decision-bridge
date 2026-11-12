@@ -4,8 +4,7 @@
 
 Run `npm exec -- decision-bridge --version` in the consuming project and compare
 it with [version availability](../README.md#version-availability). These guides
-describe 0.1.6, including native OpenRouter providers, stable-alias Jev boxes and
-Anthropic threads. Follow the [installation options](GETTING_STARTED.md#install-into-your-application)
+describe 0.1.7, including Gemini Decisions. Follow the [installation options](GETTING_STARTED.md#install-into-your-application)
 to install this version, or use the documentation bundled with an older package.
 
 ## The command cannot find a key

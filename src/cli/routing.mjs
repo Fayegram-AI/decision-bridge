@@ -62,7 +62,11 @@ export async function runRoutingCli(command, positionals, values, loaded, contex
     if (interactive) options.onAmbiguity = promptHandler(stdin, stderr);
     const router = (extracting ? createExtractionRouter : createDecisionRouter)(options);
     const call = { signal, ...(values.route === undefined ? {} : { route: values.route }), clarify: interactive };
-    const io = { stdin, cwd, signal, maxInputBytes: 64 * 1024 * 1024 };
+    const maxInputBytes = extracting ? 64 * 1024 * 1024 : Math.max(64 * 1024 * 1024,
+        ...Object.values(loaded.config.routes).filter(route => route.enabled !== false && route.operation !== 'extraction'
+            && !route.config?.provider.endsWith('-extraction'))
+            .map(route => route.config?.maxRequestBytes ?? 0));
+    const io = { stdin, cwd, signal, maxInputBytes };
     if (values.output && values.output !== '-' && path !== '-') await assertDistinctFiles(path, values.output, cwd);
     const writer = await createWriter({ output: values.output, force: values.force, stdout, cwd, signal });
     try {

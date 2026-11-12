@@ -19,6 +19,9 @@ checks and optional service checks.
 | Noul probabilities | https://docs.typesafe.ai/primitives/noul |
 | Score rubric and weighted expectation | https://docs.typesafe.ai/primitives/score |
 | Native confidence interpretation | https://docs.typesafe.ai/confidence |
+| Gemini Decisions requests, media, questions and responses | https://aistudio.google.com/docs/decisions-api |
+| Gemini Decision 1 model and limits | https://aistudio.google.com/docs/models/gemini-decision-1 |
+| Gemini model metadata | https://aistudio.google.com/api-reference/models/get-model.md |
 | OpenAI structured output modes | https://platform.openai.com/docs/guides/structured-outputs |
 | OpenAI native Decisions guide | https://developers.openai.com/api/docs/guides/decisions |
 | OpenAI Decisions request/response contract | https://developers.openai.com/api/reference/resources/decisions/methods/create |

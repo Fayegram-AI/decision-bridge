@@ -41,6 +41,7 @@ export async function initialize(directory, config, native = false, moduleBase =
         ...(config.module ? { module: resolve(moduleBase, config.module) } : {}),
         ...(config.provider === 'jev' && config.model === undefined ? { model: 'jev-latest' } : {}),
         ...(config.provider === 'openai-decisions' && config.model === undefined ? { model: OPENAI_DEFAULT_MODEL } : {}),
+        ...(config.provider === 'gemini-decisions' && config.model === undefined ? { model: 'gemini-decision-1' } : {}),
         ...(custom && config.model === undefined ? { model: 'YOUR_MODEL' } : {}),
     }, { complete: true });
     const request = config.provider.endsWith('-extraction') ? {
@@ -57,9 +58,9 @@ export async function initialize(directory, config, native = false, moduleBase =
         ? (extractionProfile(config.provider).common(request, { model: template.model }), request)
         : extractionProfile(config.provider)[native ? 'native' : 'common'](request, { model: template.model }))
         : native ? profile.native(profile.encode(validateRequest(request, template.model)), profile.options(template)) : request;
-    // OpenAI request files inherit selection from configuration, including after later edits.
+    // Generated request files inherit model selection from configuration.
     const generated = { ...sample };
-    if (config.provider === 'openai-decisions') delete generated.model;
+    if (['openai-decisions', 'gemini-decisions'].includes(config.provider)) delete generated.model;
     // Generated native defaults must not override the user's configured routing policy.
     if (['openrouter-decisions', 'openrouter-extraction'].includes(config.provider)) delete generated.provider;
     const schema = await readFile(new URL('../../schemas/decision.config.schema.json', import.meta.url), 'utf8');

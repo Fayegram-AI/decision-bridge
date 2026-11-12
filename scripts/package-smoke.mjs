@@ -16,6 +16,7 @@ import { routingScenario, routingTypes } from './package/routing-scenarios.mjs';
 import { decisionsContentScenario, decisionsContentTypes } from './package/decisions-content-scenario.mjs';
 import { anthropicScenario, anthropicTypes } from './package/anthropic-scenario.mjs';
 import { providerRefreshScenario, providerRefreshTypes } from './package/provider-refresh-scenario.mjs';
+import { geminiScenario, geminiTypes } from './package/gemini-scenario.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const temporary = mkdtempSync(join(tmpdir(), 'decision package '));
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('DECISION_') &&
@@ -49,7 +50,7 @@ import * as sdk from ${JSON.stringify(name)};
 import { createBridge, DecisionError, noul, createProvider } from ${JSON.stringify(name)};
 // Check the complete installed entry point against its public contract.
 assert.deepEqual(Object.keys(sdk).sort(), [
-    'createBridge', 'JevProvider', 'OpenAIDecisionsProvider', 'CloudflareDecisionsProvider', 'OpenRouterDecisionsProvider',
+    'createBridge', 'JevProvider', 'OpenAIDecisionsProvider', 'CloudflareDecisionsProvider', 'OpenRouterDecisionsProvider', 'GeminiDecisionsProvider',
     'createProvider', 'choice', 'noul', 'score', 'scoreLevels', 'box', 'decideChoice',
     'choiceWithParts', 'noulWithParts', 'scoreWithParts', 'scoreLevelsWithParts',
     'evaluateBatch', 'DecisionError', 'publicError',
@@ -81,6 +82,7 @@ console.log('Installed SDK imports and evaluates a local test fixture.');\n`;
     ['custom-smoke.mjs', customScenario(name)],
     ['anthropic-smoke.mjs', anthropicScenario(name)],
     ['provider-refresh-smoke.mjs', providerRefreshScenario(name)],
+    ['gemini-smoke.mjs', geminiScenario(name)],
     ['browser-smoke.mjs', browserScenario(name)],
     ['expansion-smoke.mjs', expansionScenario(name)],
     ['routing-smoke.mjs', routingScenario(name)],
@@ -88,7 +90,7 @@ console.log('Installed SDK imports and evaluates a local test fixture.');\n`;
     writeFileSync(join(consumer, file), source);
     console.log(run(process.execPath, [file], consumer).trim());
   }
-  writeFileSync(join(consumer, 'types.mts'), consumerTypes(name) + expansionTypes(name) + routingTypes(name) + decisionsContentTypes(name) + anthropicTypes(name) + providerRefreshTypes(name));
+  writeFileSync(join(consumer, 'types.mts'), consumerTypes(name) + expansionTypes(name) + routingTypes(name) + decisionsContentTypes(name) + anthropicTypes(name) + providerRefreshTypes(name) + geminiTypes(name));
   writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({
     compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext',
       lib: ['ES2022', 'DOM'], strict: true, noEmit: true, skipLibCheck: false }, files: ['types.mts'],

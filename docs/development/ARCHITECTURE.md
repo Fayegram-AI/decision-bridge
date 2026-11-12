@@ -30,6 +30,7 @@ Application / CLI
         +-- OpenAI Decisions: native /v1/decisions
         +-- Cloudflare Clef / Clef-flash / Clef-omni: REST or Workers AI binding
         +-- OpenRouter Decisions: native /api/alpha/decisions or /api/v1/systemone
+        +-- Gemini Decisions: native /v1beta/decisions
         +-- custom/decision: new native decision protocol
         +-- custom/generative: OpenAI-compatible / OpenRouter / Anthropic or new protocol
         |
@@ -40,7 +41,7 @@ Application / CLI
   application policy / storage / downstream action
 ```
 
-Native Jev, OpenAI, Cloudflare and OpenRouter providers also expose `createDecision` directly.
+Native Jev, OpenAI, Cloudflare, OpenRouter and Gemini providers also expose `createDecision` directly.
 Common and native paths share provider validation, codecs, and bounded transport.
 Direct native calls use provider deadlines; bridge calls additionally enforce the
 shared evaluation deadline and extension lifecycle.
@@ -75,6 +76,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/index.mjs`, `src/index.d.mts` | Public runtime exports and TypeScript contract |
 | `src/bridge.mjs` | Orchestration, extension lifecycle, total deadline, immutable results |
 | `src/validation.mjs`, `src/input.mjs` | Lossless snapshots, common input and result invariants |
+| `src/json-limits.mjs` | Default and maximum JSON node budgets shared by request and result validation |
 | `src/questions.mjs` | Immutable typed question builders, independent of inference selection |
 | `src/capabilities.mjs` | Provider/model capability checks and common schema versions |
 | `src/probabilities.mjs` | Provider-selected precision allowance without normalization |
@@ -90,6 +92,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/providers/decisions-input.mjs`, `src/providers/decisions-codec.mjs` | Context-specific Decisions content/cache validation and lossless common/native encoding |
 | `src/providers/cloudflare-transport.mjs` | Shared decision/extraction REST and binding authentication, dispatch and diagnostics |
 | `src/providers/openrouter-*.mjs` | Native Decisions, common projection, model profiles, assets, routing preferences and shared transport |
+| `src/providers/gemini-*.mjs` | Gemini model/MIME profile, native validation, common projection, confidence/usage checks and safety errors |
 | `src/extraction/` | Cloudflare and OpenRouter providers, field/request/response validation, common batches and declarations |
 | `src/live/` | Live protocol validation, bounded correlation state, supplied-connection controller and declarations |
 | `src/routing/` | Registry snapshots, eligibility, selection, budgets, recovery, diagnostics and routed batches |
@@ -159,8 +162,8 @@ Cancellation bounds waiting for custom promises; custom code must honor signals
 to release its own resources. Observations use a separate bounded budget.
 
 Retries cover selected explicit transient responses, with machine-code
-classification preventing billing/allocation retries. Native OpenAI, Cloudflare and
-OpenRouter default to zero retries. Valid Retry-After hints share the total deadline;
+classification preventing billing/allocation retries. Native OpenAI, Cloudflare,
+OpenRouter and Gemini default to zero retries. Valid Retry-After hints share the total deadline;
 attempt counts describe adapter dispatches, not hidden Gateway retries.
 Malformed rejection bodies retain known safe HTTP diagnostics. Ambiguous failures
 and failed observers do not trigger another inference. CLI atomic files protect previous

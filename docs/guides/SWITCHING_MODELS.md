@@ -9,7 +9,7 @@ See [model selectors and provider defaults](../../README.md#model-selectors).
 
 ## Native and custom selection
 
-The main package supports native Jev, OpenAI Decisions, Cloudflare and OpenRouter Decisions. The
+The main package supports native Jev, OpenAI Decisions, Cloudflare, OpenRouter Decisions and Gemini Decisions. The
 request remains shared when switching providers, subject to capabilities.
 General-purpose models use the explicit [custom generative](CUSTOM_GENERATIVE.md)
 entry point. A new decision protocol uses [custom decision](CUSTOM_DECISION.md).
@@ -109,8 +109,9 @@ through Decision Bridge. Use `model: 'gpt-6-luna'` to select that explicit upstr
 ID. Mappings are fixed by the installed package release; results expose the
 selection in `meta.requestedModel` and outgoing ID in `meta.resolvedModel`.
 
-For Jev, native OpenRouter Decisions and the generative providers, list models
+For Jev, native OpenRouter Decisions, Gemini Decisions and the generative providers, list models
 with `await bridge.listModels()`. Native OpenRouter filters its catalog to Decisions models.
+Gemini reads metadata for its supported `gemini-decision-1` selector.
 OpenAI Decisions and Cloudflare Clef do not implement model discovery and return
 `UNSUPPORTED_OPERATION`; their capability profiles do not prove account availability.
 A catalog entry does not prove support for a particular response format. Check
@@ -221,12 +222,12 @@ Anthropic defaults to one forced output-schema tool and also supports explicit
 model that supports the selected mode; neither mode executes tools or starts an
 agent loop. A different protocol requires the
 [custom-provider contract](CUSTOM_PROVIDERS.md).
-Jev, OpenAI Decisions, Cloudflare Clef and OpenRouter Decisions each have a dedicated native provider;
+Jev, OpenAI Decisions, Cloudflare Clef, OpenRouter Decisions and Gemini Decisions each have a dedicated native provider;
 use those provider types for their decision APIs. Native Decisions providers
 reject generative output settings such as `responseFormat` and `maxTokens`.
 
 Common `choice`, `noul` and `score` answers include probabilities. Jev, OpenAI
-Decisions, Cloudflare and native OpenRouter probabilities are marked `native`;
+Decisions, Cloudflare, Gemini and native OpenRouter probabilities are marked `native`;
 generative estimates are `elicited`, not token logprobs. Native OpenRouter answers
 may omit probabilities; use
 `createDecision()` when the selected model cannot supply the distributions required

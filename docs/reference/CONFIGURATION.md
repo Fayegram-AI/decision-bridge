@@ -44,15 +44,15 @@ REST.
 | --- | --- |
 | `$schema` | Optional nonempty schema reference for editors |
 | `schemaVersion` | 1; optional, but generated profiles include it |
-| `provider` | `jev` default for decision commands, `openai-decisions`, `cloudflare-decisions`, `openrouter-decisions`, `cloudflare-extraction` or `openrouter-extraction` for extraction commands, `custom-decision`, `custom-generative` |
+| `provider` | `jev` default for decision commands, `openai-decisions`, `cloudflare-decisions`, `openrouter-decisions`, `gemini-decisions`, `cloudflare-extraction` or `openrouter-extraction` for extraction commands, `custom-decision`, `custom-generative` |
 | `preset` | `custom-generative` only: `openai-compatible`, `openrouter`, `anthropic`; mutually exclusive with module |
-| `model` | Nonempty model selector or upstream ID; Jev, OpenAI Decisions and Cloudflare have defaults; OpenRouter native and generative evaluation require a configured or request model |
+| `model` | Nonempty model selector or upstream ID; Jev, OpenAI Decisions, Cloudflare and Gemini have defaults; OpenRouter native and generative evaluation require a configured or request model |
 | `baseURL` | HTTPS API base; loopback may use HTTP |
 | `apiKeyEnv` | Credential environment variable name; inline `apiKey` is rejected |
 | `noAuth` | Boolean; true only for loopback OpenAI-compatible endpoints |
 | `timeoutMs` | Positive integer up to 2,147,483,647 milliseconds |
-| `maxRetries` | Integer 0–10; native OpenAI/Cloudflare/OpenRouter default 0; Jev and generative presets default 2 |
-| `maxRequestBytes`, `maxResponseBytes` | Positive integer through 64 MiB; default 8 MiB, including Clairic. Jev requests default 32 MiB. Clef/Clef-flash requests default 13 MiB; Omni 36 MiB. Explicit request budgets can select through 64 MiB; first-party Anthropic Messages accepts through 128,000,000 bytes |
+| `maxRetries` | Integer 0–10; native OpenAI/Cloudflare/OpenRouter/Gemini default 0; Jev and generative presets default 2 |
+| `maxRequestBytes`, `maxResponseBytes` | Positive integer; default 8 MiB, including Gemini and Clairic. Response budgets can select through 64 MiB. Request budgets normally select through 64 MiB; Gemini accepts through 160 MiB (167,772,160 bytes), and first-party Anthropic Messages through 128,000,000 bytes. Jev requests default 32 MiB; Clef/Clef-flash 13 MiB; Omni 36 MiB |
 | `accountId` | Cloudflare REST account ID; otherwise `CLOUDFLARE_ACCOUNT_ID` |
 | `rejectIfBusy` | Cloudflare boolean; default false, incompatible with retries. Effective true fails Clef REST preflight with `UNSUPPORTED_CAPABILITY`; Clairic forwards the setting for server acceptance/rejection. See the [Clef limitation](../guides/CLOUDFLARE_DECISIONS.md#capacity-rejection-and-ai-gateway) and [extraction options](../guides/EXTRACTION.md#images-binding-and-gateway) |
 | `gateway` | Cloudflare Gateway object; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) |
@@ -119,6 +119,8 @@ Native OpenAI Decisions defaults to `default` and accepts `luna` or explicit
 OpenAI accepts transport settings
 and rejects generative output settings. Its default retry count is zero. Cloudflare Clef defaults to `clef`, uses
 account/token credentials, rejects generation settings, and also defaults to zero retries.
+Gemini defaults to `gemini-decision-1`, accepts transport settings and rejects
+generative output settings. Its retries default to zero.
 A `DECISION_MODEL` or file model takes precedence over `JEV_MODEL`.
 Custom generative presets and modules do not inherit a
 Jev model. Offline validation of a generative/module request without a model reports
@@ -187,6 +189,7 @@ Provider credential variables also supply configured routes as described above.
 | `TYPESAFE_API_KEY` | Native Jev credential |
 | `OPENAI_API_KEY` | Native Decisions and OpenAI-compatible credential at the OpenAI origin |
 | `OPENROUTER_API_KEY` | OpenRouter credential |
+| `DECISION_BRIDGE_GEMINI_API_KEY` | Native Gemini Decisions credential |
 | `ANTHROPIC_API_KEY` | Anthropic credential |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare REST account ID |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare REST token at the official origin |
@@ -211,7 +214,8 @@ A CLI `baseURL` always requires explicit `apiKeyEnv`, even when it happens to eq
 a preset origin, or `noAuth: true` for loopback compatible servers. This makes the
 credential destination a deliberate selection. The `openrouter` custom-generative
 preset fixes its origin; use `openai-compatible` for another chat-completions gateway.
-Native OpenRouter Decisions and Extractions accept an origin-only `baseURL`.
+Native OpenRouter Decisions, OpenRouter Extractions and Gemini Decisions accept
+an origin-only `baseURL`.
 
 In SDK constructors, an ambient key is used only for the provider's original
 origin. A caller-supplied third-party origin requires an explicit `apiKey`.

@@ -28,6 +28,10 @@ test('JSONL record byte limits are independent of split CRLF delimiters', async 
     }
     assert.deepEqual(await read([text + '\r', '\n' + text + '\r', '\n']),
         [{ line: 1, input }, { line: 2, input }]);
+    const bytes = Buffer.from('\n' + text + '\r\n\n' + text);
+    assert.deepEqual(await Array.fromAsync(readJsonLines('-', {
+        stdin: Readable.from(Array.from(bytes, byte => Buffer.from([byte]))), cwd: process.cwd(), maxInputBytes: limit,
+    })), [{ line: 2, input }, { line: 4, input }]);
     // A CR only earns delimiter allowance when it is followed by LF.
     for (const parts of [[text + '\r'], [text + '\r', ' '], [text + ' ', '\r\n']]) {
         await assert.rejects(read(parts), { code: 'INPUT_TOO_LARGE' });

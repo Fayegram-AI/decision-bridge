@@ -42,7 +42,7 @@ export function autoPolicy(value, concreteIds) {
                     typeof item === 'string' && item.length > 0 && item.length <= 100) && new Set(rule.when[key]).size === rule.when[key].length,
                 'Rule lists require distinct nonempty strings.', 'CONFIGURATION_ERROR');
             }
-            for (const [key, allowed] of Object.entries({ modalities: ['text', 'image', 'audio', 'video'],
+            for (const [key, allowed] of Object.entries({ modalities: ['text', 'image', 'audio', 'video', 'document'],
                 questionTypes: ['choice', 'noul', 'score', 'box'],
                 fieldTypes: ['text', 'number', 'date', 'time', 'datetime', 'duration', 'list', 'estimate', 'forecast'] })) {
                 check(rule.when[key] === undefined || rule.when[key].every(item => allowed.includes(item)), 'Unknown rule fact.', 'CONFIGURATION_ERROR');

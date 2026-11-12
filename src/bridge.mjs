@@ -40,8 +40,11 @@ export function createBridge(options) {
   check(new Set(registered.map(e => e.name)).size === registered.length,
     'Extension names must be unique.', 'CONFIGURATION_ERROR');
   function validate(input) {
-    const request = validateRequest(input, backend.defaultModel ?? '');
-    assertCapabilities(request, providerCapabilities(backend, request.model));
+    // Read only an own data descriptor to select a trusted profile before snapshotting.
+    const model = Object.getOwnPropertyDescriptor(input ?? {}, 'model')?.value ?? backend.defaultModel ?? '';
+    const capabilities = providerCapabilities(backend, model);
+    const request = validateRequest(input, backend.defaultModel ?? '', { maxJsonNodes: capabilities.maxJsonNodes });
+    assertCapabilities(request, capabilities);
     const method = inputMethod(request);
     for (const extension of registered) {
       check(!(extension.prepareState || extension.prepareInput || extension.prepareConversation) || typeof extension[method] === 'function',

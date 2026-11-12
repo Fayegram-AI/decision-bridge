@@ -47,6 +47,7 @@ also verify cancellation from a native Windows console.
 - `openrouter*.test.mjs`: native Decisions/Extractions, assets, optional results, forecast validation, routing preferences, common projection, reusable extraction validation, saved provenance and model/identifier boundaries.
 - `provider-refresh-boundaries.test.mjs`: OpenRouter CLI common/native initialization, validation and batching, routed fallback ownership, and Anthropic SDK/CLI request budgets above 64 MiB.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
+- `gemini*.test.mjs`, `gemini.types.mts`: native/common Google requests, media/MIME/resolution rules, byte/node budgets, confidence/usage/refusals, scoped credentials, CLI/schema parity, routing and type contracts.
 - `jev*.test.mjs`: native/common assets, reference substitution, boxes, opt-ins, nullable usage and CLI behavior.
 - `capability-expansion.test.mjs`: conversation/tool history, remote images, cache controls, extension revalidation, service-limit ownership and safe rejection diagnostics.
 - `extraction.test.mjs`: all nine Clairic field families, native JSON preservation, REST/binding options, batch preflight and model-selection diagnostics.
@@ -57,7 +58,7 @@ also verify cancellation from a native Windows console.
 - `generative-helpers.test.mjs`: exported prompt/normalization helper contracts and unsupported input rejection.
 - `config.test.mjs`: file/environment/flag precedence and provider transitions.
 - `cli.test.mjs`: commands, streams, exit codes, modules, and signals.
-- `io.test.mjs`: atomic output, file aliases, and cancellation.
+- `io.test.mjs`: JSONL UTF-8 and record boundaries, atomic output, file aliases, and cancellation.
 - `ordered.test.mjs`: ordered streaming and bounded concurrency.
 - `support.mjs` and `fixtures.mjs`: local test setup and synthetic domain data.
 - `types.mts`, `providers.types.mts`, `custom.types.mts`: public type inference and rejected API usage.
@@ -69,6 +70,11 @@ also verify cancellation from a native Windows console.
 Installed-consumer scenarios in `scripts/package/provider-refresh-scenario.mjs`
 also exercise reusable extraction validation and compile native OpenRouter,
 generic extraction and Anthropic thread contracts.
+
+The Gemini large-payload scenario runs in a separate process and checks the
+100 MB inline-data allowance against SDK and CLI client budgets using synthetic
+media and local dispatch. It makes no calls to Google. Installed Gemini scenarios
+also check validation-option inference and inherited node-policy rejection.
 
 ### OpenAI model-selector coverage
 

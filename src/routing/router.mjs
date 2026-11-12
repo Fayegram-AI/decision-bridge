@@ -10,6 +10,7 @@ import { refreshEligibility } from './preflight.mjs';
 import { routingBudget } from './budget.mjs';
 import { selectRoute } from './selection.mjs';
 import { executeSelected, observe } from './execution.mjs';
+import { MAX_JSON_NODES } from '../json-limits.mjs';
 
 export const routerInternals = new WeakMap();
 const CALL_FIELDS = ['route', 'candidates', 'labels', 'routingDescription', 'onAmbiguity', 'clarify', 'signal', 'timeoutMs'];
@@ -20,7 +21,9 @@ export function makeRouter(input, operation) {
     const policy = options.auto;
     const cooldowns = new Map();
     const state = { options, registry, policy, cooldowns, operation };
-    const structure = operation === 'decision' ? validateRequestStructure : validateExtractionStructure;
+    // Neutral admission accepts the largest contract; candidate preflights enforce their own limits.
+    const structure = operation === 'decision' ? value => validateRequestStructure(value, { maxJsonNodes: MAX_JSON_NODES })
+        : validateExtractionStructure;
     function callOptions(value) {
         optionsObject(value, CALL_FIELDS, 'Routing call options');
         const { signal, onAmbiguity, ...json } = value;

@@ -7,9 +7,17 @@ import { resolveOpenAIModel } from '../providers/openai-profile.mjs';
 import { preflightCommonJevDecision, preflightJevDecision, encodeJevDecision } from '../providers/jev-preflight.mjs';
 import { JEV_REQUEST_LIMIT } from '../providers/jev-profile.mjs';
 import { prepareOpenRouterDecision, prepareCommonOpenRouterDecision } from '../providers/openrouter-decisions.mjs';
+import { prepareGeminiDecision } from '../providers/gemini-input.mjs';
+import { prepareCommonGeminiDecision } from '../providers/gemini-codec.mjs';
 
 /** Provider-specific native dispatch is shared by validation, initialization and calls. */
 export function decisionProfile(provider) {
+    if (provider === 'gemini-decisions') return {
+        common: (input, settings) => prepareCommonGeminiDecision(input, settings).request,
+        native: prepareGeminiDecision, encode: input => prepareCommonGeminiDecision(input).native,
+        models: true, inputLimit: 8 * 1024 * 1024,
+        options: config => ({ model: config.model, maxRequestBytes: config.maxRequestBytes }),
+    };
     if (provider === 'openrouter-decisions') return {
         common: (input, settings) => prepareCommonOpenRouterDecision(input, settings).request,
         native: prepareOpenRouterDecision, encode: input => prepareCommonOpenRouterDecision(input).native,

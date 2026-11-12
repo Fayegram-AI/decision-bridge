@@ -1,0 +1,6 @@
+{
+    "schemaVersion": 1,
+    "provider": "gemini-decisions",
+    "model": "gemini-decision-1",
+    "apiKeyEnv": "DECISION_BRIDGE_GEMINI_API_KEY"
+}

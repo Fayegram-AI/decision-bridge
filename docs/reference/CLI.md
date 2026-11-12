@@ -4,7 +4,7 @@ The optional command runner evaluates decision files, runs Cloudflare or OpenRou
 and validates or replays Live protocol records offline. For application
 integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
 
-This reference describes 0.1.6. See
+This reference describes 0.1.7. See
 [version availability](../README.md#version-availability) for earlier command support.
 
 After [installing the package](../guides/GETTING_STARTED.md#install-into-your-application)
@@ -54,6 +54,12 @@ there is no CLI binding selector. Gateway settings route the selected REST reque
 `--provider openrouter-extraction`; `--native` enables its asset-based request
 shape. Both OpenRouter providers require a model in the request or configuration.
 See the [OpenRouter guide](../guides/OPENROUTER_NATIVE.md#cli-and-routing).
+
+`--provider gemini-decisions` selects Gemini Decisions with default model
+`gemini-decision-1`. It supports common and `--native` evaluation, validation,
+initialization and local batches, plus model metadata discovery. The default
+credential variable is `DECISION_BRIDGE_GEMINI_API_KEY`. See the
+[Gemini guide](../guides/GEMINI_DECISIONS.md).
 
 | Command | Behavior |
 | --- | --- |
@@ -171,7 +177,7 @@ See the [routing guide](../guides/ROUTING.md) for policy and selector requiremen
 | `--gateway-id ID` | Existing Cloudflare Gateway; richer settings in config |
 | `--no-auth` | Only for a loopback OpenAI-compatible endpoint |
 | `--timeout-ms N` | Single-provider HTTP and bridge deadline for each evaluation/listing; registry budgets belong in configuration |
-| `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare/OpenRouter default to 0, Jev and generative presets to 2 |
+| `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare/OpenRouter/Gemini default to 0, Jev and generative presets to 2 |
 | `--max-tokens N` | Generative output budget; default 4096 |
 | `--response-format MODE` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic modes: `tool` (default), `json_schema` |
 | `--anthropic-workspace-id ID` | Anthropic workspace header for non-scoped keys |
@@ -255,11 +261,12 @@ Single JSON input normally uses **8 MiB**. JSONL normally uses **8 MiB per line,
 64 MiB total**. Jev defaults to **32 MiB** for a single JSON input or JSONL record,
 then checks serialized requests against its configured ceiling (32 MiB by default).
 An explicit larger client request budget raises the input reader budget through
-64 MiB, or 128,000,000 bytes for first-party Anthropic Messages.
+64 MiB, 160 MiB for Gemini Decisions, or 128,000,000 bytes for first-party
+Anthropic Messages. Configure these budgets with `maxRequestBytes` in the profile.
 Config:
 **1 MiB**. Environment file: **64 KiB**. Provider request and response default to
-8 MiB each, configurable to at most 64 MiB, except for first-party Anthropic's
-128,000,000-byte request ceiling. Cloudflare reads single JSON inputs
+8 MiB each, configurable to at most 64 MiB, except for Gemini's 160 MiB and
+first-party Anthropic's 128,000,000-byte request ceilings. Cloudflare reads single JSON inputs
 and individual JSONL records within 64 MiB, then applies model-specific serialized
 request validation: Clef/Clef-flash default 13 MiB, configurable through 64 MiB; Omni default 36 MiB,
 configurable through 64 MiB; Clairic defaults to 8 MiB, configurable through 64 MiB.
@@ -273,9 +280,12 @@ Per-line limits exclude LF or CRLF delimiters, regardless of stream chunking.
 A final record may omit its newline; its complete bytes must still fit the limit.
 The total input limit includes delimiters.
 
-Routing registries use a 64 MiB input ceiling for single JSON inputs and each
-JSONL record, with the same 64 MiB total JSONL limit. Each candidate's provider
-preflight then enforces its configured serialized request and media limits.
+Decision routing registries use an input ceiling equal to the larger of 64 MiB
+and the configured request budgets of enabled decision routes. It applies to
+single JSON inputs and each JSONL record; the total JSONL limit follows the same
+per-record-budget-plus-delimiters rule above. Extraction routing retains a 64 MiB
+input ceiling. Each candidate's provider preflight enforces its own serialized
+request and media limits before inference.
 
 The CLI writes output to a new temporary file in the destination directory, uses mode
 0600 where supported, syncs it, and then creates the final file. It protects existing
