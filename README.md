@@ -31,9 +31,9 @@ additionally supports embedded WAV/MP3 audio and MP4/WebM video, ordered images 
 → videos → text. The shared API checks that the selected provider and model support your
 request before sending it. A provider refusal returns an error.
 
-**Version 0.1.7 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Version 0.1.8 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
-These docs cover 0.1.7.
+These docs cover 0.1.8.
 For feature requirements and version history, see
 [version availability](docs/README.md#version-availability) and the
 [changelog](CHANGELOG.md). Start with the
@@ -146,6 +146,10 @@ Create `.env` in your application's directory and set your TypeSafe API key:
 TYPESAFE_API_KEY=your_real_key_here
 ```
 
+Built-in providers also accept the `DECISION_BRIDGE_` prefix, such as
+`DECISION_BRIDGE_TYPESAFE_API_KEY`. The prefixed name takes precedence when both
+are defined. See [credential lookup](docs/reference/CONFIGURATION.md#recognized-environment-variables).
+
 Add `.env` to your application's `.gitignore`. The SDK reads the process
 environment; the Node command below explicitly loads this file before startup.
 
@@ -236,7 +240,7 @@ with `OPENROUTER_API_KEY`. For Anthropic, use
 `new AnthropicProvider({ model: 'your-account-model-id' })` with
 `ANTHROPIC_API_KEY`. Each preset requires an explicit model ID available to your account.
 Anthropic offers `tool` and `json_schema` output with explicit API-version
-selection. The model must support the selected output mode; see
+selection and model-aware output defaults. The model must support an explicit mode; see
 [Anthropic output settings](docs/guides/CUSTOM_GENERATIVE.md#anthropic).
 The Anthropic preset also supports workspace headers and explicit
 [cumulative threads](docs/guides/ANTHROPIC_THREADS.md) for evaluating accepted
@@ -296,7 +300,7 @@ test suite and development scripts.
 | Routing | Choose configured targets directly or use [experimental auto mode](docs/guides/ROUTING.md) with rules, a decision model, or clarification |
 | Application extensions | [State/input/conversation preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
 | Node command | [Decision/extraction commands and offline Live validation/replay](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |
-| Reliability | [Transport byte limits and fetch injection](docs/reference/SDK.md#provider-transport-options), deadlines, [limited retries and safe errors](docs/reference/ERRORS.md), strict response validation, atomic output |
+| Reliability | [Transport byte limits and fetch injection](docs/reference/SDK.md#provider-transport-options), deadlines, [limited retries and safe errors](docs/reference/ERRORS.md), [response validation and projection](docs/reference/SDK.md#returned-data), atomic output |
 | Development | [Contributor guides](docs/development/README.md) for architecture, testing, and releases |
 
 ## Result semantics

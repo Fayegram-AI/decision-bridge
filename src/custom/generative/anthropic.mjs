@@ -3,14 +3,17 @@ import { withResponseMeta, requireCondition as check } from '../../errors.mjs';
 import { isRecord, validateRequest } from '../../validation.mjs';
 import { LEGACY_CAPABILITIES } from '../../capabilities.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../../transport.mjs';
-import { environmentValue } from '../../runtime-env.mjs';
-import { anthropicOptions, anthropicRequestCeiling } from './anthropic-options.mjs';
+import { providerEnvironmentValue } from '../../runtime-env.mjs';
+import { anthropicOptions, anthropicRequestCeiling, anthropicResponseFormat } from './anthropic-options.mjs';
 import { buildAnthropicBody, parseAnthropicMessage } from './anthropic-protocol.mjs';
 import { createAnthropicThread, anthropicError } from './anthropic-thread.mjs';
 
 /** Explicit structured output; cumulative sessions are created separately. */
 export class AnthropicProvider {
-    getCapabilities() { return LEGACY_CAPABILITIES; }
+    getCapabilities(model = this.defaultModel) {
+        anthropicResponseFormat(model, this.#options.responseFormat);
+        return LEGACY_CAPABILITIES;
+    }
     name = 'anthropic';
     kind = 'generative';
     probabilitySource = 'elicited';
@@ -22,10 +25,10 @@ export class AnthropicProvider {
 
     constructor(options = {}) {
         const { apiKey, model, baseURL = 'https://api.anthropic.com', workspaceId,
-            maxTokens = 4096, parameters = {}, responseFormat = 'tool', apiVersion = '2023-06-01', ...transportOptions } = optionsObject(options,
+            maxTokens = 4096, parameters = {}, responseFormat, apiVersion = '2023-06-01', ...transportOptions } = optionsObject(options,
             ['apiKey', 'model', 'baseURL', 'workspaceId', 'maxTokens', 'parameters', 'responseFormat', 'apiVersion', ...TRANSPORT_FIELDS], 'Anthropic options');
         const endpoint = parseBaseURL(baseURL, { originOnly: true });
-        const supplied = apiKey === undefined && endpoint.origin === 'https://api.anthropic.com' ? environmentValue('ANTHROPIC_API_KEY') : apiKey;
+        const supplied = apiKey === undefined && endpoint.origin === 'https://api.anthropic.com' ? providerEnvironmentValue('ANTHROPIC_API_KEY') : apiKey;
         const key = validateApiKey(supplied, 'ANTHROPIC_API_KEY');
         this.#options = anthropicOptions({ model, maxTokens, parameters, responseFormat, apiVersion, workspaceId });
         this.defaultModel = this.#options.model;
@@ -43,14 +46,14 @@ export class AnthropicProvider {
         const request = validateRequest(input, this.defaultModel ?? '');
         const body = buildAnthropicBody(request, this.#options);
         const { data, meta } = await this.#transport.request('POST', '/v1/messages', body, options);
-        return parseAnthropicMessage(data, request, meta, this.#options.responseFormat);
+        return parseAnthropicMessage(data, request, meta, anthropicResponseFormat(request.model, this.#options.responseFormat));
     }
 
     createThread(options) {
         return createAnthropicThread(options, { model: this.defaultModel, maxRequestBytes: this.#maxRequestBytes, timeoutMs: this.#timeoutMs,
             build: request => buildAnthropicBody(request, this.#options),
             send: (body, call) => this.#threadTransport.request('POST', '/v1/messages', body, call),
-            parse: (data, request, meta) => parseAnthropicMessage(data, request, meta, this.#options.responseFormat) });
+            parse: (data, request, meta) => parseAnthropicMessage(data, request, meta, anthropicResponseFormat(request.model, this.#options.responseFormat)) });
     }
 
     async listModels(options = {}) {

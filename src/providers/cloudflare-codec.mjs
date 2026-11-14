@@ -28,8 +28,9 @@ export function decodeCloudflareDecision(decision, request, meta) {
                 value: option.value, probability: answer.probabilities['option_' + i],
             })) }];
     }));
+    // Typed statistics use only fields validated for the reported answer variant.
     const details = Object.fromEntries(Object.entries(decision.answers).map(([id, answer]) => [id, {
-        type: answer.type, ...(Object.hasOwn(answer, 'confidence') ? { confidence: answer.confidence } : {}),
+        type: answer.type, ...(['choice', 'score'].includes(answer.type) ? { confidence: answer.confidence } : {}),
     }]));
     return validateResult({ model: decision.model, answers, usage: decision.usage,
         meta: { ...meta, provider: 'cloudflare-decisions', requestedModel: request.model,

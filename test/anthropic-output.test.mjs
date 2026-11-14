@@ -12,6 +12,45 @@ const message = (mode = 'json_schema') => ({ model: 'reported', stop_reason: mod
         : [{ type: 'text', text: JSON.stringify(payload) }],
     usage: { input_tokens: 12, output_tokens: 4, cache_creation_input_tokens: 2, cache_read_input_tokens: 3 } });
 
+test('Anthropic omitted format follows effective models; explicit formats stay explicit', async () => {
+    const models = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1', 'claude-mythos-5-1',
+        'claude-fable-5-2', 'claude-mythos-5-2'];
+    for (const model of models.flatMap(id => [id, id + '-20261101'])) {
+        let calls = 0;
+        const options = { apiKey: 'fixture', model: 'legacy', fetchImpl: async (_url, init) => {
+            calls++;
+            const body = JSON.parse(init.body);
+            assert.equal(body.model, model);
+            assert.equal(body.output_config.format.type, 'json_schema');
+            assert.equal(body.tool_choice, undefined);
+            return Response.json(message());
+        } };
+        const result = await createBridge({ provider: new AnthropicProvider(options) }).evaluate({ ...request, model });
+        assert.equal(result.meta.responseFormat, 'json_schema');
+        const incompatible = new AnthropicProvider({ ...options, responseFormat: 'tool' });
+        await assert.rejects(incompatible.evaluate({ ...request, model }), { code: 'UNSUPPORTED_CAPABILITY' });
+        assert.throws(() => incompatible.createThread({ model, questions: request.questions }), { code: 'UNSUPPORTED_CAPABILITY' });
+        assert.equal(calls, 1);
+    }
+    for (const model of ['claude-opus-4-6', 'unknown', 'claude-fable-5-20', 'claude-sonnet-5-5-custom']) {
+        const provider = new AnthropicProvider({ apiKey: 'fixture', model: 'claude-sonnet-5-5', fetchImpl: async (_url, init) => {
+            assert.equal(JSON.parse(init.body).tool_choice.type, 'tool');
+            return Response.json(message('tool'));
+        } });
+        assert.equal((await provider.evaluate({ ...request, model })).meta.responseFormat, 'tool');
+    }
+});
+
+test('Anthropic model preflight rejects malformed selectors without invoking coercion hooks', () => {
+    let coerced = 0;
+    const provider = new AnthropicProvider({ apiKey: 'fixture', model: 'claude-sonnet-5-5' });
+    const bridge = createBridge({ provider });
+    const models = [{ toString() { coerced++; return 'synthetic'; } },
+        { [Symbol.toPrimitive]() { coerced++; return 'synthetic'; } }, Symbol('invalid-model')];
+    for (const model of models) assert.throws(() => bridge.validate({ ...request, model }), { code: 'VALIDATION_ERROR' });
+    assert.equal(coerced, 0);
+});
+
 for (const responseFormat of ['tool', 'json_schema']) for (const apiVersion of ['2023-06-01', '2026-10-21']) {
     test(`Anthropic ${responseFormat}/${apiVersion} preserves answers, headers and effort`, async () => {
         const calls = [];

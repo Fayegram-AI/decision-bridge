@@ -31,12 +31,13 @@ export function anthropicError(data, status, meta) {
 }
 
 export function createAnthropicThread(input, { model, maxRequestBytes, timeoutMs, build, send, parse }) {
-    const configured = optionsObject(input, ['questions', 'model', 'maxTurns', 'maxHistoryBytes'], 'Anthropic thread');
-    const fixed = freezeJson(validateRequest({ state: '', questions: configured.questions, model: configured.model ?? model }, model ?? ''));
+    // Defaults apply only to omitted values; explicit nulls must reach validation.
+    const { questions, model: threadModel = model, maxTurns = 128,
+        maxHistoryBytes = Math.min(8 * 1024 * 1024, maxRequestBytes) } =
+        optionsObject(input, ['questions', 'model', 'maxTurns', 'maxHistoryBytes'], 'Anthropic thread');
+    const fixed = freezeJson(validateRequest({ state: '', questions, model: threadModel }, model ?? ''));
     // Validate the preset's capabilities and response schema before retaining any state.
     build(fixed);
-    const maxTurns = configured.maxTurns ?? 128;
-    const maxHistoryBytes = configured.maxHistoryBytes ?? Math.min(8 * 1024 * 1024, maxRequestBytes);
     check(Number.isSafeInteger(maxTurns) && maxTurns > 0 && maxTurns <= 1000000, 'Invalid thread turn budget.', 'CONFIGURATION_ERROR');
     check(Number.isSafeInteger(maxHistoryBytes) && maxHistoryBytes > 0 && maxHistoryBytes <= maxRequestBytes,
         'Thread history budget must fit the provider request budget.', 'CONFIGURATION_ERROR');

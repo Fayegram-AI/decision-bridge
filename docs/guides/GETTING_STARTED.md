@@ -20,17 +20,17 @@ From your application's directory, install the latest version published to npm:
 npm install @fayegram-ai/decision-bridge
 ```
 
-To install the **0.1.7** version covered by these guides:
+To install the **0.1.8** version covered by these guides:
 
 ```bash
-npm install @fayegram-ai/decision-bridge@0.1.7
+npm install @fayegram-ai/decision-bridge@0.1.8
 ```
 
 To download and install the same version as a package archive:
 
 ```bash
-npm pack @fayegram-ai/decision-bridge@0.1.7
-npm install ./fayegram-ai-decision-bridge-0.1.7.tgz
+npm pack @fayegram-ai/decision-bridge@0.1.8
+npm install ./fayegram-ai-decision-bridge-0.1.8.tgz
 ```
 
 The installed package contains the SDK, declarations, command runner, examples,
@@ -53,6 +53,8 @@ Add `.env` to your application's `.gitignore`. The SDK reads `TYPESAFE_API_KEY`
 from the process environment when constructing the selected Jev provider. It does not load
 `.env` itself; the Node startup command below loads it explicitly. In a deployed
 application, you can supply the same variable through your runtime's environment.
+The alias `DECISION_BRIDGE_TYPESAFE_API_KEY` takes precedence when defined; see
+[credential lookup](../reference/CONFIGURATION.md#recognized-environment-variables).
 
 ## Make your first SDK call
 

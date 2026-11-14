@@ -8,7 +8,10 @@
 | `openai-decisions` | `POST /v1/decisions` at api.openai.com | `OPENAI_API_KEY` | `default` | Native Decisions with common and dedicated access |
 | `cloudflare-decisions` | Workers AI REST model route or `AI.run` binding | `CLOUDFLARE_API_TOKEN` and account ID for REST | `clef` | Native Clef decisions with common and dedicated access |
 | `openrouter-decisions` | OpenRouter `/api/alpha/decisions` or explicit `/api/v1/systemone` | `OPENROUTER_API_KEY` | Explicit model required | Native Decisions; optional fields preserved |
-| `gemini-decisions` | Google `POST /v1beta/decisions` | `DECISION_BRIDGE_GEMINI_API_KEY` | `gemini-decision-1` | Native probabilities with common and dedicated access |
+| `gemini-decisions` | Google `POST /v1beta/decisions` | `GEMINI_API_KEY` | `gemini-decision-1` | Native probabilities with common and dedicated access |
+
+Each credential above also accepts the `DECISION_BRIDGE_` prefix, which takes
+precedence when both names are defined. See [credential lookup](CONFIGURATION.md#recognized-environment-variables).
 
 `createProvider()` and the root SDK export these five native providers. Custom
 decision services use `defineDecisionProvider` from `custom/decision`. General-purpose
@@ -65,7 +68,7 @@ upstream. The optional capability fields `audio`, `videos`, `maxAudioClips`, and
 `maxVideos` normalize to
 false/zero when omitted, preserving legacy custom profiles. Cloudflare's older
 models reject audio/video before inference. OpenRouter also enables common audio/video
-for `cloudflare/clef-omni`; see its [native guide](../guides/OPENROUTER_NATIVE.md).
+for `cloudflare/clef-omni` and `google/gemini-decision-1`; see its [native guide](../guides/OPENROUTER_NATIVE.md).
 
 Jev additionally supports `box` questions on `jev-latest`, `jev-preview` and pinned
 1.14+ models when `dangerZone.images` is enabled. Native OpenRouter enables boxes
@@ -87,8 +90,13 @@ custom-provider behavior when `questionContent` is enabled.
 
 Gemini adds `documents`, `remoteAudio`, `remoteVideos`, `remoteDocuments` and
 `maxDocuments`. These normalize to false/zero for legacy profiles. Remote audio/video
-requires explicit `mimeType`; documents are PDFs. Gemini also requires MIME metadata
+requires explicit `mimeType`; direct Gemini documents are PDFs. Gemini also requires MIME metadata
 for remote images. See the [Gemini guide](../guides/GEMINI_DECISIONS.md).
+
+`documentMimeTypes` lists accepted inline document MIME types. Custom providers
+that enable documents without this list retain PDF-only input. OpenRouter's
+Google and ScaleDown profiles declare their supported document formats; see
+[OpenRouter media](../guides/OPENROUTER_NATIVE.md#common-media-and-capability-profiles).
 
 `imageResolutions` and `videoResolutions` list supported common `resolution` values;
 both default to empty arrays. Gemini supports image `low`, `medium`, `high` and

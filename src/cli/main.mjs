@@ -75,7 +75,7 @@ Options:
   --no-reject-if-busy       Explicitly disable Cloudflare capacity rejection
   --gateway-id ID           Use an existing Cloudflare AI Gateway
   --max-tokens N            Generative output-token budget; default 4096
-  --response-format FORMAT  Anthropic: tool (default) or json_schema; chat: json_schema/json_object/text
+  --response-format FORMAT  Anthropic: tool/json_schema (model-aware default); chat: json_schema/json_object/text
   --anthropic-api-version V Anthropic: 2023-06-01 (default) or 2026-10-21
   --anthropic-workspace-id ID Anthropic workspace header for non-scoped keys
   --token-parameter NAME    max_completion_tokens or max_tokens

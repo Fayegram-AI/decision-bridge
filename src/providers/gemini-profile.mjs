@@ -3,7 +3,7 @@ import { requireCondition as check } from '../errors.mjs';
 
 export const GEMINI_MODEL = 'gemini-decision-1';
 export const GEMINI_ORIGIN = 'https://generativelanguage.googleapis.com';
-export const GEMINI_KEY_ENV = 'DECISION_BRIDGE_GEMINI_API_KEY';
+export const GEMINI_KEY_ENV = 'GEMINI_API_KEY';
 // The serialized JSON budget includes base64 expansion and question overhead.
 export const GEMINI_REQUEST_CEILING = 160 * 1024 * 1024;
 export const GEMINI_JSON_NODES = 1000000;
@@ -27,6 +27,7 @@ export function geminiCapabilities(model) {
         supported: model === GEMINI_MODEL, orderedInput: true, images: true, remoteImages: true,
         audio: true, videos: true, documents: true, remoteAudio: true, remoteVideos: true, remoteDocuments: true,
         maxImages: null, maxAudioClips: null, maxVideos: null, maxDocuments: null,
+        documentMimeTypes: GEMINI_MIME_TYPES.document,
         typedChoices: true, labeledScores: true, maxChoiceOptions: 255, maxScoreLevels: 255,
         jsonInput: true, questionContent: true, questionContentTypes: ['text', 'json'],
         imageResolutions: ['low', 'medium', 'high', 'ultra_high'], videoResolutions: ['low', 'medium', 'high'],

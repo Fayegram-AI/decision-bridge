@@ -20,7 +20,7 @@ import { geminiScenario, geminiTypes } from './package/gemini-scenario.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const temporary = mkdtempSync(join(tmpdir(), 'decision package '));
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('DECISION_') &&
-  !['TYPESAFE_API_KEY', 'JEV_MODEL', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'].includes(key)));
+  !['TYPESAFE_API_KEY', 'JEV_MODEL', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'].includes(key)));
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, env, encoding: 'utf8', timeout: 120000 });
   if (result.status !== 0) throw Error(`${command} failed (${result.status}): ${result.stderr || result.stdout || result.error}`);

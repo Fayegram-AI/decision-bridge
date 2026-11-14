@@ -217,8 +217,8 @@ profiles and precedence remain as described above.
 ## Boundaries
 
 The opt-in custom generative compatible preset uses Chat Completions, not the OpenAI Responses API.
-Anthropic defaults to one forced output-schema tool and also supports explicit
-[JSON-schema output and API-version selection](CUSTOM_GENERATIVE.md#json-output-and-api-versions). Choose a
+Anthropic selects its default output mode from the effective model and supports
+explicit [tool/JSON-schema output and API-version selection](CUSTOM_GENERATIVE.md#json-output-and-api-versions). Choose a
 model that supports the selected mode; neither mode executes tools or starts an
 agent loop. A different protocol requires the
 [custom-provider contract](CUSTOM_PROVIDERS.md).

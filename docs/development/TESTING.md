@@ -46,8 +46,10 @@ also verify cancellation from a native Windows console.
 - `anthropic*.test.mjs`: tool/JSON output, API versions, workspace headers, request budgets, cumulative threads/recovery, response blocks, SDK/CLI/schema parity, and loopback commands.
 - `openrouter*.test.mjs`: native Decisions/Extractions, assets, optional results, forecast validation, routing preferences, common projection, reusable extraction validation, saved provenance and model/identifier boundaries.
 - `provider-refresh-boundaries.test.mjs`: OpenRouter CLI common/native initialization, validation and batching, routed fallback ownership, and Anthropic SDK/CLI request budgets above 64 MiB.
+- `credential-env.test.mjs`: prefixed/unprefixed credentials for every built-in provider, explicit selection, account IDs, environment-file precedence and generated profiles.
+- `response-extensions.test.mjs`: native extension preservation, common projection, metadata, generated answers, Live acknowledgements and safe refusal diagnostics.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
-- `gemini*.test.mjs`, `gemini.types.mts`: native/common Google requests, media/MIME/resolution rules, byte/node budgets, confidence/usage/refusals, scoped credentials, CLI/schema parity, routing and type contracts.
+- `gemini*.test.mjs`, `gemini.types.mts`: native/common Google requests, media/MIME/resolution rules, byte/node budgets, confidence/usage/refusals, credential lookup, CLI/schema parity, routing and type contracts.
 - `jev*.test.mjs`: native/common assets, reference substitution, boxes, opt-ins, nullable usage and CLI behavior.
 - `capability-expansion.test.mjs`: conversation/tool history, remote images, cache controls, extension revalidation, service-limit ownership and safe rejection diagnostics.
 - `extraction.test.mjs`: all nine Clairic field families, native JSON preservation, REST/binding options, batch preflight and model-selection diagnostics.

@@ -8,6 +8,16 @@ import { optionsObject } from './options.mjs';
 const own = (value, key) => Object.hasOwn(value, key);
 export const isRecord = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value));
+
+/** Receivers require understood fields while accepting additive JSON extensions. */
+export function requireResponseFields(value, required, label) {
+    check(isRecord(value) && required.every(key => own(value, key)), `Invalid ${label} fields.`, 'INVALID_RESPONSE');
+}
+
+/** Project only after snapshotting; malformed known values remain available for validation. */
+export function projectResponseFields(value, keys) {
+    return isRecord(value) ? Object.fromEntries(keys.filter(key => own(value, key)).map(key => [key, value[key]])) : value;
+}
 const isEntry = value => value === null || typeof value === 'string' ||
   Array.isArray(value) || isRecord(value);
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
@@ -186,12 +196,21 @@ function distribution(value, labels, decimalPlaces) {
 
 /** Validate, but do not invent, round, or normalize model results. */
 export function validateResult(input, questions, options = {}) {
+    return validateResultFields(input, questions, options, false);
+}
+
+/** Native Jev/Cloudflare envelopes share value checks but retain provider extensions. */
+export function validateNativeResult(input, questions, options = {}) {
+    return validateResultFields(input, questions, options, true);
+}
+
+function validateResultFields(input, questions, options, preserveUnknown) {
   const { native, nullableUsage, probabilityDecimalPlaces, maxJsonNodes } = validateResultOptions(options);
   const result = cloneJson(input, 'response', 'INVALID_RESPONSE', maxJsonNodes);
   // Snapshot both sides so rubric comparison uses JSON values without executing accessors.
   const questionSnapshot = cloneJson(questions, 'questions', 'VALIDATION_ERROR', maxJsonNodes);
   check(isRecord(result), 'Response must be an object.', 'INVALID_RESPONSE');
-  allowedKeys(result, ['model', 'answers', 'usage', 'meta'], 'response', 'INVALID_RESPONSE');
+  check(!result.error, 'Provider returned an error response.', 'INVALID_RESPONSE');
   check(isRecord(questionSnapshot) && Object.keys(questionSnapshot).length > 0, 'questions must be a nonempty object.');
   check(nonempty(result.model), 'Response must include model.', 'INVALID_RESPONSE');
   exactKeys(result.answers, Object.keys(questionSnapshot), 'answers', 'INVALID_RESPONSE');
@@ -206,16 +225,14 @@ export function validateResult(input, questions, options = {}) {
     if (q.type === 'score' && !own(q, 'levels')) check(Array.isArray(q.criteria) && q.criteria.length >= 2, 'score requires at least two levels.');
     const answer = result.answers[id];
     check(isRecord(answer) && answer.type === q.type, 'Answer type must match its question.', 'INVALID_RESPONSE');
-    allowedKeys(answer, q.type === 'box' ? ['type', 'box', 'confidence'] : q.type === 'noul' ? ['type', 'noul'] : q.type === 'choice'
-      ? ['type', 'choice', 'probabilities', 'confidence'] : ['type', 'score', 'legend', 'probabilities', 'confidence'], 'answer', 'INVALID_RESPONSE');
     if (q.type === 'noul') {
       probability(answer.noul, 'noul');
       continue;
     }
     if (native || own(answer, 'confidence')) probability(answer.confidence, 'confidence');
     if (q.type === 'box') {
-      exactKeys(answer.box, ['top', 'bottom', 'left', 'right'], 'box', 'INVALID_RESPONSE');
-      Object.values(answer.box).forEach(value => probability(value, 'box edge'));
+      requireResponseFields(answer.box, ['top', 'bottom', 'left', 'right'], 'box');
+      for (const key of ['top', 'bottom', 'left', 'right']) probability(answer.box[key], 'box edge');
       check(answer.box.left < answer.box.right && answer.box.top < answer.box.bottom,
         'Box edges must enclose a positive area.', 'INVALID_RESPONSE');
       continue;
@@ -245,7 +262,6 @@ export function validateResult(input, questions, options = {}) {
     }
   }
   check(isRecord(result.usage), 'Response must include usage.', 'INVALID_RESPONSE');
-  allowedKeys(result.usage, ['input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'], 'usage', 'INVALID_RESPONSE');
   for (const field of ['cache_creation_input_tokens', 'cache_read_input_tokens']) {
     if (own(result.usage, field)) check(Number.isSafeInteger(result.usage[field]) && result.usage[field] >= 0, 'Invalid cache token count.', 'INVALID_RESPONSE');
   }
@@ -255,7 +271,22 @@ export function validateResult(input, questions, options = {}) {
       'Token counts must be nonnegative safe integers.', 'INVALID_RESPONSE');
   }
   if (result.meta !== undefined) check(isRecord(result.meta), 'meta must be an object.', 'INVALID_RESPONSE');
-  return result;
+  return preserveUnknown ? result : projectCommonResult(result);
+}
+
+/** Common answers and usage keep their existing shape; metadata stays extensible. */
+function projectCommonResult(result) {
+    const projected = projectResponseFields(result, ['model', 'answers', 'usage', 'meta']);
+    projected.answers = Object.fromEntries(Object.entries(result.answers).map(([id, answer]) => {
+        const keys = answer.type === 'noul' ? ['type', 'noul'] : answer.type === 'box' ? ['type', 'box', 'confidence']
+            : answer.type === 'choice' ? ['type', 'choice', 'probabilities', 'confidence'] : ['type', 'score', 'legend', 'probabilities', 'confidence'];
+        const value = projectResponseFields(answer, keys);
+        if (answer.type === 'box') value.box = projectResponseFields(answer.box, ['top', 'bottom', 'left', 'right']);
+        if (Array.isArray(value.probabilities)) value.probabilities = value.probabilities.map(item => projectResponseFields(item, ['value', 'probability']));
+        return [id, value];
+    }));
+    projected.usage = projectResponseFields(result.usage, ['input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens']);
+    return projected;
 }
 
 /** Values retain primitive identity: true and "true" never share a map key. */
@@ -268,7 +299,7 @@ function validateTypedChoice(answer, options, decimalPlaces) {
         'Typed probabilities must match the options.', 'INVALID_RESPONSE');
     const probabilities = new Map();
     for (const item of answer.probabilities) {
-        exactKeys(item, ['value', 'probability'], 'typed probability', 'INVALID_RESPONSE');
+        requireResponseFields(item, ['value', 'probability'], 'typed probability');
         check(supplied.has(item.value) && !probabilities.has(item.value), 'Invalid typed probability value.', 'INVALID_RESPONSE');
         probability(item.probability, 'probability');
         probabilities.set(item.value, item.probability);

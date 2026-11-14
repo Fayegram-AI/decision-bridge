@@ -3,7 +3,6 @@
     "schemaVersion": 1,
     "provider": "custom-generative",
     "model": "YOUR_PROVIDER/YOUR_MODEL",
-    "apiKeyEnv": "OPENROUTER_API_KEY",
     "responseFormat": "json_schema",
     "timeoutMs": 30000,
     "preset": "openrouter"

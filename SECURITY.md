@@ -7,8 +7,9 @@ Never place them in request JSON, committed profiles, command-line arguments, or
 logs. The package contains no key, telemetry client, or background job. When you request
 a model call, the SDK sends your evidence and question or field definitions to the
 selected provider. Conversation/tool history is also request data. Remote HTTP(S) image
-references are forwarded to OpenAI without being fetched by the SDK; the provider
-handles their retrieval. Review data-sharing requirements before sending private
+references are forwarded to OpenAI without being fetched by the SDK. Gemini and
+OpenRouter also receive supported remote media references for provider retrieval.
+Review data-sharing requirements before sending private
 repository content or documents. Optional Cloudflare Gateway routing can cache
 requests/responses or collect logs according to explicit options and the Gateway's
 configuration. Review that configuration as part of your data-handling policy; Gateway
@@ -54,8 +55,11 @@ and `x-api-key` headers from HTTP logs.
 ## Input and output
 
 Strict plain-JSON checks reject accessors, cycles, non-finite numbers, lossy objects,
-and unknown request fields. Clairic additionally preserves safe native response fields,
-including predictive JSON and truncation. The SDK limits data size, JSON depth and node
+and unknown request fields. Native responses preserve additive JSON properties;
+common decision results retain their documented shape and extensible metadata.
+Known answer values, required fields and correlation remain validated. Clairic
+also preserves predictive JSON and truncation. See the [response contract](docs/reference/SDK.md#returned-data).
+The SDK limits data size, JSON depth and node
 count, retries, concurrent work and waiting time. These checks do not establish decision
 accuracy or resist every adversarial semantic input. Question instructions are trusted
 configuration; state is untrusted evidence. Prompt separation is a mitigation, not a

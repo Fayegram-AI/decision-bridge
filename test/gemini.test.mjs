@@ -37,12 +37,28 @@ test('Gemini factory, first-party endpoint, discovery and native identity', asyn
     await assert.rejects(backend.createDecision({ ...nativeRequest, model: null }), { code: 'VALIDATION_ERROR' });
 });
 
-test('Gemini scoped environment defaults do not escape to custom origins', t => {
-    const name = 'DECISION_BRIDGE_GEMINI_API_KEY';
-    const previous = process.env[name];
-    process.env[name] = 'scoped-fixture';
-    t.after(() => { if (previous === undefined) delete process.env[name]; else process.env[name] = previous; });
+test('Gemini environment aliases prefer the SDK-scoped key without custom-origin inheritance', async t => {
+    const name = 'GEMINI_API_KEY';
+    const scoped = 'DECISION_BRIDGE_GEMINI_API_KEY';
+    const previous = new Map([name, scoped].map(key => [key, process.env[key]]));
+    t.after(() => {
+        for (const [key, value] of previous) {
+            if (value === undefined) delete process.env[key]; else process.env[key] = value;
+        }
+    });
+    delete process.env[name];
+    process.env[scoped] = 'preferred-fixture';
     assert.equal(new GeminiDecisionsProvider().defaultModel, 'gemini-decision-1');
+    process.env[name] = 'environment-fixture';
+    assert.equal(new GeminiDecisionsProvider().defaultModel, 'gemini-decision-1');
+    let calls = 0;
+    const backend = new GeminiDecisionsProvider({ fetchImpl: async (_url, init) => {
+        calls++;
+        assert.equal(init.headers['x-goog-api-key'], 'preferred-fixture');
+        return Response.json(geminiResponse(JSON.parse(init.body)));
+    } });
+    await backend.createDecision(nativeRequest);
+    assert.equal(calls, 1);
     assert.throws(() => new GeminiDecisionsProvider({ baseURL: 'https://proxy.example' }), { code: 'CONFIGURATION_ERROR' });
     assert.equal(new GeminiDecisionsProvider({ baseURL: 'http://127.0.0.1', apiKey: 'explicit' }).defaultModel, 'gemini-decision-1');
     assert.throws(() => provider({ maxRequestBytes: 167772161 }), { code: 'CONFIGURATION_ERROR' });

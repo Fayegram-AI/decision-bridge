@@ -46,7 +46,6 @@ A configuration selects exactly one preset or module:
     "provider": "custom-generative",
     "preset": "openai-compatible",
     "model": "YOUR_MODEL_ID",
-    "apiKeyEnv": "OPENAI_API_KEY",
     "responseFormat": "json_schema",
     "timeoutMs": 30000
 }
@@ -66,11 +65,12 @@ The subpath exports `buildResponseSchema(questions)`, `buildPrompt(request)`,
 `parseGeneratedJson(text)`, and `normalizeGenerated(payload, request, options)`.
 Build a prompt/schema from a validated, resolved legacy request, send it using
 transport you own, parse the generated JSON, then normalize it. The normalizer
-expects exactly `{ answers }`: each `noul` answer contains `{ noul }`, and each
+requires `{ answers }`: each `noul` answer contains `{ noul }`, and each
 choice/score contains `{ probabilities }` with exactly the supplied option keys
 or zero-based level indices. It checks probabilities, derives argmax/weighted
 scores and matching legends, and marks absent usage as unknown. It does not repair
-JSON or strip Markdown, and it omits confidence. `buildPrompt` and `normalizeGenerated`
+JSON or strip Markdown. Extra root and answer properties are discarded, including
+generated confidence; normalized answers omit confidence. `buildPrompt` and `normalizeGenerated`
 independently validate and snapshot the request. They require shared state and
 legacy questions, and reject ordered input, `instructionParts`, conversation/tool
 history, remote images, prompt-cache controls, typed choices, labelled scores and
@@ -166,7 +166,7 @@ Set `workspaceId` for keys that are not workspace-scoped; it sends
 `anthropic-workspace-id` on Messages and model discovery. CLI equivalents are
 `--anthropic-workspace-id` and `DECISION_ANTHROPIC_WORKSPACE_ID`. See the
 [authentication guide](https://platform.claude.com/docs/en/manage-claude/authentication).
-Its defaults are API `2023-06-01` and `responseFormat: 'tool'`. Tool mode defines
+The default API version is `2023-06-01`. Tool mode defines
 and forces a synthetic `submit_decisions` tool whose input schema is the expected
 answer object. The returned `tool_use.input` carries the data; no tool is executed
 and no follow-up agent cycle is started.
@@ -178,7 +178,7 @@ Configure these two independent options through `createGenerativeProvider` or
 
 | Option | Values | Default |
 | --- | --- | --- |
-| `responseFormat` | `tool`, `json_schema` | `tool` |
+| `responseFormat` | `tool`, `json_schema` | Model-aware (see below) |
 | `apiVersion` | `2023-06-01`, `2026-10-21` | `2023-06-01` |
 
 ```javascript
@@ -199,11 +199,15 @@ answer extraction. Unexpected blocks, malformed JSON and invalid probabilities
 fail; Markdown is not stripped. Results retain elicited probabilities and no
 native confidence. `meta.responseFormat` reports the selected mode.
 
-Choose a model that supports the selected output mode. For example,
-[Sonnet 5.5 rejects forced tool choice](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide#forced-tool-use-is-not-supported),
-so use JSON mode for this decision-output workflow. The SDK does not infer a mode
-from the model ID or retry using another mode/version. See Anthropic's
-[structured-output contract](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+When `responseFormat` is omitted, Opus 5.5, Sonnet 5.5, Fable 5.1/5.2 and
+Mythos 5.1/5.2 (including dated snapshots) select JSON schema output. Other and
+unknown model IDs select tool output. The effective request model determines
+this default, including request and thread model overrides. Explicit tool output
+for these incompatible families fails with `UNSUPPORTED_CAPABILITY` before HTTP.
+Explicit JSON output remains available for other models. See Anthropic's
+[forced-tool restrictions](https://platform.claude.com/docs/en/api/errors#forced-tool-use-not-supported)
+and [structured-output contract](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+The SDK does not retry with another mode or API version.
 
 API `2026-10-21` rejects `temperature`, `top_p` and `top_k`; the SDK and offline
 CLI reject their presence locally, including null/default values. API

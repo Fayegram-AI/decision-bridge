@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile, lstat, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { DecisionError } from '../errors.mjs';
 import { validateRoutingConfig } from './routing-config.mjs';
-import { KEY_ENVS } from './config-validation.mjs';
+import { KEY_ENVS, credentialTemplate, ACCOUNT_ENV_TEMPLATE } from './credentials.mjs';
 
 export async function initializeRouting(directory, input, extracting, moduleBase) {
     const config = validateRoutingConfig(input.schemaVersion === 2 ? input : {
@@ -19,7 +19,7 @@ export async function initializeRouting(directory, input, extracting, moduleBase
         if (id === 'auto') continue;
         const provider = route.config;
         const key = provider.apiKeyEnv ?? KEY_ENVS[provider.preset ?? provider.provider];
-        if (key && !provider.noAuth) { provider.apiKeyEnv = key; keys.add(key); }
+        if (key && !provider.noAuth) for (const line of credentialTemplate(provider)) keys.add(line);
         if (provider.module) provider.module = resolve(moduleBase, provider.module);
         if (provider.provider.startsWith('cloudflare-')) cloudflare = true;
     }
@@ -31,8 +31,7 @@ export async function initializeRouting(directory, input, extracting, moduleBase
         'decision.config.json': JSON.stringify(config, null, 2) + '\n',
         'decision.config.schema.json': await readFile(new URL('../../schemas/decision.config.schema.json', import.meta.url), 'utf8'),
         'request.json': JSON.stringify(request, null, 2) + '\n',
-        '.env.example': [...keys].map(key => `${key}=replace_with_your_api_key\n`).join('') +
-            (cloudflare ? 'CLOUDFLARE_ACCOUNT_ID=replace_with_your_account_id\n' : ''),
+        '.env.example': [...keys, ...(cloudflare ? ACCOUNT_ENV_TEMPLATE : [])].join('\n') + '\n',
         '.gitignore': '.env\n.env.*\n!.env.example\nnode_modules/\n*.tmp\n',
     };
     try { await mkdir(directory, { recursive: true }); }

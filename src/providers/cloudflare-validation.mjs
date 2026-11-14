@@ -1,5 +1,5 @@
 import { DecisionError, requireCondition as check } from '../errors.mjs';
-import { cloneJson, isRecord, validateResult } from '../validation.mjs';
+import { cloneJson, isRecord, validateNativeResult, requireResponseFields } from '../validation.mjs';
 import { CLOUDFLARE_RESULT_OPTIONS } from './cloudflare-profile.mjs';
 
 const CODES = new Map([
@@ -41,10 +41,7 @@ export function unwrapCloudflareResponse(data, transport, meta) {
 
 export function validateCloudflareResponse(input, request) {
     const decision = cloneJson(input, 'Cloudflare response', 'INVALID_RESPONSE');
-    check(isRecord(decision) && Object.keys(decision).every(key => ['model', 'answers', 'usage'].includes(key)),
-        'Cloudflare response contains an unknown field.', 'INVALID_RESPONSE');
-    check(isRecord(decision.usage) && Object.keys(decision.usage).length === 2 &&
-        Object.hasOwn(decision.usage, 'input_tokens') && Object.hasOwn(decision.usage, 'output_tokens'),
-    'Cloudflare usage requires input_tokens and output_tokens.', 'INVALID_RESPONSE');
-    return validateResult(decision, request.questions, CLOUDFLARE_RESULT_OPTIONS);
+    requireResponseFields(decision, ['model', 'answers', 'usage'], 'Cloudflare response');
+    requireResponseFields(decision.usage, ['input_tokens', 'output_tokens'], 'Cloudflare usage');
+    return validateNativeResult(decision, request.questions, CLOUDFLARE_RESULT_OPTIONS);
 }

@@ -4,7 +4,7 @@
 
 Run `npm exec -- decision-bridge --version` in the consuming project and compare
 it with [version availability](../README.md#version-availability). These guides
-describe 0.1.7, including Gemini Decisions. Follow the [installation options](GETTING_STARTED.md#install-into-your-application)
+describe 0.1.8, including Gemini Decisions. Follow the [installation options](GETTING_STARTED.md#install-into-your-application)
 to install this version, or use the documentation bundled with an older package.
 
 ## The command cannot find a key
@@ -13,7 +13,10 @@ General `node bin/decision.mjs ...` calls need exported environment variables or
 explicit `--env-file .env`. Only the documented convenience npm scripts
 preload `.env`. The file must name the selected provider's credential variable.
 Do not pass a TypeSafe key to OpenRouter or vice versa. Existing shell environment
-values win over a file; an old exported value can therefore mask a newly edited file.
+values win over a file for the same variable name. Automatic credential lookup
+prefers a defined `DECISION_BRIDGE_` name over its unprefixed counterpart; update
+or clear that value when changing the unprefixed key. Explicit `apiKeyEnv` selectors
+read exactly the named variable. See [credential lookup](../reference/CONFIGURATION.md#recognized-environment-variables).
 
 ## My model or base URL seems ignored
 
@@ -73,10 +76,21 @@ not guarantee probabilities sum to one. `INVALID_RESPONSE` must not be treated a
 an approved decision. Large schemas also consume context/output budget.
 
 For Anthropic, check the [output and API-version settings](CUSTOM_GENERATIVE.md#json-output-and-api-versions).
-Select `json_schema` or the default `tool` mode;
+Omit `responseFormat` to use the effective model's default, or explicitly select a
+compatible `json_schema` or `tool` mode. Model families with known forced-tool
+restrictions default to JSON schema output; explicit incompatible tool requests
+fail before dispatch.
 `json_object`, `text`, and `tokenParameter` are unsupported. API `2026-10-21`
 rejects `temperature`, `top_p`, and `top_k`. A `TRUNCATED_OUTPUT` error may require
 a larger explicit `maxTokens` budget, which also covers default thinking tokens.
+
+## Extra response fields are missing from a common result
+
+Common results retain documented answer and usage fields, plus extensible `meta`.
+Use a native decision provider's `createDecision()` method for additional response
+properties. Native usage extensions also remain in provider metadata where exposed.
+See the
+[response contract](../reference/SDK.md#returned-data).
 
 ## The model returns JSON but confidence is absent
 

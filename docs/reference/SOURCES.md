@@ -66,6 +66,8 @@ checks and optional service checks.
 
 - [OpenRouter OpenAPI](https://openrouter.ai/openapi.json)
 - [OpenRouter multimodal Decisions](https://openrouter.ai/docs/guides/community/multimodal-decisions)
+- [OpenRouter Extractions](https://openrouter.ai/docs/guides/community/extractions)
+- [Anthropic forced-tool restrictions](https://platform.claude.com/docs/en/api/errors#forced-tool-use-not-supported)
 - [Anthropic authentication](https://platform.claude.com/docs/en/manage-claude/authentication)
 - [Anthropic request limits](https://platform.claude.com/docs/en/api/overview#request-size-limits)
 - [Anthropic message threads](https://platform.claude.com/docs/en/build-with-claude/message-threads)

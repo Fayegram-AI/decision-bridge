@@ -50,7 +50,7 @@ test('Gemini larger budgets match generated schemas, config layers and common re
     assert.equal(result.code, 0, result.stderr);
 });
 
-test('Gemini init generates scoped secret references, schema-valid profiles and native samples', async t => {
+test('Gemini init generates credential references, schema-valid profiles and native samples', async t => {
     const cwd = await temporaryWorkspace(t);
     const schema = JSON.parse(await readFile(new URL('../schemas/decision.config.schema.json', import.meta.url), 'utf8'));
     const ajv = new Ajv({ allErrors: true, strict: false });
@@ -60,29 +60,51 @@ test('Gemini init generates scoped secret references, schema-valid profiles and 
         const result = await invoke(['init', folder, '--provider', 'gemini-decisions', ...(native ? ['--native'] : [])], undefined, { cwd });
         assert.equal(result.code, 0, result.stderr);
         const config = JSON.parse(await readFile(join(cwd, folder, 'decision.config.json'), 'utf8'));
-        assert.equal(config.apiKeyEnv, 'DECISION_BRIDGE_GEMINI_API_KEY');
+        assert.equal(config.apiKeyEnv, undefined);
         assert.equal(config.model, 'gemini-decision-1');
         assert.equal(valid(config), true, JSON.stringify(valid.errors));
         assert.equal(config.apiKey, undefined);
-        assert.match(await readFile(join(cwd, folder, '.env.example'), 'utf8'), /^DECISION_BRIDGE_GEMINI_API_KEY=/);
+        assert.match(await readFile(join(cwd, folder, '.env.example'), 'utf8'), /^GEMINI_API_KEY=/);
         const request = await readFile(join(cwd, folder, 'request.json'), 'utf8');
         const validated = await invoke(['validate', '-', '--config', join(folder, 'decision.config.json'), ...(native ? ['--native'] : [])], request, { cwd });
         assert.equal(validated.code, 0, validated.stderr);
     }
-    await writeFile(join(cwd, '.env'), 'DECISION_BRIDGE_GEMINI_API_KEY=file-key\n');
-    const loaded = await loadConfig({ cwd, envFile: '.env', env: { DECISION_BRIDGE_GEMINI_API_KEY: 'shell-key' },
+    await writeFile(join(cwd, '.env'), 'GEMINI_API_KEY=file-key\n');
+    const loaded = await loadConfig({ cwd, envFile: '.env', env: { GEMINI_API_KEY: 'shell-key' },
         overrides: { provider: 'gemini-decisions' } });
     assert.equal(loaded.config.model, 'gemini-decision-1');
-    assert.equal(loaded.env.DECISION_BRIDGE_GEMINI_API_KEY, 'shell-key');
+    assert.equal(loaded.env.GEMINI_API_KEY, 'shell-key');
     assert.equal(valid({ provider: 'gemini-decisions', apiKey: 'literal' }), false);
     const routed = await invoke(['init', 'routed', '--provider', 'gemini-decisions', '--route', 'auto'], undefined, { cwd });
     assert.equal(routed.code, 0, routed.stderr);
     const routedConfig = JSON.parse(await readFile(join(cwd, 'routed', 'decision.config.json'), 'utf8'));
-    assert.equal(routedConfig.routes.primary.config.apiKeyEnv, 'DECISION_BRIDGE_GEMINI_API_KEY');
+    assert.equal(routedConfig.routes.primary.config.apiKeyEnv, undefined);
     assert.equal(valid(routedConfig), true, JSON.stringify(valid.errors));
     const inspected = await invoke(['inspect', '-', '--config', 'routed/decision.config.json'],
         JSON.stringify({ input: [{ type: 'document', dataUrl: pdf }], questions: nativeRequest.questions }), { cwd });
     assert.equal(inspected.code, 0, inspected.stderr);
+});
+
+test('Gemini CLI and routing support both Gemini credential environment names', async t => {
+    const cwd = await temporaryWorkspace(t);
+    await writeFile(join(cwd, 'routing.json'), JSON.stringify({ schemaVersion: 2, defaultRoute: 'google',
+        routes: { google: { config: { provider: 'gemini-decisions' } } } }));
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async (_url, init) => {
+        calls++;
+        assert.equal(init.headers['x-goog-api-key'], 'environment-fixture');
+        return Response.json(geminiResponse(JSON.parse(init.body)));
+    });
+    const input = JSON.stringify({ state: 'Evidence', questions: nativeRequest.questions });
+    for (const flags of [['--provider', 'gemini-decisions'], ['--config', 'routing.json']]) {
+        const scoped = await invoke(['evaluate', '-', ...flags], input,
+            { cwd, env: { DECISION_BRIDGE_GEMINI_API_KEY: 'environment-fixture' } });
+        assert.equal(scoped.code, 0, scoped.stderr);
+        const result = await invoke(['evaluate', '-', ...flags], input,
+            { cwd, env: { GEMINI_API_KEY: 'other-fixture', DECISION_BRIDGE_GEMINI_API_KEY: 'environment-fixture' } });
+        assert.equal(result.code, 0, result.stderr);
+    }
+    assert.equal(calls, 4);
 });
 
 test('Gemini CLI native/common execution, model listing, batches and safe refusals', async t => {
@@ -109,8 +131,8 @@ test('Gemini CLI native/common execution, model listing, batches and safe refusa
     await once(server, 'listening');
     t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
     const flags = ['--provider', 'gemini-decisions', '--base-url', 'http://127.0.0.1:' + server.address().port,
-        '--api-key-env', 'DECISION_BRIDGE_GEMINI_API_KEY'];
-    const env = { DECISION_BRIDGE_GEMINI_API_KEY: 'fixture-secret' };
+        '--api-key-env', 'GEMINI_API_KEY'];
+    const env = { GEMINI_API_KEY: 'fixture-secret' };
     for (const [request, extra] of [[nativeRequest, ['--native']], [{ state: 'Evidence', questions: nativeRequest.questions }, []]]) {
         const result = await invoke(['evaluate', '-', ...flags, ...extra], JSON.stringify(request), { env });
         assert.equal(result.code, 0, result.stderr);

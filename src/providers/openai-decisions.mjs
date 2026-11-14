@@ -3,7 +3,7 @@ import { requireCondition as check, withResponseMeta } from '../errors.mjs';
 import { freezeJson } from '../validation.mjs';
 import { builtInCapabilities } from '../capabilities.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
-import { environmentValue } from '../runtime-env.mjs';
+import { providerEnvironmentValue } from '../runtime-env.mjs';
 import { validateDecisionResponse } from './decisions-validation.mjs';
 import { decodeCommonDecision } from './decisions-codec.mjs';
 import { preflightCommonDecision, prepareCommonDecision, prepareDecision } from './decisions-preflight.mjs';
@@ -23,7 +23,7 @@ export class OpenAIDecisionsProvider {
             optionsObject(options, ['apiKey', 'model', 'baseURL', ...TRANSPORT_FIELDS], 'OpenAI Decisions options');
         const endpoint = parseBaseURL(baseURL, { originOnly: true });
         const supplied = apiKey === undefined && endpoint.origin === 'https://api.openai.com'
-            ? environmentValue('OPENAI_API_KEY') : apiKey;
+            ? providerEnvironmentValue('OPENAI_API_KEY') : apiKey;
         const key = validateApiKey(supplied, 'OPENAI_API_KEY');
         check(typeof model === 'string' && model.trim(), 'model must be nonempty.', 'CONFIGURATION_ERROR');
         this.defaultModel = model.trim();

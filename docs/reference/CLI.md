@@ -4,7 +4,7 @@ The optional command runner evaluates decision files, runs Cloudflare or OpenRou
 and validates or replays Live protocol records offline. For application
 integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
 
-This reference describes 0.1.7. See
+This reference describes 0.1.8. See
 [version availability](../README.md#version-availability) for earlier command support.
 
 After [installing the package](../guides/GETTING_STARTED.md#install-into-your-application)
@@ -58,7 +58,8 @@ See the [OpenRouter guide](../guides/OPENROUTER_NATIVE.md#cli-and-routing).
 `--provider gemini-decisions` selects Gemini Decisions with default model
 `gemini-decision-1`. It supports common and `--native` evaluation, validation,
 initialization and local batches, plus model metadata discovery. The default
-credential variable is `DECISION_BRIDGE_GEMINI_API_KEY`. See the
+credential lookup accepts `DECISION_BRIDGE_GEMINI_API_KEY` and `GEMINI_API_KEY`,
+with the prefixed name taking precedence. See the
 [Gemini guide](../guides/GEMINI_DECISIONS.md).
 
 | Command | Behavior |
@@ -179,7 +180,7 @@ See the [routing guide](../guides/ROUTING.md) for policy and selector requiremen
 | `--timeout-ms N` | Single-provider HTTP and bridge deadline for each evaluation/listing; registry budgets belong in configuration |
 | `--retries N` | Additional eligible HTTP attempts; 0–10; native OpenAI/Cloudflare/OpenRouter/Gemini default to 0, Jev and generative presets to 2 |
 | `--max-tokens N` | Generative output budget; default 4096 |
-| `--response-format MODE` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic modes: `tool` (default), `json_schema` |
+| `--response-format MODE` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic: `tool`, `json_schema`, with a [model-aware default](../guides/CUSTOM_GENERATIVE.md#json-output-and-api-versions) |
 | `--anthropic-workspace-id ID` | Anthropic workspace header for non-scoped keys |
 | `--anthropic-api-version VERSION` | Anthropic option: `2023-06-01` (default) or `2026-10-21` |
 | `--token-parameter NAME` | Compatible presets: `max_completion_tokens` or `max_tokens` |

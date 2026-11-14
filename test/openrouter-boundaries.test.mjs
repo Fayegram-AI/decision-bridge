@@ -17,6 +17,30 @@ const questions = { q: { type: 'noul', instructions: 'True?' } };
 const forecast = { type: 'forecast', min: 0, max: 10, horizon: 2, interval: 'day' };
 const extraction = fetchImpl => createExtractionProvider({ type: 'openrouter-extraction', model: 'vendor/model', apiKey: 'fixture', fetchImpl });
 
+test('OpenRouter routes canonicalize request models and retain request-selected model support', async () => {
+    for (const extracting of [false, true]) for (const hasDefault of [false, true]) {
+        let calls = 0;
+        const model = extracting ? 'cloudflare/clairic' : 'google/gemini-decision-1';
+        const router = (extracting ? createExtractionRouter : createDecisionRouter)({ defaultRoute: 'p', routes: {
+            p: { config: { type: extracting ? 'openrouter-extraction' : 'openrouter-decisions',
+                ...(hasDefault ? { model } : {}), apiKey: 'fixture', fetchImpl: async (_url, init) => {
+                    calls++;
+                    assert.equal(JSON.parse(init.body).model, model);
+                    return Response.json({ model: 'served', answers: { q: extracting ? { type: 'text', value: 'Ada' }
+                        : { type: 'noul', noul: 0.5 } }, usage });
+                } } },
+        } });
+        const request = { model: ' ' + model + ' ', ...(extracting ? { fields: { q: { type: 'text' } }, images: [image] }
+            : { questions, input: [{ type: 'document', dataUrl: 'data:text/csv;base64,YQ==' }] }) };
+        const snapshot = structuredClone(request);
+        assert.equal(router.inspect(request).selectedRoute, 'p');
+        assert.equal(calls, 0);
+        await router[extracting ? 'extract' : 'evaluate'](request);
+        assert.equal(calls, 1);
+        assert.deepEqual(request, snapshot);
+    }
+});
+
 test('validated OpenRouter extraction requests remain reusable across common operations', async () => {
     const bodies = [];
     const provider = extraction(async (_url, init) => {

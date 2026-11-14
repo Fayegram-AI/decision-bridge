@@ -17,8 +17,7 @@ export function base64ByteLength(payload, code = 'VALIDATION_ERROR', message = '
 /** Embedded media only: URLs, parameters and non-base64 data are not fetched or coerced. */
 export function embeddedDataUrl(dataUrl, kind, code = 'VALIDATION_ERROR') {
     const prefix = typeof dataUrl === 'string' ? /^data:([a-z]+\/[a-z0-9.+-]+);base64,/i.exec(dataUrl) : null;
-    check(prefix && (kind === 'document' ? prefix[1].toLowerCase() === 'application/pdf'
-        : prefix[1].toLowerCase().startsWith(kind + '/')),
+    check(prefix && (kind === 'document' || prefix[1].toLowerCase().startsWith(kind + '/')),
         'Media must be nonempty inline base64 ' + kind + ' data URLs.', code);
     const payload = dataUrl.slice(prefix[0].length);
     return { format: prefix[1].toLowerCase(), payload, size: base64ByteLength(payload, code) };

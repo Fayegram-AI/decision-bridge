@@ -1,43 +1,19 @@
 // Assets retain their native reference semantics; no network fetch or file conversion.
 import { requireCondition as check } from '../errors.mjs';
 import { isRecord } from '../validation.mjs';
-import { base64ByteLength, embeddedDataUrl } from '../embedded.mjs';
+import { base64ByteLength } from '../embedded.mjs';
 import { validateJevAssets } from './jev-images.mjs';
-
-export const isOpenRouterJev = model => /^(?:~)?typesafe\/jev-/.test(model);
-
-/** Inspect recognized media only; unrelated structured state remains ordinary JSON. */
-export function validateOpenRouterMedia(request) {
-    const jev = isOpenRouterJev(request.model);
-    function visit(value, allowed) {
-        if (!value || typeof value !== 'object') return;
-        // Only Omni interprets audio/video objects as media. Other native models
-        // may receive these same keys as ordinary structured application state.
-        if (value.type === 'image_url' || request.model === 'cloudflare/clef-omni' && ['input_audio', 'video_url'].includes(value.type)) {
-            check(allowed, 'Media must occur in a supported state position.');
-            if (value.type === 'image_url') {
-                check(isRecord(value.image_url), 'Invalid image part.');
-                openRouterInputPart({ type: 'image', dataUrl: value.image_url.url, detail: value.image_url.detail }, request.model);
-            } else if (value.type === 'input_audio') {
-                check(isRecord(value.input_audio) && ['wav', 'mp3', 'mpeg', 'm4a', 'mp4', 'aac', 'aiff', 'aif', 'flac', 'ogg', 'opus', 'webm']
-                    .includes(value.input_audio.format), 'Invalid audio format.');
-                base64ByteLength(value.input_audio.data);
-            } else {
-                check(isRecord(value.video_url), 'Invalid video part.');
-                embeddedDataUrl(value.video_url.url, 'video');
-            }
-            return;
-        }
-        Object.values(value).forEach(child => visit(child, jev));
-    }
-    if (Array.isArray(request.state)) request.state.forEach(v => visit(v, true));
-    else visit(request.state, jev);
-    Object.values(request.questions).forEach(q => visit([q.instructions, q.criteria], jev));
-}
+import { validateCloudflareImages } from './cloudflare-images.mjs';
+import { isOpenRouterJev, openRouterProfile } from './openrouter-profile.mjs';
+import { openRouterExtractionProfile } from '../extraction/openrouter-profile.mjs';
+export { openRouterInputPart, validateOpenRouterMedia } from './openrouter-media.mjs';
 
 export function validateOpenRouterAssets(request, { extraction = false } = {}) {
     if (request.assets === undefined) return;
     check(isRecord(request.assets), 'assets must be an object.');
+    if (!extraction && Object.keys(request.assets).length) check(openRouterProfile(request.model).capabilities.images,
+        'Selected OpenRouter model does not support image assets.', 'UNSUPPORTED_CAPABILITY');
+    const profile = extraction ? openRouterExtractionProfile(request.model) : undefined;
     const images = Object.create(null);
     const texts = [];
     const visit = value => {
@@ -51,11 +27,16 @@ export function validateOpenRouterAssets(request, { extraction = false } = {}) {
         const size = new TextEncoder().encode(reference).length;
         check(reference.trim() && size <= 1024 && (referenceBytes += size) <= 65536, 'Invalid or oversized asset references.');
         check(isRecord(asset) && Object.keys(asset).every(k => ['type', 'format', 'data_base64'].includes(k)), 'Invalid asset fields.');
+        if (profile) check(profile.assets.includes(asset.format), 'This extraction model does not support this asset format.', 'UNSUPPORTED_CAPABILITY');
         if (asset.format === 'pdf') {
             check(extraction && (asset.type === undefined || asset.type === 'document'), 'PDF assets require extraction.');
             base64ByteLength(asset.data_base64);
             check(atob(asset.data_base64.slice(0, 8)).startsWith('%PDF-'), 'PDF assets require a PDF file.');
-        } else images[reference] = asset;
+        } else {
+            check((asset.type === undefined || asset.type === 'image') &&
+                ['png', 'jpg', 'jpeg', ...(extraction ? ['webp'] : [])].includes(asset.format), 'Invalid image asset.');
+            images[reference] = asset;
+        }
         if (!extraction && !isOpenRouterJev(request.model)) {
             check(Array.isArray(request.state) && request.state.includes(reference), 'Image references must be top-level state items.');
             check(texts.every(text => !text.includes(reference) || text === reference), 'This model does not accept embedded references.');
@@ -67,27 +48,16 @@ export function validateOpenRouterAssets(request, { extraction = false } = {}) {
             request.state.filter(v => typeof v !== 'string').forEach(scan);
             Object.values(request.questions).forEach(q => scan([q.instructions, q.criteria]));
             check(!nested.includes(reference), 'This model accepts image references only in the top-level state array.');
-        } else check(texts.some(text => text.includes(reference)), 'Every asset must be referenced.');
+        } else if (!extraction || request.state) check(texts.some(text => text.includes(reference)), 'Every asset must be referenced.');
     }
-    // Reuse bounded PNG/JPEG inspection and Jev substitution validation.
-    if (Object.keys(images).length) validateJevAssets({ state: extraction ? texts : request.state,
-        questions: extraction ? {} : request.questions, assets: images });
-}
-
-export function openRouterInputPart(part, model) {
-    if (part.type === 'text') return part.text;
-    if (part.type === 'image') {
-        const image = embeddedDataUrl(part.dataUrl, 'image');
-        check(['image/png', 'image/jpeg', ...(isOpenRouterJev(model) ? [] : ['image/webp'])].includes(image.format), 'Unsupported image format.');
-        check(part.detail == null || ['auto', 'low', 'high'].includes(part.detail), 'Unsupported image detail.');
-        return { type: 'image_url', image_url: { url: part.dataUrl, ...(part.detail == null ? {} : { detail: part.detail }) } };
+    if (!extraction && isOpenRouterJev(request.model)) validateJevAssets(request);
+    else validateCloudflareImages(Object.values(images).map(asset => ({
+        content_type: 'image/' + (asset.format === 'jpg' ? 'jpeg' : asset.format), base64: asset.data_base64,
+    })));
+    if (profile?.clairic && Object.keys(images).length > 1) check(!texts.some(text => Object.hasOwn(images, text)),
+        'Clairic cannot select one of several images using a bare reference.');
+    if (profile?.scaledown && Object.keys(request.assets).length) {
+        const refs = Object.keys(request.assets);
+        check(refs.length === 1 && (!request.state || request.state === refs[0]), 'ScaleDown reads one asset or text, not both.');
     }
-    if (part.type === 'audio') {
-        const audio = embeddedDataUrl(part.dataUrl, 'audio');
-        const format = audio.format.slice('audio/'.length).replace('x-wav', 'wav').replace('x-aiff', 'aiff');
-        return { type: 'input_audio', input_audio: { data: audio.payload, format } };
-    }
-    check(part.type === 'video', 'Unsupported OpenRouter input part.');
-    embeddedDataUrl(part.dataUrl, 'video');
-    return { type: 'video_url', video_url: { url: part.dataUrl } };
 }

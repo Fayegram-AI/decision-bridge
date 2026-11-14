@@ -6,7 +6,7 @@ JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source chec
 the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
 declarations in `src/index.d.mts`.
 
-This reference covers **0.1.7**.
+This reference covers **0.1.8**.
 See [version availability](../README.md#version-availability).
 
 ## Create a bridge
@@ -87,7 +87,11 @@ Ordered parts are `{ type: 'text', text }`, `{ type: 'image', dataUrl, detail? }
 `{ type: 'image', url, detail? }`, `{ type: 'json', data }`,
 `{ type: 'audio', dataUrl }`, or `{ type: 'video', dataUrl }`.
 Document-capable providers also accept `{ type: 'document', dataUrl }` or
-`{ type: 'document', url }` for PDFs. Remote audio/video parts use `url` and
+`{ type: 'document', url }` for their supported formats. `documentMimeTypes`
+lists inline formats and defaults to PDF for custom providers that omit it;
+OpenRouter profiles also support selected CSV, Office and image files. See
+[OpenRouter media](../guides/OPENROUTER_NATIVE.md#common-media-and-capability-profiles).
+Remote audio/video parts use `url` and
 `mimeType`; remote image input may include `mimeType`, which Gemini requires.
 Each media part has exactly one source. New remote audio/video/document inputs
 require HTTPS without credentials or fragments and are forwarded without fetching.
@@ -253,7 +257,9 @@ for model requirements and handling an absent target.
 Jev accepts explicitly null counts as unknown; OpenAI Decisions, Cloudflare, Gemini and native OpenRouter
 require reported integer counts. Gemini requires zero output tokens and retains
 native modality counts in `meta.geminiDecisions.usage`. OpenAI and
-Anthropic cache creation/read counts are preserved separately when provided;
+Anthropic cache creation/read counts are preserved separately when provided.
+OpenAI's optional cache-write lifetime breakdown is retained in
+`meta.openaiDecisions.usage.input_tokens_details.cache_write_tokens_details`.
 Cloudflare forwards reported usage without estimating additional fields. The SDK
 does not calculate prices, cache savings or token estimates.
 
@@ -284,6 +290,16 @@ unavailable metadata exists. Result objects and nested data returned by the brid
 are immutable. Standalone common `validateRequest` and `validateResult` return
 snapshots without freezing them; dedicated extraction and Live validators return
 frozen snapshots.
+
+Response objects may contain additional JSON properties. Native response envelopes
+preserve them, and provider metadata retains extensions within its reported data,
+including native usage. Common results and `validateResult()` retain only the
+documented result, answer and usage fields, plus extensible `meta`. Unknown
+properties do not change answer values or result schema versions. Fields defined
+only on another answer type remain opaque native extensions. Required fields,
+known values, question IDs, distribution labels and refusal/error handling remain
+validated. All response data, including extensions, must satisfy JSON safety and
+resource limits. Request and operational option schemas remain strict.
 
 `schemaVersion` is selected by the highest applicable feature: 8 for explicit image
 or video `resolution`; 7 for document input,
@@ -460,8 +476,9 @@ factory selects native decision providers.
 | `custom/generative` | `buildResponseSchema`, `buildPrompt`, `parseGeneratedJson`, `normalizeGenerated` | Typed legacy generative strategy helpers |
 
 `AnthropicOptions` supports `responseFormat: 'tool' | 'json_schema'` and
-`apiVersion: '2023-06-01' | '2026-10-21'`. Defaults remain `tool` and `2023-06-01`.
-The options are independent and apply through `createGenerativeProvider` too.
+`apiVersion: '2023-06-01' | '2026-10-21'`. The output default follows the effective
+model; the API version defaults independently to `2023-06-01`.
+Both options also apply through `createGenerativeProvider`.
 See [Anthropic output and version settings](../guides/CUSTOM_GENERATIVE.md#json-output-and-api-versions)
 for parameter restrictions, thinking-block handling and canonical result semantics.
 
@@ -476,14 +493,17 @@ and validate/freeze wrappers; they do not implement a new protocol. Both kinds
 work with the same bridge, extensions, cancellation, and batch API.
 
 Generative results always use elicited probabilities and unavailable confidence.
-The bridge rejects native provenance and answer confidence from that path.
+The bridge rejects native provenance and confidence on common choice, score or
+box answers from that path. Properties outside the selected answer type follow
+the [common projection rules](#returned-data).
 Supplied probability/confidence provenance labels must be nonempty strings;
 decision providers may preserve custom string labels. Generative prompt and
 normalization helpers independently validate the shared-state, legacy-question
 profile and explicitly reject unsupported request capabilities.
 Decision-kind classification alone does not require confidence or known counts;
-`validateResult(result, questions, { native: true })` is a separate strict validation option used for
-Jev's contract. See [custom decision](../guides/CUSTOM_DECISION.md),
+`validateResult(result, questions, { native: true })` applies native confidence/count
+requirements; additive response properties still follow common projection rules.
+See [custom decision](../guides/CUSTOM_DECISION.md),
 [custom generative](../guides/CUSTOM_GENERATIVE.md), and the shared
 [custom contract](../guides/CUSTOM_PROVIDERS.md).
 

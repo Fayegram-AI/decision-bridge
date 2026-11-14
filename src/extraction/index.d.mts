@@ -17,10 +17,10 @@ export interface ExtractionRequest<F extends ExtractionFields = ExtractionFields
     readonly reference_date?: string;
     readonly options?: { readonly include_quantiles?: boolean; readonly return_state_text?: boolean; readonly rejectIfBusy?: boolean };
 }
-export interface ExtractionAnswer {
+export interface ExtractionAnswer<Span = readonly [number, number]> {
     readonly type: ExtractionFieldType; readonly value: JsonValue; readonly guess?: JsonValue;
     readonly confidence?: number; readonly p_null?: number; readonly span?: readonly [number, number];
-    readonly spans?: readonly (readonly [number, number])[]; readonly mean?: JsonValue; readonly median?: JsonValue;
+    readonly spans?: readonly Span[]; readonly mean?: JsonValue; readonly median?: JsonValue;
     readonly p10?: JsonValue; readonly p90?: JsonValue; readonly p_below?: number; readonly p_above?: number;
     readonly quantiles?: readonly JsonValue[]; readonly steps?: readonly JsonValue[];
     readonly [key: string]: unknown;
@@ -75,15 +75,15 @@ export interface ExtractionProvider<R = CommonExtractionRequest, T = AnyExtracti
     validateResult(result: unknown, request: R): T;
 }
 export type OpenRouterExtractionOptions = import('../openrouter.mjs').OpenRouterNativeOptions;
-export type OpenRouterExtractionAsset = import('../openrouter.mjs').OpenRouterImageAsset
+export type OpenRouterExtractionAsset = { readonly type?: 'image'; readonly format: 'png' | 'jpg' | 'jpeg' | 'webp'; readonly data_base64: string }
     | { readonly type?: 'document'; readonly format: 'pdf'; readonly data_base64: string };
 export interface OpenRouterExtractionRequest<F extends ExtractionFields = ExtractionFields> extends OpenRouterRequestMetadata {
-    readonly model?: string; readonly state: string; readonly fields: F; readonly reference_date?: string;
+    readonly model?: string; readonly state?: string; readonly fields: F; readonly reference_date?: string;
     readonly assets?: Readonly<Record<string, OpenRouterExtractionAsset>>;
 }
 type OpenRouterFieldValue<T extends ExtractionFieldType, I> = T extends 'forecast' ? readonly (number | string)[] | null : FieldValue<T, I>;
 export type OpenRouterExtractionResponse<F extends ExtractionFields = ExtractionFields> = Pick<ExtractionResponse<F>, 'model' | 'usage'> & {
-    readonly answers: { readonly [K in keyof F]: ExtractionAnswer & {
+    readonly answers: { readonly [K in keyof F]: ExtractionAnswer<readonly [number, number] | null> & {
         readonly type: F[K]['type']; readonly value: OpenRouterFieldValue<F[K]['type'], F[K]['items']>;
     } };
     readonly truncated?: boolean; readonly state_text?: string | null; readonly id?: string; readonly provider?: string;

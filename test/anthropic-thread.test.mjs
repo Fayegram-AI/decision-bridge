@@ -9,6 +9,43 @@ const reply = (id, mode = 'json_schema') => ({ id, model: 'served', stop_reason:
         : [{ type: 'text', text: JSON.stringify({ answers: { q: { noul: 0.7 } } }) }], usage: { input_tokens: 2, output_tokens: 1 } });
 const provider = extra => new AnthropicProvider({ model: 'selected', apiKey: 'fixture', responseFormat: 'json_schema', ...extra });
 
+test('thread defaults apply only to omitted options and explicit null values fail before HTTP', async () => {
+    for (const mode of ['json_schema', 'tool']) {
+        let calls = 0;
+        const client = provider({ responseFormat: mode, fetchImpl: async () => {
+            calls++; return Response.json(reply(String(calls), mode));
+        } });
+        for (const [options, code] of [[{ model: null }, 'VALIDATION_ERROR'],
+            [{ maxTurns: null }, 'CONFIGURATION_ERROR'], [{ maxHistoryBytes: null }, 'CONFIGURATION_ERROR']]) {
+            assert.throws(() => client.createThread({ questions, ...options }), { code });
+        }
+        assert.equal(calls, 0);
+        for (const options of [{}, { model: undefined, maxTurns: undefined, maxHistoryBytes: undefined }]) {
+            const thread = client.createThread({ questions, ...options });
+            assert.equal((await thread.evaluate('accepted')).meta.responseFormat, mode);
+            thread.dispose();
+        }
+        assert.equal(calls, 2);
+    }
+});
+
+test('omitted thread format follows fixed model override across continuation and recovery', async () => {
+    const bodies = [];
+    const client = new AnthropicProvider({ apiKey: 'fixture', model: 'legacy', fetchImpl: async (_url, init) => {
+        const body = JSON.parse(init.body); bodies.push(body);
+        assert.equal(body.model, 'claude-sonnet-5-5');
+        assert.equal(body.output_config.format.type, 'json_schema');
+        assert.equal(body.tool_choice, undefined);
+        if (bodies.length === 2) return Response.json({ error: { type: 'not_found_error', details: { error_code: 'thread_not_found' } } }, { status: 404 });
+        return Response.json(reply(String(bodies.length)));
+    } });
+    const thread = client.createThread({ model: 'claude-sonnet-5-5', questions });
+    assert.equal((await thread.evaluate('first')).meta.responseFormat, 'json_schema');
+    assert.equal((await thread.evaluate('second')).meta.responseFormat, 'json_schema');
+    assert.equal(bodies[2].messages.length, 3);
+    thread.dispose();
+});
+
 for (const mode of ['json_schema', 'tool']) test(`explicit ${mode} threads preserve cumulative history and independent evaluations`, async () => {
     const bodies = [];
     const client = provider({ responseFormat: mode, workspaceId: 'workspace', fetchImpl: async (_url, init) => {

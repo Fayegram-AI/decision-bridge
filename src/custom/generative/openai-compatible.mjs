@@ -3,7 +3,7 @@ import { DecisionError, withResponseMeta, requireCondition as check } from '../.
 import { cloneJson, isRecord, validateRequest } from '../../validation.mjs';
 import { assertCapabilities, LEGACY_CAPABILITIES } from '../../capabilities.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../../transport.mjs';
-import { environmentValue } from '../../runtime-env.mjs';
+import { providerEnvironmentValue } from '../../runtime-env.mjs';
 import { buildPrompt, buildResponseSchema, normalizeGenerated, parseGeneratedJson } from './schema.mjs';
 import { generationOptions, chatUsage } from './shared.mjs';
 
@@ -24,7 +24,7 @@ export class OpenAICompatibleProvider {
     const endpoint = parseBaseURL(baseURL);
     // Never send an ambient OpenAI key to a caller-specified third-party endpoint.
     const supplied = apiKey === undefined && endpoint.origin === 'https://api.openai.com'
-      ? environmentValue('OPENAI_API_KEY') : apiKey;
+      ? providerEnvironmentValue('OPENAI_API_KEY') : apiKey;
     check(supplied !== null || endpoint.loopback,
       'Unauthenticated connections require an explicitly configured loopback endpoint.', 'CONFIGURATION_ERROR');
     const key = supplied === null ? null : validateApiKey(supplied, 'the selected provider API key');
@@ -89,7 +89,7 @@ export class OpenAICompatibleProvider {
 export class OpenRouterProvider extends OpenAICompatibleProvider {
   name = 'openrouter';
   constructor(configuration = {}) {
-    const { apiKey = environmentValue('OPENROUTER_API_KEY'), parameters = {}, ...options } = optionsObject(configuration,
+    const { apiKey = providerEnvironmentValue('OPENROUTER_API_KEY'), parameters = {}, ...options } = optionsObject(configuration,
       ['apiKey', 'model', 'responseFormat', 'tokenParameter', 'maxTokens', 'parameters', ...TRANSPORT_FIELDS], 'OpenRouter options');
     const safeParameters = cloneJson(parameters, 'parameters', 'CONFIGURATION_ERROR');
     check(isRecord(safeParameters), 'parameters must be an object.', 'CONFIGURATION_ERROR');

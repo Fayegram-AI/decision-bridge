@@ -27,7 +27,7 @@ test('extraction namespace defaults to Clairic and validates/initializes without
     assert.equal(initialized.code, 0, initialized.stderr);
     const config = JSON.parse(await readFile(join(cwd, 'decision.config.json'), 'utf8'));
     assert.equal(config.provider, 'cloudflare-extraction');
-    assert.equal(config.apiKeyEnv, 'CLOUDFLARE_API_TOKEN');
+    assert.equal(config.apiKeyEnv, undefined);
     const sample = await invoke(['extraction', 'validate', 'request.json', '--config', 'decision.config.json'], undefined, { cwd });
     assert.equal(sample.code, 0, sample.stderr);
     const ajvModule = await import('ajv/dist/2020.js'); const ajv = new ajvModule.default({ strict: false });

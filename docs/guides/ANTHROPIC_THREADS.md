@@ -35,6 +35,10 @@ turns. Concurrent evaluations on the same thread reject with `THREAD_BUSY`.
 aborts outstanding work and clears retained state; it does not delete server
 storage. Neither operation can change the questions or model.
 
+An omitted `responseFormat` follows the fixed thread model using the preset's
+[model-aware defaults](CUSTOM_GENERATIVE.md#anthropic). The same format is used
+for creation, continuation and recovery.
+
 The SDK sends the beta header `message-threads-2026-08-12`. The first request
 creates a thread with the complete prompt, tools/schema and history. A
 continuation sends the next turn and the preceding response's message ID.
@@ -43,8 +47,10 @@ does not execute application tools. JSON-schema mode retains ordered text and
 thinking/signature blocks needed for replay. No prompt-cache controls are added.
 
 The SDK retains bounded in-memory history. Defaults are 128 accepted turns and
-8 MiB of history, reduced to the configured request budget when smaller. Explicit
-history bytes must fit the provider request budget; complete serialized requests
+8 MiB of history, reduced to the configured request budget when smaller. An
+omitted model uses the provider's configured model. Explicit `null` values for
+`model`, `maxTurns` or `maxHistoryBytes` are invalid. Explicit history bytes must
+fit the provider request budget; complete serialized requests
 must also fit that budget. Exceeding either history bound raises `HISTORY_LIMIT`.
 Failed, refused, truncated or invalid turns never enter accepted history.
 

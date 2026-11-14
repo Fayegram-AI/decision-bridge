@@ -187,11 +187,11 @@ test('bridge, provider, batch and extension reject misspelled operational option
   await assert.rejects(provider.evaluate(request, { timeoutMs: 5 }), { code: 'CONFIGURATION_ERROR' });
 });
 
-test('result validation rejects unexpected decision, usage and envelope fields', () => {
+test('result validation projects additive fields onto the common result shape', () => {
   for (const mutate of [r => { r.extra = true; }, r => { r.answers.yes.explanation = 'extra'; },
     r => { r.answers.route.extra = true; }, r => { r.usage.extra = 0; }]) {
     const data = copy(response); mutate(data);
-    assert.throws(() => validateResult(data, request.questions), { code: 'INVALID_RESPONSE' });
+    assert.deepEqual(validateResult(data, request.questions), response);
   }
 });
 

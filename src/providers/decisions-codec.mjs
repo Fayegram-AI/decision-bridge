@@ -45,9 +45,10 @@ export function decodeCommonDecision(decision, request, meta) {
     const answerDetails = {};
     const answers = Object.fromEntries(Object.entries(request.questions).map(([id, q], index) => {
         const native = decision.answers[index];
-        const probabilities = new Map(native.probabilities?.map(item => [item.value, item.probability]) ?? []);
+        // Predicate extensions can reuse field names defined on other answer variants.
+        const probabilities = new Map(native.type === 'choice' ? native.probabilities.map(item => [item.value, item.probability]) : []);
         Object.defineProperty(answerDetails, id, { enumerable: true, configurable: true, writable: true,
-            value: { type: native.type, ...(own(native, 'confidence') ? { confidence: native.confidence } : {}) } });
+            value: { type: native.type, ...(['choice', 'score'].includes(native.type) ? { confidence: native.confidence } : {}) } });
         if (q.type === 'noul') return [id, { type: 'noul', noul: native.type === 'predicate' ? native.probability
             : probabilities.get(true) }];
         if (q.type === 'choice') return [id, { type: 'choice', choice: native.choice, confidence: native.confidence,

@@ -7,28 +7,31 @@ import { openRouterSettings, openRouterTransport, openRouterRequest, openRouterR
 import { validateOpenRouterAssets } from '../providers/openrouter-assets.mjs';
 import { validateExtractionStructure, validateExtractionField, validateExtractionResponse } from './validation.mjs';
 import { extractionResult } from './result.mjs';
+import { validateOpenRouterFields } from './openrouter-profile.mjs';
 
 const common = ['type', 'instructions', 'null_threshold'];
 const predictive = ['min', 'max', 'step', 'scale', 'unit'];
-const keys = { text: [], date: [], datetime: [], time: [], number: ['unit', 'integer', 'decimals'],
-    duration: ['unit', 'integer', 'decimals'], list: ['items', 'decimals'], estimate: predictive,
+const keys = { text: ['unit'], date: ['unit'], datetime: ['unit'], time: ['unit'], number: ['unit', 'integer', 'decimals'],
+    duration: ['unit', 'integer', 'decimals'], list: ['items', 'unit', 'integer', 'decimals'], estimate: predictive,
     forecast: [...predictive, 'horizon', 'interval'] };
 
 export function prepareOpenRouterExtraction(input, settings = {}) {
     const request = openRouterRequest(input, settings, ['state', 'fields', 'assets', 'reference_date']);
-    check(typeof request.state === 'string' && (request.state.length > 0 || Object.keys(request.assets ?? {}).length > 0),
+    check((request.state === undefined || typeof request.state === 'string') &&
+        ((request.state?.length ?? 0) > 0 || isRecord(request.assets) && Object.keys(request.assets).length > 0),
         'Extraction requires state text or assets.');
     check(isRecord(request.fields) && Object.keys(request.fields).length > 0, 'Extraction requires named fields.');
     for (const [name, spec] of Object.entries(request.fields)) {
         check(name.trim() && isRecord(spec) && Object.hasOwn(keys, spec.type) && Object.keys(spec).every(k => [...common, ...keys[spec.type]].includes(k)),
             'Invalid extraction field.');
-        validateExtractionField(spec, { allowZeroThreshold: true });
+        validateExtractionField(spec, { allowZeroThreshold: true, numericListInteger: true });
         check(spec.decimals === undefined || spec.decimals <= 6, 'OpenRouter decimals must be between 0 and 6.');
         if (spec.type === 'forecast') check(spec.horizon !== undefined && spec.horizon <= 64 && spec.interval !== undefined,
             'OpenRouter forecast requires a horizon from 1 to 64 and an interval.');
     }
     check(request.reference_date === undefined || typeof request.reference_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(request.reference_date),
         'reference_date must be an ISO date.');
+    validateOpenRouterFields(request);
     serializeRequestBody(request, settings.maxRequestBytes);
     validateOpenRouterAssets(request, { extraction: true });
     return freezeJson(request);
@@ -36,7 +39,7 @@ export function prepareOpenRouterExtraction(input, settings = {}) {
 
 /** Keep the reusable common snapshot separate from its provider-specific wire form. */
 function prepareCommonExtraction(input, settings) {
-    const request = validateExtractionStructure(input);
+    const request = validateExtractionStructure(input, { allowZeroThreshold: true, numericListInteger: true });
     check(request.options === undefined || Object.keys(request.options).length === 0,
         'Cloudflare extraction options are not portable; configure OpenRouter providerPreferences.options explicitly.', 'UNSUPPORTED_CAPABILITY');
     const assets = {};
@@ -44,14 +47,14 @@ function prepareCommonExtraction(input, settings) {
     const refs = (request.images ?? []).map((image, index) => {
         const data = typeof image === 'string' ? embeddedDataUrl(image, 'image')
             : { format: image.content_type, payload: image.base64 };
-        check(['image/png', 'image/jpeg', 'image/jpg'].includes(data.format), 'OpenRouter extraction assets require PNG/JPEG.');
+        check(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(data.format), 'OpenRouter extraction assets require PNG/JPEG/WebP.');
         let reference = `__decision_bridge_image_${index}__`;
         while (occupied.includes(reference) || Object.hasOwn(assets, reference)) reference += '_';
-        assets[reference] = { type: 'image', format: data.format === 'image/png' ? 'png' : 'jpg', data_base64: data.payload };
+        assets[reference] = { type: 'image', format: data.format === 'image/jpeg' ? 'jpg' : data.format.slice(6), data_base64: data.payload };
         return reference;
     });
     const native = prepareOpenRouterExtraction({ ...(request.model === undefined ? {} : { model: request.model }),
-        state: [request.state ?? '', ...refs].filter(Boolean).join('\n'), fields: request.fields,
+        ...(request.state ? { state: [request.state, ...refs].join('\n') } : {}), fields: request.fields,
         ...(request.reference_date === undefined ? {} : { reference_date: request.reference_date }),
         ...(refs.length ? { assets } : {}),
     }, settings);

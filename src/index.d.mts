@@ -140,7 +140,8 @@ export interface ProviderResult<Q extends Questions = Questions> {
   readonly answers: { readonly [K in keyof Q]: AnswerFor<Q[K]> };
   readonly usage: Usage;
   readonly meta?: Readonly<Record<string, JsonValue>> & { readonly openaiDecisions?: OpenAIDecisionsMetadata; readonly cloudflareDecisions?: CloudflareDecisionsMetadata;
-      readonly geminiDecisions?: import('./gemini-decisions.mjs').GeminiDecisionsMetadata };
+      readonly geminiDecisions?: import('./gemini-decisions.mjs').GeminiDecisionsMetadata;
+      readonly openRouter?: import('./openrouter.mjs').OpenRouterMetadata };
 }
 export interface Metadata {
   readonly provider: string; readonly providerKind: ProviderKind; readonly requestedModel: string;
@@ -155,6 +156,7 @@ export interface Metadata {
   readonly durationMs?: number; readonly attempts?: number; readonly requestId?: string;
   readonly openaiDecisions?: OpenAIDecisionsMetadata;
   readonly geminiDecisions?: import('./gemini-decisions.mjs').GeminiDecisionsMetadata;
+  readonly openRouter?: import('./openrouter.mjs').OpenRouterMetadata;
   readonly cloudflareDecisions?: CloudflareDecisionsMetadata; readonly gatewayLogId?: string;
   readonly [key: string]: unknown;
 }
@@ -188,6 +190,8 @@ export interface Capabilities {
     readonly imageResolutions?: readonly DecisionImageResolution[];
     readonly videoResolutions?: readonly DecisionVideoResolution[];
     readonly documents?: boolean; readonly remoteAudio?: boolean; readonly remoteVideos?: boolean; readonly remoteDocuments?: boolean;
+    /** Accepted inline document MIME types; omitted custom profiles default to PDF. */
+    readonly documentMimeTypes?: readonly string[];
     readonly maxDocuments?: number | null;
     readonly questionContentTypes?: readonly ('text' | 'image' | 'json')[];
     readonly jsonInput?: boolean; readonly questionContent?: boolean;

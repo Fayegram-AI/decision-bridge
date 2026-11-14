@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBridge, createProvider, OpenAIDecisionsProvider, JevProvider, choice, noul, score, scoreLevels, decideChoice, evaluateBatch, publicError, validateRequest } from '../src/index.mjs';
+import { createBridge, createProvider, OpenAIDecisionsProvider, JevProvider, choice, noul, score, scoreLevels, decideChoice, evaluateBatch, publicError, validateRequest, validateResult } from '../src/index.mjs';
 import { OpenAICompatibleProvider, AnthropicProvider, buildResponseSchema } from '../src/custom/generative/index.mjs';
 import { image, usage, decisionResponse } from './decisions-fixtures.mjs';
 import { jsonResponse } from './fixtures.mjs';
@@ -21,6 +21,38 @@ function fixture(mutate = () => {}, options = {}) {
     } });
     return { provider, requests, bridge: createBridge({ provider }) };
 }
+
+test('OpenAI native/common usage preserves optional zero and nonzero cache-write lifetime counts', async () => {
+    for (const breakdown of [undefined, { ttl_30m_tokens: 0, ttl_12h_tokens: 0 }, { ttl_30m_tokens: 3000, ttl_12h_tokens: 4000 }]) {
+        const { provider, bridge } = fixture(data => {
+            if (breakdown === undefined) return;
+            data.usage.input_tokens = data.usage.total_tokens = 12000;
+            data.usage.input_tokens_details = { cached_tokens: 4000,
+                cache_write_tokens: breakdown.ttl_30m_tokens + breakdown.ttl_12h_tokens,
+                cache_write_tokens_details: structuredClone(breakdown) };
+        });
+        const direct = await provider.createDecision(native);
+        const result = await bridge.evaluate(common);
+        assert.deepEqual(direct.decision.usage.input_tokens_details.cache_write_tokens_details, breakdown);
+        assert.deepEqual(result.meta.openaiDecisions.usage, direct.decision.usage);
+        assert.equal(result.usage.cache_creation_input_tokens, direct.decision.usage.input_tokens_details.cache_write_tokens);
+        assert.equal(result.usage.cache_read_input_tokens, direct.decision.usage.input_tokens_details.cached_tokens);
+        const saved = validateResult(JSON.parse(JSON.stringify(result)), common.questions, { native: true });
+        assert.deepEqual(saved.meta.openaiDecisions.usage, direct.decision.usage);
+        if (breakdown) assert(Object.isFrozen(direct.decision.usage.input_tokens_details.cache_write_tokens_details));
+        assert.equal(result.answers.yes.noul, 0.7);
+    }
+});
+
+test('OpenAI cache-write breakdown rejects malformed shapes and counters with safe diagnostics', async () => {
+    for (const breakdown of [null, [], 'invalid', {}, { ttl_30m_tokens: 0 }, { ttl_30m_tokens: 0, ttl_12h_tokens: -1 },
+        { ttl_30m_tokens: 0.5, ttl_12h_tokens: 0 }, { ttl_30m_tokens: '0', ttl_12h_tokens: 0 },
+        { ttl_30m_tokens: 0, ttl_12h_tokens: Number.MAX_SAFE_INTEGER + 1 }]) {
+        const { provider } = fixture(data => { data.usage.input_tokens_details.cache_write_tokens_details = breakdown; });
+        await assert.rejects(provider.createDecision(native), error => error.code === 'INVALID_RESPONSE' &&
+            error.requestId === 'fixture-request-id' && !JSON.stringify(publicError(error)).includes('private upstream body'));
+    }
+});
 
 test('native common mapping preserves legacy contracts, criteria and usage', async () => {
     const { bridge, requests } = fixture();
@@ -96,7 +128,6 @@ for (const [label, mutate] of [
     ['invalid probability', d => { d.answers[0].probability = 1.1; }],
     ['missing usage', d => { delete d.usage; }],
     ['negative cache usage', d => { d.usage.input_tokens_details.cached_tokens = -1; }],
-    ['invented field', d => { d.explanation = 'private upstream body'; }],
 ]) test(`native response rejects ${label} with safe HTTP diagnostics`, async () => {
     const { provider } = fixture(mutate);
     await assert.rejects(provider.createDecision(native), error => error.code === 'INVALID_RESPONSE' &&

@@ -105,8 +105,6 @@ for (const [label, mutate] of [
   ['string probability', d => { d.answers.route.probabilities.a = '0.8'; }],
   ['invalid probability', d => { d.answers.route.probabilities.a = -0.8; }],
   ['wrong total', d => { d.answers.route.probabilities.a = 0.1; }],
-  ['extra confidence', d => { d.answers.route.confidence = 0.9; }],
-  ['extra top-level content', d => { d.explanation = 'x'; }],
   ['invalid noul', d => { d.answers.yes.noul = 1.1; }],
 ]) {
   test(`generated normalization rejects ${label}`, () => {

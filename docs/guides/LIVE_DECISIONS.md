@@ -70,6 +70,10 @@ Questions use the native predicate/choice/score representation. A sparse Decisio
 delegation update can omit `decisions` and set `acknowledgement_delay_ms` from
 0 through 800. `session.started` and `session.updated` carry resolved snapshots.
 
+Received events preserve additive JSON properties, including nested configuration,
+question and item fields. Required data and known values remain validated.
+Outgoing commands accept the documented request fields only.
+
 Decision items include system, developer, user and assistant messages containing
 text, images or `input_json` parts, plus function/custom tool calls and outputs.
 Assistant messages may carry `phase`. IDs, tool namespaces and statuses retain
@@ -92,6 +96,8 @@ delegation ID or null; any service rejection is reported as an error event.
 
 Completed native decisions arrive as `type: 'decision'` notifications containing
 the full model, ordered answers and usage. Native refusal answers are preserved.
+Reported cache-write lifetime counts are retained in
+`decision.usage.input_tokens_details.cache_write_tokens_details` when present.
 
 `correlation` contains `matched`, `stale`, source event ID/type, delegation ID, trigger
 ID and a configuration generation when known. Match quality describes how well a result

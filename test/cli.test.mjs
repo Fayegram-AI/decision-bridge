@@ -119,7 +119,7 @@ test('init writes useful templates without replacing existing files', async t =>
   const result = await child(['init', 'project'], { cwd });
   assert.equal(result.code, 0, result.stderr);
   const config = JSON.parse(await readFile(join(cwd, 'project/decision.config.json'), 'utf8'));
-  assert.equal(config.provider, 'jev'); assert.equal(config.apiKeyEnv, 'TYPESAFE_API_KEY');
+  assert.equal(config.provider, 'jev'); assert.equal(config.apiKeyEnv, undefined);
   assert.equal(config.model, 'jev-latest');
   assert.equal((await child(['init', 'project'], { cwd })).code, 2);
 });

@@ -162,11 +162,10 @@ test('native reference validation follows whole-value and ordered non-overlappin
     assert.equal(calls, 5);
 });
 
-test('box results enforce exact coordinates, positive area and native confidence', async () => {
+test('box results enforce required coordinates, positive area and native confidence', async () => {
     for (const mutate of [
         result => { result.answers.target.box.left = -0.1; },
         result => { result.answers.target.box.top = result.answers.target.box.bottom; },
-        result => { result.answers.target.box.extra = 1; },
         result => { delete result.answers.target.box.right; },
         result => { result.answers.target.box = null; },
         result => { result.answers.target.box.left = '0.2'; },

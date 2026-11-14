@@ -188,11 +188,12 @@ async function nativeSelection() {
     const provider = createProvider({ type: 'openai-decisions', model: 'luna', apiKey: 'compile-only' });
     const native = await provider.createDecision({ input: '', questions: [{ type: 'predicate', instructions: 'True?' }] });
     const metadata: OpenAIDecisionsTransportMetadata = native.meta;
+    const ttl: number | undefined = native.decision.usage.input_tokens_details.cache_write_tokens_details?.ttl_30m_tokens;
     const requested: string = metadata.requestedModel;
     const resolved: string = metadata.resolvedModel;
     const common = await createBridge({ provider }).evaluate({ state: '', questions: { q: noul('True?') } });
     const commonResolved: string | undefined = common.meta.resolvedModel;
-    return { requested, resolved, commonResolved };
+    return { requested, resolved, commonResolved, ttl };
 }
 void nativeSelection;
 async function jevSelection() {
