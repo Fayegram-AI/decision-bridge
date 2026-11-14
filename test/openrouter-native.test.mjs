@@ -25,7 +25,7 @@ test('native OpenRouter IDs, explicit endpoints, discovery and common metadata',
     assert.equal(result.meta.upstreamProvider, 'upstream');
     assert.equal(result.answers.q.confidence, undefined);
     assert.equal((await provider.listModels()).models[0].name, 'vendor/new-model');
-    assert.equal(calls[1].url, 'https://openrouter.ai/api/v1/models?output_modalities=decisions');
+    assert.equal(calls[1].url, 'https://openrouter.ai/api/v1/models?endpoints=%2Fapi%2Falpha%2Fdecisions');
     await native({ api: 'systemone', fetchImpl: async url => {
         assert.equal(url, 'https://openrouter.ai/api/v1/systemone'); return Response.json(decision);
     } }).createDecision({ state: 'Text', questions });

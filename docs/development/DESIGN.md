@@ -41,7 +41,11 @@ and models. Services may truncate input without reporting it; local byte limits 
 guarantee token fit. Invalid results fail explicitly so applications can apply their
 own error-handling policy.
 
-Clairic preserves additional safe native JSON and its truncation flag. Native
+Native responses preserve additive JSON properties after JSON safety and resource
+checks. Common results project documented answer and usage fields while retaining
+extensible metadata. Fields are interpreted only for answer variants that define
+them; required values and response correlation remain validated.
+Clairic also preserves predictive JSON and its truncation flag. Native
 OpenRouter responses retain optional distributions and confidence; common
 evaluation requires the distributions needed by its result contract. Live
 preserves native refusal events and marks ambiguous correlation as unmatched.

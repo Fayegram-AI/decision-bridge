@@ -1,5 +1,5 @@
 import { DecisionError, requireCondition as check } from '../errors.mjs';
-import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
+import { cloneJson, freezeJson, isRecord, requireResponseFields, projectResponseFields } from '../validation.mjs';
 import { builtInCapabilities } from '../capabilities.mjs';
 import { OPENAI_DEFAULT_MODEL } from './openai-profile.mjs';
 import { fields, validateCacheOptions, validateDecisionInput, validateDecisionQuestions } from './decisions-input.mjs';
@@ -27,19 +27,33 @@ const probability = value => invalid(typeof value === 'number' && Number.isFinit
 const tokens = value => invalid(Number.isSafeInteger(value) && value >= 0, 'Invalid decision token usage.');
 
 function validateUsage(usage) {
-    fields(usage, ['input_tokens', 'output_tokens', 'total_tokens', 'input_tokens_details', 'output_tokens_details'],
-        ['input_tokens', 'output_tokens', 'total_tokens', 'input_tokens_details', 'output_tokens_details'], 'usage', 'INVALID_RESPONSE');
+    requireResponseFields(usage, ['input_tokens', 'output_tokens', 'total_tokens', 'input_tokens_details', 'output_tokens_details'], 'usage');
     for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) tokens(usage[key]);
-    fields(usage.input_tokens_details, ['cached_tokens', 'cache_write_tokens'], ['cached_tokens', 'cache_write_tokens'], 'input usage', 'INVALID_RESPONSE');
-    fields(usage.output_tokens_details, ['reasoning_tokens'], ['reasoning_tokens'], 'output usage', 'INVALID_RESPONSE');
-    Object.values(usage.input_tokens_details).forEach(tokens);
-    Object.values(usage.output_tokens_details).forEach(tokens);
+    requireResponseFields(usage.input_tokens_details, ['cached_tokens', 'cache_write_tokens'], 'input usage');
+    requireResponseFields(usage.output_tokens_details, ['reasoning_tokens'], 'output usage');
+    for (const key of ['cached_tokens', 'cache_write_tokens']) tokens(usage.input_tokens_details[key]);
+    if (Object.hasOwn(usage.input_tokens_details, 'cache_write_tokens_details')) {
+        const details = usage.input_tokens_details.cache_write_tokens_details;
+        requireResponseFields(details, ['ttl_30m_tokens', 'ttl_12h_tokens'], 'cache-write usage');
+        for (const key of ['ttl_30m_tokens', 'ttl_12h_tokens']) tokens(details[key]);
+    }
+    tokens(usage.output_tokens_details.reasoning_tokens);
+}
+
+/** Public refusal diagnostics contain only understood counters, never opaque extensions. */
+function errorUsage(usage) {
+    const input = projectResponseFields(usage.input_tokens_details, ['cached_tokens', 'cache_write_tokens']);
+    if (Object.hasOwn(usage.input_tokens_details, 'cache_write_tokens_details')) input.cache_write_tokens_details =
+        projectResponseFields(usage.input_tokens_details.cache_write_tokens_details, ['ttl_30m_tokens', 'ttl_12h_tokens']);
+    return { ...projectResponseFields(usage, ['input_tokens', 'output_tokens', 'total_tokens']), input_tokens_details: input,
+        output_tokens_details: projectResponseFields(usage.output_tokens_details, ['reasoning_tokens']) };
 }
 
 /** Refusals are failures even when valid sibling answers exist. No partial success. */
 export function validateDecisionResponse(input, request, { allowRefusals = false } = {}) {
     const data = cloneJson(input, 'native decision response', 'INVALID_RESPONSE');
-    fields(data, ['model', 'answers', 'usage'], ['model', 'answers', 'usage'], 'decision response', 'INVALID_RESPONSE');
+    requireResponseFields(data, ['model', 'answers', 'usage'], 'decision response');
+    invalid(!data.error, 'Provider returned an error response.');
     invalid(typeof data.model === 'string' && data.model.trim().length > 0, 'Missing reported model.');
     validateUsage(data.usage);
     // Live can deliver a native result before its configuration is observed.
@@ -74,19 +88,19 @@ export function validateDecisionResponse(input, request, { allowRefusals = false
         const q = request.questions[index];
         invalid(isRecord(answer) && answer.name === (q.name ?? null), 'Decision answer name/order mismatch.');
         if (answer.type === 'refusal') {
-            fields(answer, ['type', 'name'], ['type', 'name'], 'refusal', 'INVALID_RESPONSE');
+            requireResponseFields(answer, ['type', 'name'], 'refusal');
             refusedQuestions.push({ index, name: answer.name });
             continue;
         }
         invalid(answer.type === q.type, 'Decision answer type mismatch.');
         if (q.type === 'predicate') {
-            fields(answer, ['type', 'name', 'probability'], ['type', 'name', 'probability'], 'predicate answer', 'INVALID_RESPONSE');
+            requireResponseFields(answer, ['type', 'name', 'probability'], 'predicate answer');
             probability(answer.probability);
             continue;
         }
         const selectedField = q.type === 'choice' ? 'choice' : 'score';
         const keys = ['type', 'name', 'confidence', 'probabilities', selectedField];
-        fields(answer, keys, keys, 'decision answer', 'INVALID_RESPONSE');
+        requireResponseFields(answer, keys, 'decision answer');
         invalid(typeof answer.confidence === 'number' && Number.isFinite(answer.confidence), 'Invalid native confidence.');
         const supplied = q.type === 'choice' ? q.choices : q.levels;
         invalid(Array.isArray(answer.probabilities) && answer.probabilities.length === supplied.length, 'Decision distribution count mismatch.');
@@ -96,7 +110,7 @@ export function validateDecisionResponse(input, request, { allowRefusals = false
         let mean = 0;
         for (const item of answer.probabilities) {
             const keys = q.type === 'choice' ? ['value', 'probability'] : ['value', 'label', 'probability'];
-            fields(item, keys, keys, 'decision probability', 'INVALID_RESPONSE');
+            requireResponseFields(item, keys, 'decision probability');
             invalid(values.has(item.value) && !seen.has(item.value), 'Decision distribution values mismatch.');
             seen.add(item.value);
             probability(item.probability);
@@ -113,7 +127,7 @@ export function validateDecisionResponse(input, request, { allowRefusals = false
         'Decision score is inconsistent with its rubric.');
     }
     if (refusedQuestions.length && !allowRefusals) throw new DecisionError('The model refused one or more decision questions.', {
-        code: 'MODEL_REFUSAL', refusedQuestions, usage: data.usage,
+        code: 'MODEL_REFUSAL', refusedQuestions, usage: errorUsage(data.usage),
     });
     return freezeJson(data);
 }

@@ -34,7 +34,7 @@ Application / CLI
         +-- custom/decision: new native decision protocol
         +-- custom/generative: OpenAI-compatible / OpenRouter / Anthropic or new protocol
         |
-  canonical result validation using provider precision policy
+  canonical result validation and projection using provider precision policy
         |
   immutable result + bounded observation
         |
@@ -45,6 +45,10 @@ Native Jev, OpenAI, Cloudflare, OpenRouter and Gemini providers also expose `cre
 Common and native paths share provider validation, codecs, and bounded transport.
 Direct native calls use provider deadlines; bridge calls additionally enforce the
 shared evaluation deadline and extension lifecycle.
+
+Native envelopes preserve additive JSON properties. Common results project the
+documented fields and retain extensible metadata. Codecs interpret fields by
+answer variant so opaque native extensions cannot become typed statistics.
 
 Application policy decides whether a downstream action is permitted. The SDK
 returns decisions without executing actions or maintaining an agent loop.
@@ -75,7 +79,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | --- | --- |
 | `src/index.mjs`, `src/index.d.mts` | Public runtime exports and TypeScript contract |
 | `src/bridge.mjs` | Orchestration, extension lifecycle, total deadline, immutable results |
-| `src/validation.mjs`, `src/input.mjs` | Lossless snapshots, common input and result invariants |
+| `src/validation.mjs`, `src/input.mjs` | Lossless snapshots, common input/result invariants, native extension preservation and common projection |
 | `src/json-limits.mjs` | Default and maximum JSON node budgets shared by request and result validation |
 | `src/questions.mjs` | Immutable typed question builders, independent of inference selection |
 | `src/capabilities.mjs` | Provider/model capability checks and common schema versions |
@@ -100,6 +104,7 @@ See [OpenAI model selection](../guides/OPENAI_DECISIONS.md#model-selection).
 | `src/transport.mjs`, `src/response-transport.mjs` | Credential destinations, bounded bodies, safe errors, retries |
 | `src/async.mjs` | Deadlines and cancellation races |
 | `src/options.mjs` | Unknown-field/accessor rejection for options |
+| `src/runtime-env.mjs` | Browser-safe environment lookup and prefixed/unprefixed provider credential precedence |
 | `src/errors.mjs` | DecisionError and safe public diagnostics |
 | `src/batch.mjs` | Ordered bounded-concurrency SDK arrays |
 | `src/policy.mjs` | Explicit choice thresholds, without action execution |

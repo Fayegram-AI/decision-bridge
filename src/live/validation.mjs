@@ -7,36 +7,37 @@ export const TRANSCRIPTS = ['session.input_transcript.delta', 'session.output_tr
 const text = value => typeof value === 'string' && value.length > 0;
 const nullableId = value => value === null || text(value);
 
-export function validateLiveConfiguration(input, { resolved = false } = {}) {
+export function validateLiveConfiguration(input, { resolved = false, allowUnknown = false } = {}) {
     const config = cloneJson(input, 'Live Decisions configuration');
-    fields(config, ['delegation', 'triggers'], [], 'Live configuration');
+    fields(config, ['delegation', 'triggers'], [], 'Live configuration', 'VALIDATION_ERROR', allowUnknown);
     if (config.delegation !== undefined) {
         fields(config.delegation, ['type', 'decisions', 'acknowledgement_delay_ms'],
-            ['type', ...(resolved ? ['decisions'] : [])], 'delegation');
+            ['type', ...(resolved ? ['decisions'] : [])], 'delegation', 'VALIDATION_ERROR', allowUnknown);
         check(config.delegation.type === 'decisions', 'This controller configures Decisions delegation.');
         const delay = config.delegation.acknowledgement_delay_ms;
         check(delay === undefined || Number.isInteger(delay) && delay >= 0 && delay <= 800, 'Invalid acknowledgement delay.');
         const decisions = config.delegation.decisions;
         if (decisions !== undefined) {
-            fields(decisions, ['model', 'questions'], [], 'delegation decisions');
-            check(decisions.model === undefined || decisions.model === 'gpt-6-luna', 'Unsupported Live Decisions model.');
-            if (decisions.questions !== undefined) validateDecisionQuestions(decisions.questions);
+            fields(decisions, ['model', 'questions'], [], 'delegation decisions', 'VALIDATION_ERROR', allowUnknown);
+            check(decisions.model === undefined || (allowUnknown ? typeof decisions.model === 'string' && decisions.model.trim()
+                : decisions.model === 'gpt-6-luna'), 'Unsupported Live Decisions model.');
+            if (decisions.questions !== undefined) validateDecisionQuestions(decisions.questions, { allowUnknown });
         }
     }
     if (config.triggers !== undefined) {
         check(Array.isArray(config.triggers), 'triggers must be an array.');
         for (const trigger of config.triggers) {
-            fields(trigger, ['type', 'event_type', 'decisions'], ['type', 'event_type', 'decisions'], 'trigger');
+            fields(trigger, ['type', 'event_type', 'decisions'], ['type', 'event_type', 'decisions'], 'trigger', 'VALIDATION_ERROR', allowUnknown);
             check(trigger.type === 'decisions' && TRANSCRIPTS.includes(trigger.event_type), 'Invalid Decisions trigger.');
-            fields(trigger.decisions, ['questions'], ['questions'], 'trigger decisions');
-            validateDecisionQuestions(trigger.decisions.questions);
+            fields(trigger.decisions, ['questions'], ['questions'], 'trigger decisions', 'VALIDATION_ERROR', allowUnknown);
+            validateDecisionQuestions(trigger.decisions.questions, { allowUnknown });
         }
     }
     return freezeJson(config);
 }
 
 function item(input, created = false) {
-    validateDecisionInput([input], { live: true, pairTools: false });
+    validateDecisionInput([input], { live: true, pairTools: false, allowUnknown: created });
     check(created ? text(input.id) : input.id === undefined || input.id === null || text(input.id), 'Invalid item ID.');
 }
 
@@ -70,7 +71,7 @@ export function configurationFromSession(session) {
     const result = {};
     if (session.delegation?.type === 'decisions') result.delegation = session.delegation;
     if (Array.isArray(session.triggers)) result.triggers = session.triggers.filter(trigger => trigger.type === 'decisions');
-    return validateLiveConfiguration(result, { resolved: true });
+    return validateLiveConfiguration(result, { resolved: true, allowUnknown: true });
 }
 
 export function validateLiveEvent(input) {

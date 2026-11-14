@@ -3,10 +3,12 @@ import { DecisionError, withResponseMeta, requireCondition as check } from '../.
 import { isRecord } from '../../validation.mjs';
 import { buildPrompt, buildResponseSchema, normalizeGenerated, parseGeneratedJson } from './schema.mjs';
 import { anthropicUsage } from './shared.mjs';
+import { anthropicResponseFormat } from './anthropic-options.mjs';
 
 export function buildAnthropicBody(request, settings) {
     const prompt = buildPrompt(request);
-    const { parameters, maxTokens, responseFormat } = settings;
+    const { parameters, maxTokens } = settings;
+    const responseFormat = anthropicResponseFormat(request.model, settings.responseFormat);
     const body = { ...parameters, model: request.model,
       max_tokens: maxTokens, stream: false, system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }],

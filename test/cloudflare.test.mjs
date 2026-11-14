@@ -114,7 +114,6 @@ for (const [label, mutate] of [
     ['invalid noul', data => { data.answers.q.noul = 1.1; }],
     ['missing usage', data => { delete data.usage; }],
     ['negative usage', data => { data.usage.output_tokens = -1; }],
-    ['invented cache usage', data => { data.usage.cache_read_input_tokens = 1; }],
 ]) test('native response rejects ' + label, async () => {
     const { provider } = fixture({ mutate });
     await assert.rejects(provider.createDecision(native), { code: 'INVALID_RESPONSE', requestId: 'fixture-request-id' });

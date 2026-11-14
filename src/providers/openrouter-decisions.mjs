@@ -7,16 +7,10 @@ import { serializeRequestBody } from '../transport.mjs';
 import { fields } from './decisions-input.mjs';
 import { openRouterSettings, openRouterTransport, openRouterRequest, openRouterResponse, openRouterMeta, openRouterModels } from './openrouter-shared.mjs';
 import { validateOpenRouterAssets, validateOpenRouterMedia, openRouterInputPart } from './openrouter-assets.mjs';
+import { openRouterProfile } from './openrouter-profile.mjs';
 
 export function openRouterCapabilities(model) {
-    const jev = ['typesafe/jev-1.13', 'typesafe/jev-1.14', '~typesafe/jev-latest'].includes(model);
-    const clef = /^cloudflare\/clef(?:-flash|-omni)?$/.test(model);
-    const luna = model === 'openai/gpt-6-luna-decisions';
-    const omni = model === 'cloudflare/clef-omni';
-    return freezeJson({ ...LEGACY_CAPABILITIES, orderedInput: true,
-        images: jev || clef || luna, maxImages: null, maxChoiceOptions: null, maxScoreLevels: null,
-        boxes: jev && !/jev-1\.13(?:$|\.)/.test(model), typedChoices: clef || luna, labeledScores: clef || luna,
-        audio: omni, videos: omni, maxAudioClips: null, maxVideos: null });
+    return freezeJson({ ...LEGACY_CAPABILITIES, ...openRouterProfile(model).capabilities });
 }
 
 const entry = value => typeof value === 'string' || Array.isArray(value) || isRecord(value);
@@ -112,8 +106,14 @@ export class OpenRouterDecisionsProvider {
         const { decision, meta } = await this.#perform(native, options);
         return withResponseMeta(meta, () => {
             const answers = cloneJson(decision.answers);
+            const nativeDetails = Object.create(null);
             for (const [id, q] of Object.entries(request.questions)) {
                 const a = answers[id];
+                // Common Noul answers carry only the probability; retain extra native confidence in metadata.
+                if (q.type === 'noul' && a.confidence !== undefined) {
+                    nativeDetails[id] = { confidence: a.confidence };
+                    delete a.confidence;
+                }
                 if (['choice', 'score'].includes(q.type)) check(a.probabilities !== undefined,
                     'This response lacks probabilities required by evaluate(); use createDecision() for native answers.', 'UNSUPPORTED_CAPABILITY');
                 if (q.options) {
@@ -124,9 +124,10 @@ export class OpenRouterDecisionsProvider {
             }
             return freezeJson(validateResult({ model: decision.model, answers,
                 usage: { input_tokens: decision.usage.input_tokens, output_tokens: decision.usage.output_tokens },
-                meta: { ...meta, probabilitySource: 'native', modelSource: 'reported', openRouter: { usage: decision.usage } },
+                meta: { ...meta, probabilitySource: 'native', modelSource: 'reported', openRouter: { usage: decision.usage,
+                    ...(Object.keys(nativeDetails).length ? { answers: nativeDetails } : {}) } },
             }, request.questions, this.getResultValidationOptions()));
         });
     }
-    listModels(options = {}) { return openRouterModels(this.#transport, options); }
+    listModels(options = {}) { return openRouterModels(this.#transport, options, this.#settings.api); }
 }

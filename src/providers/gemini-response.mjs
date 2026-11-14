@@ -44,6 +44,7 @@ function usage(value) {
 export function validateGeminiDecision(input, request) {
     const response = cloneJson(input, 'Gemini decision response', 'INVALID_RESPONSE', GEMINI_JSON_NODES);
     valid(isRecord(response), 'Invalid Gemini decision response.');
+    valid(!response.error, 'Provider returned an error response.');
     feedback(response.prompt_feedback);
     usage(response.usage);
     valid(isRecord(response.answers) && Object.keys(response.answers).length === Object.keys(request.questions).length,

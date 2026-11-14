@@ -3,7 +3,9 @@ import { optionsObject } from '../options.mjs';
 import { cloneJson, isRecord } from '../validation.mjs';
 import { requireCondition as check } from '../errors.mjs';
 import { autoPolicy, integer, validId } from '../routing/configuration.mjs';
-import { validateConfig, KEY_ENVS, isModule } from './config-validation.mjs';
+import { validateConfig, isModule } from './config-validation.mjs';
+import { configuredApiKey } from './credentials.mjs';
+import { providerEnvironmentValue } from '../runtime-env.mjs';
 import { configuredProvider } from './provider-loader.mjs';
 import { validateApiKey } from '../transport.mjs';
 
@@ -45,8 +47,7 @@ export function routingOptions(loaded) {
             config = { ...config, maxRetries: 0 };
             rest.singleDispatch = true;
         }
-        const keyEnv = config.apiKeyEnv ?? KEY_ENVS[config.preset ?? config.provider];
-        const apiKey = keyEnv ? loaded.env[keyEnv] : undefined;
+        const apiKey = configuredApiKey(config, loaded.env);
         if (['custom-decision', 'custom-generative'].includes(config.provider)) {
             let ready = true;
             if (!config.noAuth && (!isModule(config) || config.apiKeyEnv)) {
@@ -63,7 +64,7 @@ export function routingOptions(loaded) {
         // Never fall back to process.env inside a lazily constructed SDK provider.
         native.apiKey = apiKey ?? '';
         if (config.provider.startsWith('cloudflare-')) native.accountId = config.accountId ??
-            (config.baseURL === undefined ? loaded.env.CLOUDFLARE_ACCOUNT_ID : undefined);
+            (config.baseURL === undefined ? providerEnvironmentValue('CLOUDFLARE_ACCOUNT_ID', loaded.env) : undefined);
         if (native.accountId === undefined) delete native.accountId;
         return [id, { ...rest, config: native }];
     }));

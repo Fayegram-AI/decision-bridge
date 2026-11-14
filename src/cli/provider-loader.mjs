@@ -5,7 +5,9 @@ import { deadline, withSignal, abortError } from '../async.mjs';
 import { providerContract } from '../provider-contract.mjs';
 import { createProvider } from '../providers/index.mjs';
 import { createExtractionProvider } from '../extraction/index.mjs';
-import { validateConfig, isModule, KEY_ENVS } from './config-validation.mjs';
+import { validateConfig, isModule } from './config-validation.mjs';
+import { configuredApiKey } from './credentials.mjs';
+import { providerEnvironmentValue } from '../runtime-env.mjs';
 
 /** Executable modules are loaded only by explicit inference/model-list commands. */
 async function moduleProvider({ config, moduleBase }, apiKey, signal) {
@@ -39,10 +41,9 @@ async function moduleProvider({ config, moduleBase }, apiKey, signal) {
 export async function configuredProvider(loaded, { signal } = {}) {
     const config = validateConfig(loaded.config, { complete: true });
     const type = config.provider ?? 'jev';
-    const keyEnv = config.apiKeyEnv ?? KEY_ENVS[config.preset ?? type];
     check(isModule(config) || config.baseURL === undefined || config.apiKeyEnv !== undefined || config.noAuth === true,
         'A custom baseURL requires apiKeyEnv or explicit noAuth.', 'CONFIGURATION_ERROR');
-    const apiKey = config.noAuth ? null : keyEnv ? loaded.env[keyEnv] : undefined;
+    const apiKey = configuredApiKey(config, loaded.env);
     if (isModule(config)) return moduleProvider({ ...loaded, config }, apiKey, signal);
     const options = Object.fromEntries(Object.entries(config).filter(([key]) => ![
         '$schema', 'schemaVersion', 'provider', 'preset', 'apiKeyEnv', 'noAuth', 'module', 'options',
@@ -54,6 +55,6 @@ export async function configuredProvider(loaded, { signal } = {}) {
         return createGenerativeProvider({ type: config.preset, ...options });
     }
     if (['cloudflare-decisions', 'cloudflare-extraction'].includes(type)) options.accountId = config.accountId ??
-        (config.baseURL === undefined ? loaded.env.CLOUDFLARE_ACCOUNT_ID : undefined) ?? '';
+        (config.baseURL === undefined ? providerEnvironmentValue('CLOUDFLARE_ACCOUNT_ID', loaded.env) : undefined) ?? '';
     return type.endsWith('-extraction') ? createExtractionProvider({ type, ...options }) : createProvider({ type, ...options });
 }

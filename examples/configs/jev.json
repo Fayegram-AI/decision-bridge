@@ -1,7 +1,6 @@
 {
-  "schemaVersion": 1,
-  "provider": "jev",
-  "model": "jev-latest",
-  "apiKeyEnv": "TYPESAFE_API_KEY",
-  "timeoutMs": 30000
+    "schemaVersion": 1,
+    "provider": "jev",
+    "model": "jev-latest",
+    "timeoutMs": 30000
 }

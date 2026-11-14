@@ -41,6 +41,11 @@ after cancellation. Internal transport helpers are not stable public exports. De
 maintained preset for a protocol already supported, or implement and test your own
 transport.
 
+The bridge projects returned answers and usage onto the documented common shape.
+Place provider-specific details in `meta` to retain them in common results. See
+the [response contract](../reference/SDK.md#returned-data) for native extensions,
+variant-specific fields and JSON safety requirements.
+
 If you omit capabilities, the provider supports the original shared-state question
 format. Audio and video flags/counts default to false/zero; conversation, tool history,
 remote images and prompt caching default to false. Numeric limits you declare are

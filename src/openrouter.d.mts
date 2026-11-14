@@ -28,13 +28,17 @@ export interface OpenRouterDecisionRequest<Q extends OpenRouterDecisionQuestions
     readonly assets?: Readonly<Record<string, OpenRouterImageAsset>>;
 }
 export type OpenRouterDecisionAnswer<Q extends OpenRouterDecisionQuestion> = Q extends { readonly type: 'noul' }
-    ? { readonly type: 'noul'; readonly noul: number }
+    ? { readonly type: 'noul'; readonly noul: number; readonly confidence?: number }
     : Q extends { readonly type: 'choice' } ? { readonly type: 'choice'; readonly choice: string;
         readonly probabilities?: Readonly<Record<string, number>>; readonly confidence?: number }
     : Q extends { readonly type: 'score' } ? { readonly type: 'score'; readonly score: number;
         readonly probabilities?: Readonly<Record<string, number>>; readonly legend?: Readonly<Record<string, Instructions>>; readonly confidence?: number }
     : { readonly type: 'box'; readonly box: BoxCoordinates; readonly confidence?: number };
 export interface OpenRouterUsage { readonly input_tokens: number; readonly output_tokens: number; readonly cost?: number; }
+export interface OpenRouterMetadata {
+    readonly usage: OpenRouterUsage;
+    readonly answers?: Readonly<Record<string, { readonly confidence: number }>>;
+}
 export interface OpenRouterDecisionResponse<Q extends OpenRouterDecisionQuestions = OpenRouterDecisionQuestions> {
     readonly model: string; readonly id?: string; readonly provider?: string;
     readonly answers: { readonly [K in keyof Q]: OpenRouterDecisionAnswer<Q[K]> }; readonly usage: OpenRouterUsage;

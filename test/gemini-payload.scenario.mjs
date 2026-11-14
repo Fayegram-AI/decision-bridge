@@ -55,7 +55,7 @@ try {
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const config = { provider: 'gemini-decisions', maxRequestBytes: 167772160,
-        baseURL: 'http://127.0.0.1:' + server.address().port, apiKeyEnv: 'DECISION_BRIDGE_GEMINI_API_KEY' };
+        baseURL: 'http://127.0.0.1:' + server.address().port, apiKeyEnv: 'GEMINI_API_KEY' };
     await writeFile(join(cwd, 'config.json'), JSON.stringify(config));
     await writeFile(join(cwd, 'routes.json'), JSON.stringify({ schemaVersion: 2, defaultRoute: 'google',
         routes: { google: { config } } }));
@@ -79,7 +79,7 @@ try {
         ['batch', 'batch.jsonl', '--concurrency', '1', '--config', 'routes.json'],
     ]) {
         const io = streams();
-        const code = await runCli(args, { ...io, cwd, env: { DECISION_BRIDGE_GEMINI_API_KEY: 'fixture' } });
+        const code = await runCli(args, { ...io, cwd, env: { GEMINI_API_KEY: 'fixture' } });
         assert.equal(code, 0, io.error());
         if (args[0] === 'evaluate') assert.equal(JSON.parse(io.output()).meta.schemaVersion, 8);
         cliChecks++;

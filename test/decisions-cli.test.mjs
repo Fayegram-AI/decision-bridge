@@ -115,25 +115,29 @@ test('native init creates a request that validates with --native', async t => {
     const config = JSON.parse(await readFile(join(cwd, 'decision.config.json'), 'utf8'));
     assert.equal(config.model, 'default');
     assert.equal(Object.hasOwn(JSON.parse(await readFile(join(cwd, 'request.json'), 'utf8')), 'model'), false);
-    assert.equal(config.apiKeyEnv, 'OPENAI_API_KEY');
+    assert.equal(config.apiKeyEnv, undefined);
     const result = await invoke(['validate', 'request.json', '--config', 'decision.config.json', '--native'], undefined, { cwd });
     assert.equal(result.code, 0, result.stderr);
 });
 
 test('actual common and native HTTP evaluations preserve their output contracts', async t => {
-    const { bodies, flags, env } = await serverFor(t);
+    const breakdown = { ttl_30m_tokens: 1, ttl_12h_tokens: 1 };
+    const { bodies, flags, env } = await serverFor(t, data => { data.usage.input_tokens_details.cache_write_tokens_details = breakdown; });
     const commonResult = await invoke(['evaluate', '-', ...flags], JSON.stringify(common), { env });
     assert.equal(commonResult.code, 0, commonResult.stderr);
     assert.equal(JSON.parse(commonResult.stdout).answers.q.choice, true);
+    assert.deepEqual(JSON.parse(commonResult.stdout).meta.openaiDecisions.usage.input_tokens_details.cache_write_tokens_details, breakdown);
     const nativeResult = await invoke(['evaluate', '-', ...flags, '--native'], JSON.stringify(native), { env });
     assert.equal(nativeResult.code, 0, nativeResult.stderr);
     assert.equal(JSON.parse(nativeResult.stdout).decision.answers[0].probability, 0.7);
+    assert.deepEqual(JSON.parse(nativeResult.stdout).decision.usage.input_tokens_details.cache_write_tokens_details, breakdown);
     assert.equal(bodies.length, 2);
     assert.equal(bodies[0].input[0].content[1].detail, 'low');
 });
 
 test('native JSONL batch records refusals as errors and preserves successful rows', async t => {
     const { flags, env } = await serverFor(t, (data, request) => {
+        data.usage.input_tokens_details.cache_write_tokens_details = { ttl_30m_tokens: 1, ttl_12h_tokens: 1 };
         if (request.input === 'refuse') data.answers[0] = { type: 'refusal', name: null };
     });
     const rows = [native, { ...native, input: 'refuse' }, native].map(JSON.stringify).join('\n');
@@ -142,6 +146,7 @@ test('native JSONL batch records refusals as errors and preserves successful row
     const records = result.stdout.trim().split('\n').map(JSON.parse);
     assert.deepEqual(records.map(record => [record.line, record.ok]), [[1, true], [2, false], [3, true]]);
     assert.equal(records[1].error.code, 'MODEL_REFUSAL');
+    assert.deepEqual(records[1].error.usage.input_tokens_details.cache_write_tokens_details, { ttl_30m_tokens: 1, ttl_12h_tokens: 1 });
     assert(!Object.hasOwn(records[1], 'result'));
 });
 

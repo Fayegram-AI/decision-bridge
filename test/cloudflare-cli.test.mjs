@@ -58,7 +58,7 @@ test('Cloudflare native initialization produces placeholders and an offline-vali
         undefined, { cwd });
     assert.equal(init.code, 0, init.stderr);
     const config = JSON.parse(await readFile(join(cwd, 'decision.config.json'), 'utf8'));
-    assert.equal(config.apiKeyEnv, 'CLOUDFLARE_API_TOKEN');
+    assert.equal(config.apiKeyEnv, undefined);
     const example = await readFile(join(cwd, '.env.example'), 'utf8');
     assert.match(example, /CLOUDFLARE_API_TOKEN=replace_with_/);
     assert.match(example, /CLOUDFLARE_ACCOUNT_ID=replace_with_/);

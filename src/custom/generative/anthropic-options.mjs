@@ -19,10 +19,12 @@ export function anthropicWorkspace(value) {
 
 export const ANTHROPIC_RESPONSE_FORMATS = ['tool', 'json_schema'];
 
+export { anthropicResponseFormat } from '../../providers/anthropic-profile.mjs';
+
 /** Defaults stay independent so selecting a new output mode never changes the API version. */
 export function anthropicOptions({ model, maxTokens = 4096, parameters = {},
-    responseFormat = 'tool', apiVersion = '2023-06-01', workspaceId } = {}) {
-    check(ANTHROPIC_RESPONSE_FORMATS.includes(responseFormat), 'Anthropic responseFormat must be tool or json_schema.', 'CONFIGURATION_ERROR');
+    responseFormat, apiVersion = '2023-06-01', workspaceId } = {}) {
+    check(responseFormat === undefined || ANTHROPIC_RESPONSE_FORMATS.includes(responseFormat), 'Anthropic responseFormat must be tool or json_schema.', 'CONFIGURATION_ERROR');
     check(ANTHROPIC_API_VERSIONS.includes(apiVersion), 'Unsupported Anthropic API version.', 'CONFIGURATION_ERROR');
     const generation = generationOptions({ model, maxTokens, parameters });
     const params = generation.parameters;

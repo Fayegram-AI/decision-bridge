@@ -64,7 +64,10 @@ export type NativeDecisionAnswer =
 /** Refusals are represented by DecisionError, never by a successful response. */
 export type OpenAIDecisionUsage = {
     readonly input_tokens: number; readonly output_tokens: number; readonly total_tokens: number;
-    readonly input_tokens_details: { readonly cached_tokens: number; readonly cache_write_tokens: number };
+    readonly input_tokens_details: {
+        readonly cached_tokens: number; readonly cache_write_tokens: number;
+        readonly cache_write_tokens_details?: { readonly ttl_30m_tokens: number; readonly ttl_12h_tokens: number };
+    };
     readonly output_tokens_details: { readonly reasoning_tokens: number };
 };
 export interface OpenAIDecisionResponse {

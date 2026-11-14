@@ -5,20 +5,37 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { createBridge, createProvider, noul } from ${JSON.stringify(name)};
-const usage = { input_tokens: 1, output_tokens: 0, total_tokens: 1,
-    input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } };
+const usage = { input_tokens: 1, output_tokens: 0, total_tokens: 1, extension: { future_tokens: 0 },
+    input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0,
+        cache_write_tokens_details: { ttl_30m_tokens: 0, ttl_12h_tokens: 0 } }, output_tokens_details: { reasoning_tokens: 0 } };
 const response = request => {
     assert.equal(request.model, 'gpt-6-luna');
-    return { model: 'reported-model', usage,
-        answers: request.questions.map(q => ({ type: 'predicate', name: q.name ?? null, probability: 0.7 })) };
+    return { model: 'reported-model', usage, extension: 'native fixture',
+        answers: request.questions.map(q => ({ type: 'predicate', name: q.name ?? null, probability: 0.7, extension: 'answer fixture',
+            probabilities: { future: true }, confidence: { future: true } })) };
 };
 const provider = createProvider({ type: 'openai-decisions', apiKey: 'fixture', fetchImpl: async (_, init) =>
     new Response(JSON.stringify(response(JSON.parse(init.body)))) });
 const bridge = createBridge({ provider });
 const common = { input: [{ type: 'text', text: 'Installed package fixture' }], questions: { yes: noul('True?') } };
-assert.equal((await bridge.evaluate(common)).answers.yes.noul, 0.7);
+const commonResult = await bridge.evaluate(common);
+assert.equal(commonResult.answers.yes.noul, 0.7);
+assert.deepEqual(commonResult.answers.yes, { type: 'noul', noul: 0.7 });
+assert.deepEqual(commonResult.meta.openaiDecisions.answers.yes, { type: 'predicate' });
+assert.equal(Object.hasOwn(commonResult, 'extension'), false);
+assert.equal(Object.hasOwn(commonResult.usage, 'extension'), false);
+assert.deepEqual(commonResult.meta.openaiDecisions.usage.extension, usage.extension);
+assert.deepEqual(commonResult.meta.openaiDecisions.usage.input_tokens_details.cache_write_tokens_details,
+    usage.input_tokens_details.cache_write_tokens_details);
 const native = { input: 'Installed package fixture', questions: [{ type: 'predicate', instructions: 'True?' }] };
-assert.equal((await provider.createDecision(native)).decision.answers[0].probability, 0.7);
+const nativeResult = await provider.createDecision(native);
+assert.equal(nativeResult.decision.answers[0].probability, 0.7);
+assert.equal(nativeResult.decision.extension, 'native fixture');
+assert.equal(nativeResult.decision.answers[0].extension, 'answer fixture');
+assert.deepEqual(nativeResult.decision.answers[0].probabilities, { future: true });
+assert.deepEqual(nativeResult.decision.answers[0].confidence, { future: true });
+assert.deepEqual(nativeResult.decision.usage.input_tokens_details.cache_write_tokens_details,
+    usage.input_tokens_details.cache_write_tokens_details);
 assert.equal(provider.defaultModel, 'default');
 for (const model of ['default', 'luna', 'gpt-6-luna']) {
     const result = await bridge.evaluate({ ...common, model });
@@ -66,7 +83,7 @@ export function cloudflareScenario(name) {
     return `import assert from 'node:assert/strict';
 import { CloudflareDecisionsProvider, createProvider, createBridge, noul } from ${JSON.stringify(name)};
 const common = { state: 'Installed package protocol check', questions: { q: noul('True?') } };
-const response = input => ({ model: input.model, answers: { q: { type: 'noul', noul: 0.7 } },
+const response = input => ({ model: input.model, answers: { q: { type: 'noul', noul: 0.7, confidence: { future: true } } },
     usage: { input_tokens: 1, output_tokens: 0 } });
 for (const model of ['clef', 'clef-flash', 'clef-omni']) {
     const provider = createProvider({ type: 'cloudflare-decisions', accountId: 'fixture-account', apiKey: 'fixture',
@@ -77,7 +94,9 @@ for (const model of ['clef', 'clef-flash', 'clef-omni']) {
             return Response.json({ success: true, result: response(input), errors: [], messages: [] });
         } });
     assert(provider instanceof CloudflareDecisionsProvider);
-    assert.equal((await createBridge({ provider }).evaluate(common)).answers.q.noul, 0.7);
+    const projected = await createBridge({ provider }).evaluate(common);
+    assert.equal(projected.answers.q.noul, 0.7);
+    assert.deepEqual(projected.meta.cloudflareDecisions.answers.q, { type: 'noul' });
     assert.equal((await provider.createDecision(common)).decision.answers.q.noul, 0.7);
     if (model === 'clef-omni') {
         const wav = Buffer.alloc(46);

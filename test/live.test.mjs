@@ -27,6 +27,24 @@ const completed = (id, source, type = 'session.input_transcript.delta', decision
 });
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+test('Live decisions preserve cache-write lifetime usage through validation and correlation', () => {
+    const f = fixture({ configuration: config });
+    try {
+        const decision = decisionResponse({ model: 'gpt-6-luna', questions });
+        const breakdown = { ttl_30m_tokens: 2, ttl_12h_tokens: 0 };
+        decision.usage.input_tokens_details.cache_write_tokens_details = breakdown;
+        const event = completed('cache-result', 'cache-source', 'session.input_transcript.delta', decision);
+        assert.deepEqual(validateLiveEvent(event).event.decision.usage.input_tokens_details.cache_write_tokens_details, breakdown);
+        f.emit(delta('cache-source')); f.emit(event);
+        assert.equal(f.events.at(-1).type, 'decision');
+        assert.equal(f.events.at(-1).correlation.matched, true);
+        assert.deepEqual(f.events.at(-1).decision.usage.input_tokens_details.cache_write_tokens_details, breakdown);
+        decision.usage.input_tokens_details.cache_write_tokens_details.ttl_12h_tokens = -1;
+        assert.throws(() => validateLiveEvent(completed('invalid-cache', 'cache-source', 'session.input_transcript.delta', decision)),
+            { code: 'INVALID_RESPONSE' });
+    } finally { f.controller.dispose(); }
+});
+
 test('current startup and delay-only updates retain resolved question correlation', async () => {
     const f = fixture();
     try {
@@ -174,8 +192,12 @@ test('Live JSON and hosted-image content survives configuration and item acknowl
         f.emit(delta('json-source')); f.emit(completed('json-result', 'json-source'));
         assert.equal(f.events.at(-1).correlation.matched, true);
     } finally { f.controller.dispose(); }
-    for (const part of [...content.map(value => ({ ...value, prompt_cache_breakpoint: null })),
-        { type: 'input_json', data: [42] }, { type: 'input_image', image_url: 'https://user:secret@example.com/a.png' }]) {
+    for (const part of content.map(value => ({ ...value, prompt_cache_breakpoint: null }))) {
+        const item = { role: 'user', content: [part] };
+        assert.throws(() => validateLiveCommand({ type: 'decision.item.create', item }), { code: 'VALIDATION_ERROR' });
+        assert.deepEqual(validateLiveEvent({ type: 'decision.item.created', event_id: 'extended', item: { ...item, id: 'id' } }).item.content, [part]);
+    }
+    for (const part of [{ type: 'input_json', data: [42] }, { type: 'input_image', image_url: 'https://user:secret@example.com/a.png' }]) {
         const item = { role: 'user', content: [part] };
         assert.throws(() => validateLiveCommand({ type: 'decision.item.create', item }), { code: 'VALIDATION_ERROR' });
         assert.throws(() => validateLiveEvent({ type: 'decision.item.created', event_id: 'invalid', item: { ...item, id: 'id' } }),

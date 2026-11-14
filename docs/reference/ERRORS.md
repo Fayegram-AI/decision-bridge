@@ -4,7 +4,8 @@
 `gatewayLogId`, `attempts`, and numeric `upstreamCode` for service diagnostics.
 Optional `source`, `upstreamErrorCode`, `upstreamErrorType`, `retryAfterMs` and
 `retryable` help identify whether a failure came from local limits or the service.
-OpenAI Decisions refusal errors can also carry validated `refusedQuestions` and `usage`.
+OpenAI Decisions refusal errors can also carry validated `refusedQuestions` and
+recognized `usage` counters; opaque response extensions are excluded from those diagnostics.
 Gemini textual safety and block diagnostics use `upstreamErrorCode`; `upstreamCode` remains numeric.
 Routed errors can carry immutable `routing` diagnostics with candidate statuses,
 selector usage, execution attempts and timings. `toJSON()` and `publicError(error)`
@@ -33,7 +34,7 @@ and raw response bodies are omitted. Custom providers deliberately constructing
 | `RETRY_BUDGET_EXCEEDED` | Server delay cannot fit remaining deadline; choose a later attempt explicitly |
 | `TIMEOUT` | Provider, bridge, preparation, or listing deadline exceeded |
 | `ABORTED` | Caller cancelled; remote work might already have been billed |
-| `INVALID_RESPONSE` | Non-byte response chunks, wrong envelope, or invalid UTF-8/JSON/schema/distribution/usage; do not trust partial answers |
+| `INVALID_RESPONSE` | Non-byte chunks, invalid UTF-8/JSON, missing required fields, or invalid known values, answer correlation, distributions or usage; do not trust partial answers |
 | `MODEL_REFUSAL` | Provider declined the evaluation, including explicit Gemini blocked prompt feedback or safety rejection; no result is returned |
 | `TRUNCATED_OUTPUT` | Output/context budget exhausted; revise budget/input explicitly |
 | `EXTENSION_ERROR` | Preparation failed; inference was not issued after that failure |

@@ -23,7 +23,7 @@ const moduleText = `export function createProvider({ model = 'local-test-fixture
 
 export function cleanEnv(extra = {}) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('DECISION_') &&
-    !['TYPESAFE_API_KEY', 'JEV_MODEL', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'].includes(key)));
+    !['TYPESAFE_API_KEY', 'JEV_MODEL', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID'].includes(key)));
   return { ...env, ...extra };
 }
 

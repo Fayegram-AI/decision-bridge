@@ -3,7 +3,8 @@ import { mkdir, readFile, writeFile, unlink, lstat } from 'node:fs/promises';
 import { DecisionError } from '../errors.mjs';
 import { validateRequest } from '../validation.mjs';
 import { decisionProfile } from './decisions.mjs';
-import { validateConfig, KEY_ENVS } from './config-validation.mjs';
+import { validateConfig } from './config-validation.mjs';
+import { KEY_ENVS, credentialTemplate, ACCOUNT_ENV_TEMPLATE } from './credentials.mjs';
 import { OPENAI_DEFAULT_MODEL } from '../providers/openai-profile.mjs';
 import { extractionProfile } from './extractions.mjs';
 
@@ -34,9 +35,10 @@ export function createProvider(options = {}) {
 export async function initialize(directory, config, native = false, moduleBase = process.cwd()) {
     const custom = ['custom-decision', 'custom-generative'].includes(config.provider);
     const generateModule = custom && !config.module && !config.preset;
-    const defaultKey = KEY_ENVS[config.preset ?? config.provider] ?? 'CUSTOM_PROVIDER_API_KEY';
+    const defaultKey = KEY_ENVS[config.preset ?? config.provider];
     const template = validateConfig({ ...config, $schema: './decision.config.schema.json',
-        apiKeyEnv: config.apiKeyEnv ?? defaultKey,
+        ...(config.apiKeyEnv === undefined && (defaultKey === undefined || config.baseURL !== undefined)
+            ? { apiKeyEnv: defaultKey ?? 'CUSTOM_PROVIDER_API_KEY' } : {}),
         ...(generateModule ? { module: './provider.mjs' } : {}),
         ...(config.module ? { module: resolve(moduleBase, config.module) } : {}),
         ...(config.provider === 'jev' && config.model === undefined ? { model: 'jev-latest' } : {}),
@@ -68,8 +70,8 @@ export async function initialize(directory, config, native = false, moduleBase =
         'decision.config.json': JSON.stringify(template, null, 2) + '\n',
         'decision.config.schema.json': schema,
         'request.json': JSON.stringify(generated, null, 2) + '\n',
-        '.env.example': `${template.apiKeyEnv}=replace_with_your_api_key\n` +
-            (['cloudflare-decisions', 'cloudflare-extraction'].includes(config.provider) ? 'CLOUDFLARE_ACCOUNT_ID=replace_with_your_account_id\n' : ''),
+        '.env.example': [...credentialTemplate(template),
+            ...(['cloudflare-decisions', 'cloudflare-extraction'].includes(config.provider) ? ACCOUNT_ENV_TEMPLATE : [])].join('\n') + '\n',
         '.gitignore': '.env\n.env.*\n!.env.example\nnode_modules/\n*.tmp\n',
         ...(generateModule ? { 'provider.mjs': providerTemplate(config.provider === 'custom-decision' ? 'decision' : 'generative') } : {}),
     };

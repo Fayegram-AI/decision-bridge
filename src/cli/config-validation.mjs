@@ -16,9 +16,7 @@ export const PROVIDER_FIELDS = [...TRANSPORT, ...GENERATION, 'apiKeyEnv', 'model
     'options', 'accountId', 'rejectIfBusy', 'gateway', 'dangerZone', 'api', 'providerPreferences'];
 const FIELDS = new Set(['$schema', 'schemaVersion', 'provider', 'timeoutMs', ...PROVIDER_FIELDS]);
 export const NUMERIC = new Set(['timeoutMs', 'maxRetries', 'maxRequestBytes', 'maxResponseBytes', 'maxTokens']);
-export const KEY_ENVS = { 'gemini-decisions': 'DECISION_BRIDGE_GEMINI_API_KEY', 'openrouter-decisions': 'OPENROUTER_API_KEY', 'openrouter-extraction': 'OPENROUTER_API_KEY', jev: 'TYPESAFE_API_KEY', 'openai-decisions': 'OPENAI_API_KEY',
-    'cloudflare-decisions': 'CLOUDFLARE_API_TOKEN', 'cloudflare-extraction': 'CLOUDFLARE_API_TOKEN', 'openai-compatible': 'OPENAI_API_KEY',
-    openrouter: 'OPENROUTER_API_KEY', anthropic: 'ANTHROPIC_API_KEY' };
+export { KEY_ENVS } from './credentials.mjs';
 export const isModule = config => ['custom-decision', 'custom-generative'].includes(config.provider) && config.module !== undefined;
 
 /** Partial layers may omit a selector; complete execution must identify one implementation. */

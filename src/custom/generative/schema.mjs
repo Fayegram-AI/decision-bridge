@@ -1,5 +1,5 @@
 import { DecisionError, requireCondition as check } from '../../errors.mjs';
-import { isRecord, validateRequest, validateResult, cloneJson } from '../../validation.mjs';
+import { isRecord, validateRequest, validateResult, cloneJson, requireResponseFields } from '../../validation.mjs';
 import { assertCapabilities, LEGACY_CAPABILITIES } from '../../capabilities.mjs';
 
 const objectSchema = properties => ({ type: 'object', properties,
@@ -63,11 +63,11 @@ function exact(value, keys) {
 export function normalizeGenerated(payload, input, { model, usage, meta = {} } = {}) {
   const request = legacyRequest(input);
   const data = cloneJson(payload, 'generated response', 'INVALID_RESPONSE');
-  exact(data, ['answers']);
+  requireResponseFields(data, ['answers'], 'generated response');
   exact(data.answers, Object.keys(request.questions));
   const answers = Object.fromEntries(Object.entries(request.questions).map(([id, q]) => {
     const raw = data.answers[id];
-    exact(raw, q.type === 'noul' ? ['noul'] : ['probabilities']);
+    requireResponseFields(raw, q.type === 'noul' ? ['noul'] : ['probabilities'], 'generated answer');
     if (q.type === 'noul') return [id, { type: 'noul', noul: raw.noul }];
     const labels = q.type === 'choice' ? Object.keys(q.criteria) : q.criteria.map((_, i) => String(i));
     exact(raw.probabilities, labels);

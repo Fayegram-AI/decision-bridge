@@ -4,7 +4,7 @@ import { requireCondition as check, withResponseMeta } from '../errors.mjs';
 import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
 import { builtInCapabilities } from '../capabilities.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
-import { environmentValue } from '../runtime-env.mjs';
+import { providerEnvironmentValue } from '../runtime-env.mjs';
 import { GEMINI_MODEL, GEMINI_ORIGIN, GEMINI_KEY_ENV, GEMINI_REQUEST_CEILING, GEMINI_JSON_NODES, geminiModel } from './gemini-profile.mjs';
 import { prepareGeminiDecision } from './gemini-input.mjs';
 import { prepareCommonGeminiDecision, decodeCommonGeminiDecision } from './gemini-codec.mjs';
@@ -22,7 +22,7 @@ export class GeminiDecisionsProvider {
             optionsObject(options, ['apiKey', 'model', 'baseURL', ...TRANSPORT_FIELDS], 'Gemini Decisions options');
         const endpoint = parseBaseURL(baseURL, { originOnly: true });
         const key = validateApiKey(apiKey === undefined && endpoint.origin === GEMINI_ORIGIN
-            ? environmentValue(GEMINI_KEY_ENV) : apiKey, GEMINI_KEY_ENV);
+            ? providerEnvironmentValue(GEMINI_KEY_ENV) : apiKey, GEMINI_KEY_ENV);
         this.defaultModel = geminiModel(model);
         this.#settings = { model: this.defaultModel, maxRequestBytes: transport.maxRequestBytes };
         this.#transport = new JsonTransport({ ...transport, maxRetries, baseURL: endpoint.baseURL,

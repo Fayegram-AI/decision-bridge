@@ -2,6 +2,5 @@
     "schemaVersion": 1,
     "provider": "openai-decisions",
     "model": "default",
-    "apiKeyEnv": "OPENAI_API_KEY",
     "maxRetries": 0
 }

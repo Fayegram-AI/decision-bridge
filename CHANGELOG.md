@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.8
+
+- Accept additive response fields in native decisions, generated answers and Live
+  acknowledgements. Preserve native extensions and metadata while keeping common
+  result shapes, required value/correlation checks and variant-specific decoding.
+- Validate and preserve OpenAI's optional cache-write lifetime counters in native
+  Decisions, common metadata and Live results.
+- Default to Anthropic JSON schema output for known forced-tool-incompatible
+  models; retain tool output for others and reject incompatible explicit tool requests.
+- Expand OpenRouter model media profiles, including Google inline/HTTPS media
+  and PDF, CSV, Office and OpenDocument files, plus ScaleDown inline documents.
+  Add document MIME capabilities with PDF defaults for existing custom providers.
+- Support asset-only OpenRouter extraction, Clairic WebP and model-specific field
+  options. Preserve optional null span entries and Noul confidence metadata.
+- Filter OpenRouter discovery by Decisions/System One endpoint, preserving
+  upstream metadata. Align model selection across native/common requests and
+  routing; reject malformed Anthropic/OpenRouter selectors without coercion hooks.
+- Reject explicit null Anthropic thread model, turn-limit and history-limit
+  options; omitted options retain their defaults.
+- Support both provider credential names and their `DECISION_BRIDGE_` aliases
+  across native providers, generative presets, CLI profiles and routing. The
+  prefixed name takes precedence; explicit credentials and environment selectors
+  retain their selection. Cloudflare account IDs use the same alias policy.
+- Generate built-in profiles for default endpoints without pinning an environment
+  selector, so either credential name works. Environment templates document both
+  forms; explicit endpoints retain a specific selector.
+
 ## 0.1.7
 
 - Add native Gemini Decisions with `gemini-decision-1`, common and native SDK

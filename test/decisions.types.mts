@@ -58,10 +58,15 @@ void checks;
 void configuration;
 
 function metadataChecks(usage: OpenAIDecisionUsage, nativeMetadata: OpenAIDecisionsMetadata) {
+    const breakdown: OpenAIDecisionUsage['input_tokens_details']['cache_write_tokens_details'] = { ttl_30m_tokens: 0, ttl_12h_tokens: 2 };
+    const detailed: OpenAIDecisionUsage = { ...usage, input_tokens_details: { ...usage.input_tokens_details, cache_write_tokens_details: breakdown } };
+    const ttl: number | undefined = usage.input_tokens_details.cache_write_tokens_details?.ttl_30m_tokens;
+    // @ts-expect-error Cache-write detail counters are immutable.
+    breakdown.ttl_30m_tokens = 1;
     const json: JsonValue = usage;
     const meta: ProviderResult['meta'] = { openaiDecisions: nativeMetadata };
     // @ts-expect-error Usage remains immutable after being represented as a JSON type.
     usage.input_tokens_details.cached_tokens = 0;
-    return { json, meta };
+    return { json, meta, detailed, ttl };
 }
 void metadataChecks;

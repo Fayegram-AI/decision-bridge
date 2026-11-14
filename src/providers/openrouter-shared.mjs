@@ -4,7 +4,7 @@ import { DecisionError, requireCondition as check, withResponseMeta } from '../e
 import { cloneJson, freezeJson, isRecord } from '../validation.mjs';
 import { isTextWithinLimit } from '../input.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
-import { environmentValue } from '../runtime-env.mjs';
+import { providerEnvironmentValue } from '../runtime-env.mjs';
 
 export function openRouterModel(value) {
     check(typeof value === 'string' && value.trim(), 'OpenRouter requires an explicit model ID.');
@@ -42,8 +42,8 @@ export function openRouterSettings(input = {}, { extraction = false } = {}) {
 }
 
 export function openRouterTransport(settings) {
-    const key = validateApiKey(settings.apiKey ?? (settings.baseURL === 'https://openrouter.ai'
-        ? environmentValue('OPENROUTER_API_KEY') : undefined), 'OPENROUTER_API_KEY');
+    const key = validateApiKey(settings.apiKey === undefined && settings.baseURL === 'https://openrouter.ai'
+        ? providerEnvironmentValue('OPENROUTER_API_KEY') : settings.apiKey, 'OPENROUTER_API_KEY');
     const options = Object.fromEntries(TRANSPORT_FIELDS.filter(k => settings[k] !== undefined).map(k => [k, settings[k]]));
     return new JsonTransport({ maxRetries: 0, ...options, baseURL: settings.baseURL,
         headers: { authorization: `Bearer ${key}` }, secrets: [key], errorDecoder: openRouterError });
@@ -73,6 +73,7 @@ export function openRouterResponse(input) {
     const valid = (condition, message) => check(condition, message, 'INVALID_RESPONSE');
     valid(isRecord(data) && typeof data.model === 'string' && data.model.trim() && isRecord(data.answers) && isRecord(data.usage),
         'Invalid OpenRouter response.');
+    valid(!data.error, 'Provider returned an error response.');
     for (const key of ['input_tokens', 'output_tokens']) valid(Number.isSafeInteger(data.usage[key]) && data.usage[key] >= 0, 'Invalid token usage.');
     if (data.usage.cost !== undefined) valid(typeof data.usage.cost === 'number' && data.usage.cost >= 0, 'Invalid usage cost.');
     for (const key of ['id', 'provider']) valid(data[key] === undefined || typeof data[key] === 'string' && data[key].length > 0, 'Invalid response identity.');
@@ -85,8 +86,9 @@ export function openRouterMeta(data, meta, model) {
         ...(data.provider === undefined ? {} : { upstreamProvider: data.provider }) };
 }
 
-export async function openRouterModels(transport, options) {
-    const { data, meta } = await transport.request('GET', '/api/v1/models', undefined, options, { output_modalities: 'decisions' });
+export async function openRouterModels(transport, options, api = 'decisions') {
+    const { data, meta } = await transport.request('GET', '/api/v1/models', undefined, options,
+        { endpoints: api === 'systemone' ? '/api/v1/systemone' : '/api/alpha/decisions' });
     return withResponseMeta(meta, () => {
         check(isRecord(data) && Array.isArray(data.data) && data.data.every(m => isRecord(m) && typeof m.id === 'string' && m.id.trim()),
             'Invalid OpenRouter model catalogue.', 'INVALID_RESPONSE');

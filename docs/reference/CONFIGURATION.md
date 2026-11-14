@@ -13,7 +13,6 @@ See [version availability](../README.md#version-availability).
   "schemaVersion": 1,
   "provider": "jev",
   "model": "jev-latest",
-  "apiKeyEnv": "TYPESAFE_API_KEY",
   "timeoutMs": 30000,
   "maxRetries": 2
 }
@@ -48,7 +47,7 @@ REST.
 | `preset` | `custom-generative` only: `openai-compatible`, `openrouter`, `anthropic`; mutually exclusive with module |
 | `model` | Nonempty model selector or upstream ID; Jev, OpenAI Decisions, Cloudflare and Gemini have defaults; OpenRouter native and generative evaluation require a configured or request model |
 | `baseURL` | HTTPS API base; loopback may use HTTP |
-| `apiKeyEnv` | Credential environment variable name; inline `apiKey` is rejected |
+| `apiKeyEnv` | Optional exact credential environment variable selector; omitting it enables both built-in names. Inline `apiKey` is rejected |
 | `noAuth` | Boolean; true only for loopback OpenAI-compatible endpoints |
 | `timeoutMs` | Positive integer up to 2,147,483,647 milliseconds |
 | `maxRetries` | Integer 0–10; native OpenAI/Cloudflare/OpenRouter/Gemini default 0; Jev and generative presets default 2 |
@@ -58,7 +57,7 @@ REST.
 | `gateway` | Cloudflare Gateway object; see the [Cloudflare guide](../guides/CLOUDFLARE_DECISIONS.md) |
 | `dangerZone` | Jev-only `{ images?: boolean, longContext?: boolean }`; both default false; see the [Jev guide](../guides/JEV.md) |
 | `maxTokens` | Generative output budget, 1–1,048,576; default 4096 |
-| `responseFormat` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic modes: `tool` (default), `json_schema` |
+| `responseFormat` | Compatible presets: `json_schema`, `json_object`, `text`; Anthropic: `tool`, `json_schema`, with a [model-aware default](../guides/CUSTOM_GENERATIVE.md#json-output-and-api-versions) |
 | `workspaceId` | Anthropic workspace header for non-scoped keys; applied to Messages and discovery |
 | `api` | Native OpenRouter Decisions: `decisions` (default) or `systemone` |
 | `providerPreferences` | Native OpenRouter routing/options JSON; `allow_fallbacks` defaults false |
@@ -170,7 +169,7 @@ Routing registries ignore `DECISION_*` provider/model settings and reject the
 single-provider override flags, including `--model`, `--provider`, `--timeout-ms`
 and transport overrides. Edit a route's configuration and choose it with `--route`.
 Request `model` narrows compatible targets; it cannot replace a route's model.
-Each route still resolves `apiKeyEnv`, or its provider's default credential variable,
+Each route resolves an explicit `apiKeyEnv`, or its provider's credential aliases,
 from the process environment and explicit `--env-file`. Existing environment values
 win. Custom module paths remain relative to the configuration file.
 
@@ -184,15 +183,28 @@ credentials in native descriptors, and can also accept providers or factories.
 The `DECISION_*` selection variables below apply to single-provider profiles.
 Provider credential variables also supply configured routes as described above.
 
+Every built-in credential below accepts both names. A defined `DECISION_BRIDGE_`
+name takes precedence over the unprefixed name. Empty or invalid preferred values
+fail validation rather than falling back. SDK `apiKey` and `accountId` options
+override ambient values. An explicit CLI/configuration `apiKeyEnv` reads exactly
+that variable, with no alias lookup. Generated built-in profiles using default
+endpoints omit `apiKeyEnv` to retain automatic lookup. Profiles with an explicit
+endpoint retain a specific selector. Custom modules select their own variable explicitly.
+
+| Provider / purpose | Prefixed name | Unprefixed name |
+| --- | --- | --- |
+| Jev | `DECISION_BRIDGE_TYPESAFE_API_KEY` | `TYPESAFE_API_KEY` |
+| OpenAI Decisions and compatible preset | `DECISION_BRIDGE_OPENAI_API_KEY` | `OPENAI_API_KEY` |
+| OpenRouter Decisions, extraction and preset | `DECISION_BRIDGE_OPENROUTER_API_KEY` | `OPENROUTER_API_KEY` |
+| Gemini | `DECISION_BRIDGE_GEMINI_API_KEY` | `GEMINI_API_KEY` |
+| Anthropic preset | `DECISION_BRIDGE_ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
+| Cloudflare REST token | `DECISION_BRIDGE_CLOUDFLARE_API_TOKEN` | `CLOUDFLARE_API_TOKEN` |
+| Cloudflare account ID (not a secret) | `DECISION_BRIDGE_CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_ACCOUNT_ID` |
+
+Model and CLI control variables retain the names listed below.
+
 | Variable | Purpose |
 | --- | --- |
-| `TYPESAFE_API_KEY` | Native Jev credential |
-| `OPENAI_API_KEY` | Native Decisions and OpenAI-compatible credential at the OpenAI origin |
-| `OPENROUTER_API_KEY` | OpenRouter credential |
-| `DECISION_BRIDGE_GEMINI_API_KEY` | Native Gemini Decisions credential |
-| `ANTHROPIC_API_KEY` | Anthropic credential |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare REST account ID |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare REST token at the official origin |
 | `DECISION_ACCOUNT_ID` | CLI Cloudflare account selection |
 | `DECISION_REJECT_IF_BUSY` | CLI Cloudflare busy mode; literal `true` or `false` |
 | `DECISION_GATEWAY_ID` | CLI Cloudflare Gateway ID |

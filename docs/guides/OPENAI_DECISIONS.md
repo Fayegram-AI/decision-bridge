@@ -273,6 +273,13 @@ Common usage maps reported input/output and cache counts.
 reasoning tokens. `meta.openaiDecisions.answers` retains native answer types and
 reported confidence.
 
+When reported, `input_tokens_details.cache_write_tokens_details` contains
+`ttl_30m_tokens` and `ttl_12h_tokens`. Native usage and common
+`meta.openaiDecisions.usage` preserve this optional breakdown, including zero
+counts. Its counters must be nonnegative integers. Responses without the
+breakdown remain valid. See OpenAI's
+[cache usage accounting](https://developers.openai.com/api/docs/guides/prompt-caching#how-to-optimize-prompt-caching).
+
 Decisions defaults to **zero HTTP retries**. Explicit `maxRetries` opts into the
 existing bounded policy and may repeat a billed request. There is no model
 fallback, streaming, generation-parameter passthrough, or model listing.

@@ -7,24 +7,24 @@ choice and score questions. It uses REST directly and adds no runtime dependency
 
 ## Credentials and configuration
 
-The default credential variable is scoped to this SDK:
+Set `GEMINI_API_KEY` or `DECISION_BRIDGE_GEMINI_API_KEY` in the environment.
+The prefixed name takes precedence when both are defined:
 
 ```dotenv
-DECISION_BRIDGE_GEMINI_API_KEY=replace_with_your_gemini_api_key
+GEMINI_API_KEY=replace_with_your_gemini_api_key
 ```
 
-Keep the populated environment file ignored. Saved configuration names the
-variable through `apiKeyEnv`:
+Keep the populated environment file ignored. Omit `apiKeyEnv` to accept either
+name, or set it explicitly to select exactly one variable:
 
 ```json
 {
     "provider": "gemini-decisions",
-    "model": "gemini-decision-1",
-    "apiKeyEnv": "DECISION_BRIDGE_GEMINI_API_KEY"
+    "model": "gemini-decision-1"
 }
 ```
 
-Provider constructors read that variable from the process environment at Google's
+Provider constructors read those variables from the process environment at Google's
 official origin. A server or Worker can supply its binding as the in-memory
 `apiKey` option. Custom origins require an explicit key and do not inherit the
 ambient Google credential. See [browser credential handling](BROWSER.md).
@@ -197,7 +197,7 @@ decision-bridge init ./gemini-native --provider gemini-decisions --native
 ```
 
 Native evaluation and JSONL batches use `--native` explicitly. Routing registries
-use the same provider selector and `apiKeyEnv` reference. Offline validation and
+use the same provider selector and credential aliases. Offline validation and
 routing inspection do not make inference requests.
 
 See the [official API guide](https://aistudio.google.com/docs/decisions-api),

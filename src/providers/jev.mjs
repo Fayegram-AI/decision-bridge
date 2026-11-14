@@ -1,8 +1,8 @@
 import { optionsObject, TRANSPORT_FIELDS } from '../options.mjs';
 import { withResponseMeta, requireCondition as check } from '../errors.mjs';
-import { freezeJson, isRecord, validateResult } from '../validation.mjs';
+import { freezeJson, isRecord, validateResult, validateNativeResult } from '../validation.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
-import { environmentValue } from '../runtime-env.mjs';
+import { environmentValue, providerEnvironmentValue } from '../runtime-env.mjs';
 import { builtInCapabilities } from '../capabilities.mjs';
 import { jevDangerZone, jevHeaders, jevRequestLimit, JEV_RESULT_OPTIONS } from './jev-profile.mjs';
 import { prepareCommonJevDecision, prepareJevDecision } from './jev-preflight.mjs';
@@ -22,7 +22,7 @@ export class JevProvider {
       ['apiKey', 'model', 'baseURL', 'dangerZone', ...TRANSPORT_FIELDS], 'Jev options'));
     const endpointInfo = parseBaseURL(baseURL, { originOnly: true });
     const supplied = apiKey === undefined && endpointInfo.origin === 'https://api.typesafe.ai'
-      ? environmentValue('TYPESAFE_API_KEY') : apiKey;
+      ? providerEnvironmentValue('TYPESAFE_API_KEY') : apiKey;
     const key = validateApiKey(supplied, 'TYPESAFE_API_KEY');
     check(typeof model === 'string' && model.trim(), 'model must be nonempty.', 'CONFIGURATION_ERROR');
     const endpoint = endpointInfo.baseURL;
@@ -36,7 +36,8 @@ export class JevProvider {
   async evaluate(input, options = {}) {
     const prepared = prepareCommonJevDecision(input, this.#options);
     const { decision, meta } = await this.#perform(prepared, options);
-    return freezeJson({ ...decision, meta: { ...meta, provider: this.name,
+    const common = validateResult(decision, prepared.request.questions, JEV_RESULT_OPTIONS);
+    return freezeJson({ ...common, meta: { ...common.meta, ...meta, provider: this.name,
       probabilitySource: 'native', confidenceSource: 'native', modelSource: 'reported' } });
   }
 
@@ -54,7 +55,7 @@ export class JevProvider {
   async #perform({ request, native }, options) {
     const { data, meta: transport } = await this.#transport.request('POST', '/v1/systemone', native, options);
     const meta = { ...transport, requestedModel: request.model };
-    const decision = withResponseMeta(meta, () => validateResult(data, request.questions, JEV_RESULT_OPTIONS));
+    const decision = withResponseMeta(meta, () => validateNativeResult(data, request.questions, JEV_RESULT_OPTIONS));
     return freezeJson({ decision, meta });
   }
 

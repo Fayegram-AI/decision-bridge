@@ -1,7 +1,7 @@
 import { requireCondition as check } from '../errors.mjs';
 import { JsonTransport, parseBaseURL, validateApiKey } from '../transport.mjs';
 import { JsonResponseTransport } from '../response-transport.mjs';
-import { environmentValue } from '../runtime-env.mjs';
+import { providerEnvironmentValue } from '../runtime-env.mjs';
 import { cloudflareGatewayHeaders, cloudflareRequestLimit } from './cloudflare-profile.mjs';
 import { cloudflareBindingBody } from './cloudflare-preflight.mjs';
 import { cloudflareError } from './cloudflare-validation.mjs';
@@ -42,12 +42,12 @@ export class CloudflareTransport {
         } else {
             const endpoint = parseBaseURL(baseURL, { originOnly: true });
             const official = endpoint.origin === 'https://api.cloudflare.com';
-            const account = accountId === undefined && official ? environmentValue('CLOUDFLARE_ACCOUNT_ID') : accountId;
+            const account = accountId === undefined && official ? providerEnvironmentValue('CLOUDFLARE_ACCOUNT_ID') : accountId;
             check(typeof account === 'string' && /^[A-Za-z0-9_-]+$/.test(account.trim()) &&
                 !/^(replace_with_|your_actual_|paste_)/i.test(account.trim()),
             'Set CLOUDFLARE_ACCOUNT_ID or supply a URL-safe accountId.', 'CONFIGURATION_ERROR');
             this.#accountId = account.trim();
-            const key = validateApiKey(apiKey === undefined && official ? environmentValue('CLOUDFLARE_API_TOKEN') : apiKey,
+            const key = validateApiKey(apiKey === undefined && official ? providerEnvironmentValue('CLOUDFLARE_API_TOKEN') : apiKey,
                 'CLOUDFLARE_API_TOKEN');
             for (const limit of byteLimits) this.#transports.set(limit, new JsonTransport({ ...shared,
                 maxRequestBytes: limit, baseURL: endpoint.baseURL,

@@ -5,6 +5,8 @@ import { openaiModelProfile } from './providers/openai-profile.mjs';
 import { jevFeatures } from './providers/jev-profile.mjs';
 import { geminiCapabilities } from './providers/gemini-profile.mjs';
 import { DEFAULT_JSON_NODES, jsonNodeLimit } from './json-limits.mjs';
+import { anthropicResponseFormat } from './providers/anthropic-profile.mjs';
+import { documentMimeTypes, assertDocumentMime } from './document-media.mjs';
 
 /** Conservative defaults preserve the pre-existing custom-provider contract. */
 export const LEGACY_CAPABILITIES = freezeJson({
@@ -16,6 +18,7 @@ export const LEGACY_CAPABILITIES = freezeJson({
     conversation: false, toolHistory: false, remoteImages: false, promptCaching: false,
     jsonInput: false, questionContent: false,
     documents: false, remoteAudio: false, remoteVideos: false, remoteDocuments: false, maxDocuments: 0,
+    documentMimeTypes: ['application/pdf'],
     questionContentTypes: [],
     imageResolutions: [], videoResolutions: [], maxJsonNodes: DEFAULT_JSON_NODES,
 });
@@ -26,6 +29,7 @@ const CLOUDFLARE_CAPABILITIES = freezeJson({
 });
 
 export function builtInCapabilities(type, model, options = {}) {
+    if (type === 'custom-generative' && options.preset === 'anthropic') anthropicResponseFormat(model, options.responseFormat);
     if (type === 'gemini-decisions') return freezeJson({ ...LEGACY_CAPABILITIES, ...geminiCapabilities(model) });
     if (type === 'jev') return freezeJson({ ...LEGACY_CAPABILITIES,
         ...jevFeatures(model, Object.hasOwn(options, 'dangerZone') ? options.dangerZone : undefined),
@@ -59,6 +63,7 @@ export function providerCapabilities(provider, model) {
     check(isRecord(profile) && Object.keys(profile).every(key => Object.hasOwn(LEGACY_CAPABILITIES, key)),
         'Invalid capability profile.', 'CONFIGURATION_ERROR');
     const result = { ...LEGACY_CAPABILITIES, ...profile };
+    documentMimeTypes(result.documentMimeTypes);
     result.maxJsonNodes = jsonNodeLimit(result.maxJsonNodes);
     for (const [key, allowed] of [['imageResolutions', ['low', 'medium', 'high', 'ultra_high']],
         ['videoResolutions', ['low', 'medium', 'high']]]) {
@@ -125,6 +130,7 @@ export function assertCapabilities(request, capabilities) {
             if (count) {
                 requireFeature(capabilities[flag], kind + ' input');
                 requireFeature(capabilities[limit] === null || count <= (capabilities[limit] ?? 0), 'this ' + kind + ' count');
+                if (kind === 'document') media.forEach(part => assertDocumentMime(part, capabilities.documentMimeTypes));
             }
         }
     }

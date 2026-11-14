@@ -17,10 +17,11 @@ export function extractionModel(value = 'clairic') {
     return 'clairic';
 }
 
-export function validateExtractionField(spec, { allowZeroThreshold = false } = {}) {
+export function validateExtractionField(spec, { allowZeroThreshold = false, numericListInteger = false } = {}) {
     check(isRecord(spec) && Object.keys(spec).every(key => FIELD_KEYS.includes(key)) && TYPES.includes(spec.type), 'Invalid extraction field.');
     for (const key of ['instructions', 'unit']) check(spec[key] === undefined || typeof spec[key] === 'string', `${key} must be text.`);
-    check(spec.integer === undefined || (['number', 'duration'].includes(spec.type) && typeof spec.integer === 'boolean'), 'Invalid integer option.');
+    check(spec.integer === undefined || ((['number', 'duration'].includes(spec.type) || numericListInteger && spec.type === 'list' && spec.items === 'number') &&
+        typeof spec.integer === 'boolean'), 'Invalid integer option.');
     check(spec.decimals === undefined || ((['number', 'duration'].includes(spec.type) || spec.type === 'list' && spec.items === 'number') &&
         Number.isSafeInteger(spec.decimals) && spec.decimals >= 0), 'Invalid decimals option.');
     if (spec.type === 'duration' && spec.unit !== undefined) check(['seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years'].includes(spec.unit), 'Invalid duration unit.');
@@ -43,14 +44,14 @@ export function validateExtractionField(spec, { allowZeroThreshold = false } = {
 }
 
 /** Structural validation is independent of route model and transport policy. */
-export function validateExtractionStructure(input) {
+export function validateExtractionStructure(input, fieldOptions) {
     const request = cloneJson(input, 'extraction request');
     check(isRecord(request) && Object.keys(request).every(key => ['model', 'state', 'fields', 'images', 'reference_date', 'options'].includes(key)), 'Invalid extraction request fields.');
     check(request.model === undefined || (typeof request.model === 'string' && request.model.trim()), 'model must be nonempty text.');
     check(isRecord(request.fields) && Object.keys(request.fields).length > 0, 'Extraction requires named fields.');
     for (const [name, spec] of Object.entries(request.fields)) {
         check(/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name), 'Invalid extraction field name.');
-        validateExtractionField(spec);
+        validateExtractionField(spec, fieldOptions);
     }
     check(request.state === undefined || typeof request.state === 'string', 'Extraction state must be text.');
     check((request.state?.length ?? 0) > 0 || (Array.isArray(request.images) && request.images.length > 0), 'Provide text or embedded images.');
@@ -108,7 +109,7 @@ export function validateExtractionResponse(input, request, { openRouter = false 
         }
         const span = item => Array.isArray(item) && item.length === 2 && item.every(n => Number.isSafeInteger(n) && n >= 0) && item[1] >= item[0];
         if (own(answer, 'span')) invalid(span(answer.span), 'Invalid extraction span.');
-        if (own(answer, 'spans')) invalid(Array.isArray(answer.spans) && answer.spans.every(span), 'Invalid extraction spans.');
+        if (own(answer, 'spans')) invalid(Array.isArray(answer.spans) && answer.spans.every(item => openRouter && item === null || span(item)), 'Invalid extraction spans.');
         for (const key of ['quantiles', 'steps']) if (own(answer, key)) invalid(Array.isArray(answer[key]), 'Invalid predictive array.');
     }
     return freezeJson(data);

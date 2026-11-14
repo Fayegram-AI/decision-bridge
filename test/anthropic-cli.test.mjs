@@ -61,6 +61,18 @@ test('Anthropic workspace IDs are header-safe in SDK, runtime and schema validat
     }
 });
 
+test('offline Anthropic validation checks explicit mode against request model overrides', async () => {
+    const flags = ['--provider', 'custom-generative', '--preset', 'anthropic', '--model', 'legacy'];
+    const input = JSON.stringify({ ...one, model: 'claude-sonnet-5-5' });
+    assert.equal((await invoke(['validate', '-', ...flags], input)).code, 0);
+    const rejected = await invoke(['validate', '-', ...flags, '--response-format', 'tool'], input);
+    // CLI --model is an explicit request override, so omit it to select the input model.
+    assert.equal(rejected.code, 0);
+    const incompatible = await invoke(['validate', '-', ...flags.slice(0, 4), '--response-format', 'tool'], input);
+    assert.equal(incompatible.code, 2);
+    assert.equal(JSON.parse(incompatible.stderr).error.code, 'UNSUPPORTED_CAPABILITY');
+});
+
 test('Anthropic mode/version precedence, switching and initialization preserve explicit settings', async t => {
     const cwd = await temporaryWorkspace(t);
     await writeFile(join(cwd, 'config.json'), JSON.stringify({ ...base, responseFormat: 'tool', apiVersion: '2023-06-01' }));

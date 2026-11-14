@@ -4,6 +4,7 @@ Use `openrouter-decisions` for OpenRouter's native Decisions API and
 `openrouter-extraction` for Extractions. Both require an explicit model ID and
 read `OPENROUTER_API_KEY` for the official endpoint. The SDK accepts native model
 IDs without an account catalog allowlist. The service determines model access.
+Leading and trailing whitespace does not change model selection.
 The separate `custom/generative` preset `openrouter` uses chat completions and
 elicited probabilities.
 
@@ -42,15 +43,20 @@ rubrics can contain one level. Common `evaluate()` keeps the common rubric and
 distribution requirements: a choice/score response without probabilities raises
 `UNSUPPORTED_CAPABILITY`. No probabilities or confidence are fabricated.
 Common metadata keeps additional native usage under `meta.openRouter.usage`.
+Optional Noul confidence is retained under `meta.openRouter.answers[id].confidence`;
+the common Noul answer contains its probability.
 
-`provider.listModels()` queries `/api/v1/models?output_modalities=decisions`.
+`provider.listModels()` queries `/api/v1/models?endpoints=/api/alpha/decisions`.
+With `api: 'systemone'`, it filters by `/api/v1/systemone` instead. Extraction-only
+models are excluded. Model entries retain upstream metadata, including endpoint
+and architecture information.
 Discovery lists advertised IDs; it does not establish your account's inference
 access. Native requests can use other IDs accepted by the service.
 
 ## Common media and capability profiles
 
 All native model IDs accept the basic shared-state contract and ordered text.
-Richer common capabilities are enabled for these verified profiles:
+Richer common capabilities are enabled for these model profiles:
 
 | Model ID | Images | Boxes | Typed choices / labelled scores | Audio / video |
 | --- | --- | --- | --- | --- |
@@ -59,13 +65,35 @@ Richer common capabilities are enabled for these verified profiles:
 | `cloudflare/clef`, `cloudflare/clef-flash` | PNG/JPEG/WebP | No | Yes | No |
 | `cloudflare/clef-omni` | PNG/JPEG/WebP | No | Yes | Yes |
 | `openai/gpt-6-luna-decisions` | PNG/JPEG/WebP | No | Yes | No |
+| `google/gemini-decision-1` | Any inline `image/*`, HTTPS images | No | No | Inline audio; inline/HTTPS video |
+| `scaledown/classify-1` | PNG/JPEG/TIFF | No | No | No |
+| `heygen/heygen-decision-1`, `heygen/heygen-decision-1-turbo` | PNG/JPEG/WebP | No | No | No |
+| `baseten/joey-1`, `baseten/mammoth-1`, `baseten/elephant-1` | PNG/JPEG/WebP | No | No | No |
+| `liquid/d1`, `liquid/d1.1`, `liquid/d1-ultra`, `~liquid/d1-latest`, `~liquid/d1-ultra-latest` | PNG/JPEG/WebP | No | No | No |
+| `morph/reflex` | PNG/JPEG/WebP | No | No | No |
+| `perplexity/pplx-decider-v1.2`, `perplexity/pplx-decider-flash-v1.2`, `perplexity/pplx-decider-v1.3:free`, `perplexity/pplx-decider-flash-v1.3:free`, `~perplexity/pplx-decider-latest`, `~perplexity/pplx-decider-flash-latest` | PNG/JPEG/WebP | No | No | No |
 
 Ordered input retains its order. Native text items are strings, images use
 `image_url` parts with embedded data URLs, audio uses `input_audio` with raw
 base64 and a format, and video uses `video_url` with an embedded data URL.
-Remote media URLs and Responses-style `input_image` parts are not translated.
-Only the Omni profile enables common audio/video; native JSON remains subject
-to the selected model's interpretation and service limits.
+Google's profile also accepts HTTPS images and video. Remote audio and
+Responses-style `input_image` parts are unsupported. Image `detail` accepts
+`auto`, `low` or `high`; common `resolution` controls are unsupported through
+OpenRouter. Native media parts on known profiles are validated before dispatch.
+Only Jev images can be nested in state, instructions or criteria; other media
+belong in the top-level state array. A native `file` may also be the whole state.
+
+Common documents use `{ type: 'document', dataUrl }` or
+`{ type: 'document', url }`, encoded as native `file` parts. Google accepts PDF,
+CSV, Word (`.doc`, `.docx`), Excel (`.xls`, `.xlsx`), PowerPoint (`.ppt`, `.pptx`)
+and OpenDocument (`.odt`, `.ods`, `.odp`) MIME types. HTTPS document URLs require
+one of these filename extensions in their path; signed query strings are
+preserved. ScaleDown accepts inline PDF, PNG, JPEG and TIFF files. Its image
+parts count toward its single-document service limit. The SDK forwards media
+references without fetching them. `documentMimeTypes` reports accepted inline
+document MIME types. Document input uses common result schema version 7.
+See the [CSV example](../../examples/openrouter-media.mjs) for a complete common
+document request through Google's OpenRouter profile.
 
 Native image assets use `{ type: 'image', format: 'png' | 'jpg' | 'jpeg',
 data_base64 }`. Jev references can appear inside state, instructions or criteria,
@@ -91,7 +119,8 @@ console.log(result.extraction.answers.total.value);
 
 The endpoint is `POST /api/alpha/extractions`. `extract()` accepts common
 `state`, `fields`, `images`, `reference_date`, and optional `model`. Common
-PNG/JPEG images become referenced native assets. Cloudflare-specific request
+PNG/JPEG/WebP images become native assets. Image-only requests omit native
+`state`; requests with text append generated references. Cloudflare-specific request
 `options` are rejected; use explicit `providerPreferences.options` where the
 selected upstream provider documents them.
 
@@ -99,21 +128,45 @@ selected upstream provider documents them.
 It returns an immutable common request with a resolved model, retaining `images`
 for reuse with `extract()`, `extractBatch()` and `validateResult()`.
 
-`createExtraction()` accepts the native shape with `state`, `fields`, `assets`,
-`reference_date` and OpenRouter request metadata. Assets can be PNG/JPEG images
-or `{ type: 'document', format: 'pdf', data_base64 }` PDFs referenced in the
-state text. The nine field types are text, number, date, datetime, time,
+`createExtraction()` accepts the native shape with optional `state`, `fields`,
+`assets`, `reference_date` and OpenRouter request metadata. Assets can be PNG,
+JPEG or WebP images, or `{ type: 'document', format: 'pdf', data_base64 }` PDFs,
+subject to the model's formats. Omit `state` or set it to an empty string for
+asset-only input; references are then unnecessary. With nonempty text, every
+asset must be referenced in state or field instructions.
+
+Clairic accepts PNG/JPEG/WebP images, and rejects a bare asset key as state or
+field instructions when there are multiple images. ScaleDown accepts one PDF,
+PNG or JPEG asset and reads either text or that asset; omit state or use the
+sole asset key for file-only input. Mercury Decide, Schematron, Sage and
+Perplexity extraction profiles accept text only.
+
+The nine field types are text, number, date, datetime, time,
 duration, list, estimate and forecast. Forecast fields require a `horizon` from
 1 through 64 and an `interval`; `decimals` accepts 0 through 6 where supported.
-Native `null_threshold` accepts zero through one. Forecast values are arrays of
+Known models enforce their field contracts:
+
+| Model | Fields and options |
+| --- | --- |
+| `cloudflare/clairic` | All nine types; optional unit labels, including text/date/time and lists; numeric lists accept `integer` and `decimals`. No `null_threshold` on list/estimate/forecast; other thresholds must be above zero. |
+| `inception/mercury-decide` | Text and text lists; no unit labels or `reference_date`. |
+| `inference-net/schematron-v2-small`, `inference-net/schematron-v2-turbo` | Text, number, date, time, datetime and lists; no unit labels, `null_threshold` or `reference_date`. |
+| `levanto/sage-2` | Text, number, date, time, datetime, duration and lists; no text/list/number unit labels, list `null_threshold` or `reference_date`. Duration units are supported. |
+| `perplexity/pplx-decider-v1.3`, `perplexity/pplx-decider-flash-v1.3` (including `:free`) | Text and text lists; no unit labels, `null_threshold` or `reference_date`. |
+| `scaledown/extract` | Text and text lists; no unit labels, `null_threshold` or `reference_date`. |
+
+Other model IDs use the general field grammar, including thresholds from zero
+through one; the service determines their support and availability.
+Forecast values are arrays of
 numbers or strings, or null; their predictive arrays and step values are validated.
 
-Results preserve omitted `truncated` and nullable `state_text`. The API does not
+Results preserve omitted `truncated`, nullable `state_text` and null entries in
+optional `spans` arrays. The API does not
 insert Cloudflare defaults into native responses. `validateResult(result, commonRequest)`
 checks a saved envelope against the configured provider, model and common request's
 field contract without inference. `extractBatch()` supports both built-in extraction providers.
-Extraction discovery is not exposed because the catalog has no documented
-extraction-modality filter.
+For extraction model discovery, query OpenRouter's Models API directly with
+`endpoints=/api/alpha/extractions`; the SDK has no extraction listing method.
 
 ## CLI and routing
 

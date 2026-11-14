@@ -9,7 +9,7 @@ import { createExtractionProvider, CloudflareExtractionProvider, OpenRouterExtra
 import { extractionProviderContract } from '../extraction/result.mjs';
 import { prepareCommonOpenRouterExtraction } from '../extraction/openrouter.mjs';
 import { prepareCommonOpenRouterDecision } from '../providers/openrouter-decisions.mjs';
-import { openRouterSettings } from '../providers/openrouter-shared.mjs';
+import { openRouterSettings, openRouterModel } from '../providers/openrouter-shared.mjs';
 import { prepareCommonGeminiDecision } from '../providers/gemini-codec.mjs';
 import { GEMINI_MODEL, GEMINI_REQUEST_CEILING, geminiModel } from '../providers/gemini-profile.mjs';
 import { validateExtractionRequest, extractionModel } from '../extraction/validation.mjs';
@@ -27,7 +27,10 @@ const pure = { 'gemini-decisions': (request, options) => prepareCommonGeminiDeci
     'openrouter-decisions': (request, options) => prepareCommonOpenRouterDecision(request, options).request, 'openrouter-extraction': prepareCommonOpenRouterExtraction, jev: preflightCommonJevDecision, 'openai-decisions': preflightCommonDecision,
     'cloudflare-decisions': preflightCommonCloudflareDecision, 'cloudflare-extraction': validateExtractionRequest };
 const modelDefault = { 'gemini-decisions': GEMINI_MODEL, jev: 'jev-latest', 'openai-decisions': 'default', 'cloudflare-decisions': 'clef', 'cloudflare-extraction': 'clairic' };
-const normalize = { 'gemini-decisions': geminiModel, 'openai-decisions': resolveOpenAIModel, 'cloudflare-decisions': cloudflareModel, 'cloudflare-extraction': extractionModel };
+// OpenRouter routes may defer model selection until the request arrives.
+const openRouterRouteModel = value => value === undefined ? undefined : openRouterModel(value);
+const normalize = { 'gemini-decisions': geminiModel, 'openai-decisions': resolveOpenAIModel, 'cloudflare-decisions': cloudflareModel,
+    'cloudflare-extraction': extractionModel, 'openrouter-decisions': openRouterRouteModel, 'openrouter-extraction': openRouterRouteModel };
 
 function nativeConfig(input) {
     const type = Object.getOwnPropertyDescriptor(input ?? {}, 'type')?.value;
