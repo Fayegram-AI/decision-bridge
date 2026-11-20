@@ -109,11 +109,13 @@ through Decision Bridge. Use `model: 'gpt-6-luna'` to select that explicit upstr
 ID. Mappings are fixed by the installed package release; results expose the
 selection in `meta.requestedModel` and outgoing ID in `meta.resolvedModel`.
 
-For Jev, native OpenRouter Decisions, Gemini Decisions and the generative providers, list models
-with `await bridge.listModels()`. Native OpenRouter filters its catalog to Decisions models.
-Gemini reads metadata for its supported `gemini-decision-1` selector.
+For Jev, OpenRouter Decisions with `api: 'decisions'`, Gemini Decisions and
+the generative providers, list models with `await bridge.listModels()`.
+OpenRouter filters its catalog to the Decisions endpoint. Gemini reads metadata
+for its supported `gemini-decision-1` selector.
 OpenAI Decisions and Cloudflare Clef do not implement model discovery and return
-`UNSUPPORTED_OPERATION`; their capability profiles do not prove account availability.
+`UNSUPPORTED_OPERATION`. OpenRouter with `api: 'systemone'` returns the same
+error for listing. Supply a model ID for System One inference.
 A catalog entry does not prove support for a particular response format. Check
 that the selected serving endpoint supports the configured output mode. Anthropic
 model listing preserves first-page pagination metadata; this client does not

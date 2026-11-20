@@ -3,9 +3,9 @@
 ## An export or command from these guides is missing
 
 Run `npm exec -- decision-bridge --version` in the consuming project and compare
-it with [version availability](../README.md#version-availability). These guides
-describe 0.1.8, including Gemini Decisions. Follow the [installation options](GETTING_STARTED.md#install-into-your-application)
-to install this version, or use the documentation bundled with an older package.
+it with [version availability](../README.md#version-availability). Use the
+documentation bundled with your installed package, or install the version you
+need using the [installation guide](GETTING_STARTED.md#install-into-your-application).
 
 ## The command cannot find a key
 
@@ -140,7 +140,7 @@ designing resumability.
 
 ## Extraction or Live does not behave like bridge evaluation
 
-For Clairic, use `CloudflareExtractionProvider` from the `/extraction` export or
+For Clairic or Clairic Flash, use `CloudflareExtractionProvider` from the `/extraction` export or
 the `extraction` CLI namespace with `cloudflare-extraction`. For OpenRouter, use
 `OpenRouterExtractionProvider` or `--provider openrouter-extraction`; add `--native`
 for its image/PDF assets and request metadata. The root decision
@@ -152,7 +152,11 @@ native result; inspect it according to your application's needs.
 Use `provider.validate(request)` for offline extraction preflight and reuse its
 returned common request with extraction, batching or routing. For a saved
 `{ extraction, meta }` envelope, call `provider.validateResult(result, request)`
-with the corresponding common request. See [shared extraction contracts](EXTRACTION.md#provider-neutral-extraction).
+with the original request and its model selector. See [shared extraction contracts](EXTRACTION.md#provider-neutral-extraction).
+
+If a Cloudflare PDF request exceeds the client budget, check the size of the
+serialized JSON, including base64 and any binding options. The
+[attachment limits](EXTRACTION.md#pdf-documents) also apply.
 
 For Live, `requestDecision` and `appendCommentary` resolve on submission. Consume
 completed decisions through `subscribe`. An unmatched result indicates missing or

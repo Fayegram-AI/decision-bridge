@@ -45,16 +45,16 @@ also verify cancellation from a native Windows console.
 - `decisions*.test.mjs`: native/common OpenAI codecs, explicit JSON/question content, builders, selectors and model identities, boundaries, preflight, CLI, and smoke-helper fixtures.
 - `anthropic*.test.mjs`: tool/JSON output, API versions, workspace headers, request budgets, cumulative threads/recovery, response blocks, SDK/CLI/schema parity, and loopback commands.
 - `openrouter*.test.mjs`: native Decisions/Extractions, assets, optional results, forecast validation, routing preferences, common projection, reusable extraction validation, saved provenance and model/identifier boundaries.
-- `provider-refresh-boundaries.test.mjs`: OpenRouter CLI common/native initialization, validation and batching, routed fallback ownership, and Anthropic SDK/CLI request budgets above 64 MiB.
+- `provider-refresh-boundaries.test.mjs`: OpenRouter CLI common/native initialization, validation and batching, System One discovery rejection, routed extraction and fallback ownership, and Anthropic SDK/CLI request budgets above 64 MiB.
 - `credential-env.test.mjs`: prefixed/unprefixed credentials for every built-in provider, explicit selection, account IDs, environment-file precedence and generated profiles.
 - `response-extensions.test.mjs`: native extension preservation, common projection, metadata, generated answers, Live acknowledgements and safe refusal diagnostics.
 - `cloudflare*.test.mjs`: models, images, codecs, REST/binding/Gateway arguments, errors, and CLI limits.
 - `gemini*.test.mjs`, `gemini.types.mts`: native/common Google requests, media/MIME/resolution rules, byte/node budgets, confidence/usage/refusals, credential lookup, CLI/schema parity, routing and type contracts.
 - `jev*.test.mjs`: native/common assets, reference substitution, boxes, opt-ins, nullable usage and CLI behavior.
 - `capability-expansion.test.mjs`: conversation/tool history, remote images, cache controls, extension revalidation, service-limit ownership and safe rejection diagnostics.
-- `extraction.test.mjs`: all nine Clairic field families, native JSON preservation, REST/binding options, batch preflight and model-selection diagnostics.
+- `extraction.test.mjs`: Clairic and Clairic Flash, nine field types, PDF preflight and attachment limits, REST/binding dispatch, nullable spans, and batch model metadata.
 - `live.test.mjs`: commands/acknowledgements, configuration history, transcript ordering, unmatched/stale/duplicate results, observer isolation and lifecycle cleanup.
-- `expansion-cli.test.mjs`: extraction commands/configuration, offline Live validation/replay, per-row errors and provider-switch isolation.
+- `expansion-cli.test.mjs`: extraction commands, model selection in generated profiles, PDF and JSONL requests, provider switching, and offline Live validation and replay.
 - `routing*.test.mjs`: eligibility, deterministic/model selection, clarification, preparation, budgets, recovery/cooldowns, batch snapshots and registry CLI behavior.
 - `custom-providers.test.mjs`, `custom-config.test.mjs`: classified SDK paths, provenance, presets/modules, schema and initialization.
 - `generative-helpers.test.mjs`: exported prompt/normalization helper contracts and unsupported input rejection.
@@ -154,7 +154,8 @@ Forward provider/model/config options for the selected account. The helper refus
 to infer without the opt-in flag and returns real results or errors. It checks a
 configured inference path, not model quality or throughput. For model listing
 alone, use `node bin/decision.mjs models --env-file .env`.
-Model listing is unsupported for OpenAI Decisions and Cloudflare Clef.
+Model listing is unsupported for OpenAI Decisions, Cloudflare Clef, and
+OpenRouter with `api: 'systemone'`.
 
 The OpenAI Decisions helper performs four bounded common/native requests when
 invoked with `--decisions`. It includes a valid embedded PNG, typed choices, and

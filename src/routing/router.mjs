@@ -23,7 +23,7 @@ export function makeRouter(input, operation) {
     const state = { options, registry, policy, cooldowns, operation };
     // Neutral admission accepts the largest contract; candidate preflights enforce their own limits.
     const structure = operation === 'decision' ? value => validateRequestStructure(value, { maxJsonNodes: MAX_JSON_NODES })
-        : validateExtractionStructure;
+        : value => validateExtractionStructure(value, { allowZeroThreshold: true, numericListInteger: true });
     function callOptions(value) {
         optionsObject(value, CALL_FIELDS, 'Routing call options');
         const { signal, onAmbiguity, ...json } = value;

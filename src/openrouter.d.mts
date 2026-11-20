@@ -56,5 +56,5 @@ export class OpenRouterDecisionsProvider implements DecisionProvider {
     evaluate<const Q extends Questions>(request: EvaluationRequest<Q>, options?: ProviderCallOptions): Promise<ProviderResult<Q>>;
     createDecision<const Q extends OpenRouterDecisionQuestions>(request: OpenRouterDecisionRequest<Q>, options?: ProviderCallOptions):
         Promise<{ readonly decision: OpenRouterDecisionResponse<Q>; readonly meta: OpenRouterTransportMetadata & { readonly provider: 'openrouter-decisions' } }>;
-    listModels(options?: ProviderCallOptions): Promise<ModelList>;
+    listModels(options?: ProviderCallOptions): Promise<ModelList & Readonly<Record<string, unknown>>>;
 }

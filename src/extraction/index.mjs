@@ -5,7 +5,8 @@ import { cloneJson, freezeJson } from '../validation.mjs';
 import { CloudflareTransport } from '../providers/cloudflare-transport.mjs';
 import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudflare-profile.mjs';
 import { unwrapCloudflareResponse } from '../providers/cloudflare-validation.mjs';
-import { validateExtractionRequest, validateExtractionResponse, extractionModel } from './validation.mjs';
+import { validateExtractionRequest, validateExtractionResponse, extractionModel, CLOUDFLARE_EXTRACTION_MODELS } from './validation.mjs';
+import { DEFAULT_EXTRACTION_REQUEST_BYTES } from './cloudflare-media.mjs';
 import { evaluateBatch } from '../batch.mjs';
 import { extractionResult } from './result.mjs';
 import { OpenRouterExtractionProvider } from './openrouter.mjs';
@@ -42,16 +43,17 @@ export class CloudflareExtractionProvider {
         const gateway = cloudflareGateway(supplied.gateway);
         this.#settings = { model: this.defaultModel, transport, gateway, ...validateCloudflareLimits({ ...supplied, gateway }) };
         this.#transport = new CloudflareTransport({ ...supplied, ...this.#settings }, {
-            models: ['clairic'], requestLimit: (_model, ceiling) => ceiling ?? 8 * 1024 * 1024,
+            models: CLOUDFLARE_EXTRACTION_MODELS, requestLimit: (_model, ceiling) => ceiling ?? DEFAULT_EXTRACTION_REQUEST_BYTES,
         });
     }
 
     validate(request) { return validateExtractionRequest(request, this.#settings); }
 
     validateResult(result, input) {
-        const request = this.validate(input);
+        const snapshot = cloneJson(input, 'extraction request');
+        const request = this.validate(snapshot);
         return extractionResult(result, request, { provider: this.name,
-            requestedModel: input.model ?? request.model, validateResponse: validateExtractionResponse });
+            requestedModel: snapshot.model ?? this.#settings.model, validateResponse: validateExtractionResponse });
     }
 
     async extract(input, options = {}) {

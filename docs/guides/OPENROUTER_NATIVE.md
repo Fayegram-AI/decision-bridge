@@ -46,10 +46,14 @@ Common metadata keeps additional native usage under `meta.openRouter.usage`.
 Optional Noul confidence is retained under `meta.openRouter.answers[id].confidence`;
 the common Noul answer contains its probability.
 
-`provider.listModels()` queries `/api/v1/models?endpoints=/api/alpha/decisions`.
-With `api: 'systemone'`, it filters by `/api/v1/systemone` instead. Extraction-only
-models are excluded. Model entries retain upstream metadata, including endpoint
-and architecture information.
+With the default `api: 'decisions'`, `provider.listModels()` queries
+`/api/v1/models?endpoints=/api/alpha/decisions`. Extraction-only models are excluded.
+The result retains catalogue metadata and model-card metadata, including endpoint
+and architecture information. The CLI `models` command uses the same catalogue.
+
+With `api: 'systemone'`, model listing returns `UNSUPPORTED_OPERATION` because
+OpenRouter's catalogue has no filter for that route. Supply an explicit model ID
+for System One requests. Use `api: 'decisions'` to browse the Decisions catalogue.
 Discovery lists advertised IDs; it does not establish your account's inference
 access. Native requests can use other IDs accepted by the service.
 

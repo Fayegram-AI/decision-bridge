@@ -177,6 +177,8 @@ context defaults to 32 KiB and is never silently truncated.
 
 Modalities are `text`, `image`, `audio`, `video` and `document`. PDF parts contribute
 to `document`; capability checks exclude providers that cannot accept them.
+Cloudflare extraction's `documents` array contributes to the same modality.
+The selector sees the MIME type and decoded byte count for each embedded PDF.
 Recognized remote media includes its MIME hint, and PDF references identify
 `application/pdf`, while selector context omits their URLs and payloads.
 Explicit JSON parts contribute to the `text` modality and question images contribute to

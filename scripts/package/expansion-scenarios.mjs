@@ -3,14 +3,16 @@ export function expansionScenario(name) {
     return `import assert from 'node:assert/strict';
 import { CloudflareExtractionProvider, validateExtractionRequest, extractBatch } from ${JSON.stringify(name + '/extraction')};
 import { createLiveDecisions, validateLiveCommand } from ${JSON.stringify(name + '/live')};
-const request = { state: '4 USD', fields: { amount: { type: 'number' } }, options: { return_state_text: true } };
-assert.equal(validateExtractionRequest(request).model, 'clairic');
+const request = { documents: ['data:application/pdf;base64,JVBERi0xLjcK'],
+    fields: { amount: { type: 'number' } }, options: { return_state_text: true } };
+assert.equal(validateExtractionRequest(request, { model: '@cf/cloudflare/clairic-flash' }).model, 'clairic-flash');
 const extraction = new CloudflareExtractionProvider({ transport: 'binding', ai: { async run(model, input) {
-    assert.equal(model, '@cf/cloudflare/clairic');
+    assert.equal(model, '@cf/cloudflare/clairic-flash');
+    assert.deepEqual(input.documents, request.documents);
     assert.equal(input.options.return_state_text, true);
-    return Response.json({ model: 'clairic', answers: { amount: { type: 'number', value: 4 } },
+    return Response.json({ model: 'clairic-flash', answers: { amount: { type: 'number', value: 4 } },
         truncated: false, usage: { input_tokens: 1, output_tokens: 0 } });
-} } });
+} }, model: 'clairic-flash' });
 assert.equal((await extraction.extract(request)).extraction.answers.amount.value, 4);
 assert((await extractBatch(extraction, [request])).every(row => row.ok));
 let listener;
@@ -35,7 +37,8 @@ import { CloudflareExtractionProvider as QualifiedExtraction } from ${JSON.strin
 import { createLiveDecisions as qualifiedLive, type LiveCommand as QualifiedCommand } from ${JSON.stringify(name + '/live')};
 async function qualifyExpandedDeclarations() {
     const provider = new QualifiedExtraction({ accountId: 'fixture', apiKey: 'fixture' });
-    const result = await provider.extract({ state: '4', fields: { amount: { type: 'number' } } });
+    const result = await provider.extract({ model: '@cf/cloudflare/clairic-flash',
+        documents: [{ content_type: 'application/pdf', base64: 'JVBERi0xLjcK' }], fields: { amount: { type: 'number' } } });
     const amount: number | null = result.extraction.answers.amount.value;
     const sent: QualifiedCommand[] = [];
     const live = qualifiedLive({ transport: { send(command) { sent.push(command); }, subscribe() { return () => {}; } } });

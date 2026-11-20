@@ -54,6 +54,8 @@ checks and optional service checks.
 ## Cloudflare extraction
 
 - [Extraction concepts](https://developers.cloudflare.com/workers-ai/concepts/extraction-models/)
+- [Clairic](https://developers.cloudflare.com/workers-ai/models/clairic/#parameters) and [Clairic Flash](https://developers.cloudflare.com/workers-ai/models/clairic-flash/#parameters) model schemas
+- [Cloudflare's Clairic announcement](https://blog.cloudflare.com/open-clairic/) documents PDF input and the rendered page limit
 - [Clairic schema snapshot](https://github.com/cloudflare/cloudflare-docs/blob/a5cc2cba1a31b8bd95eda69dad151e6cd307ac7b/src/content/workers-ai-models/clairic.json), the pinned basis for established native fields; underspecified predictive JSON remains preserved
 
 ## Package and repository release

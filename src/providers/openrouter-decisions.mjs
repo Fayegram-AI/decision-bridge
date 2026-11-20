@@ -129,5 +129,11 @@ export class OpenRouterDecisionsProvider {
             }, request.questions, this.getResultValidationOptions()));
         });
     }
-    listModels(options = {}) { return openRouterModels(this.#transport, options, this.#settings.api); }
+    async listModels(options = {}) {
+        // The catalogue supports Decisions as a filter but has no System One filter.
+        check(this.#settings.api !== 'systemone',
+            "OpenRouter System One model listing is unavailable. Use api: 'decisions' to browse the Decisions catalogue.",
+            'UNSUPPORTED_OPERATION');
+        return openRouterModels(this.#transport, options);
+    }
 }

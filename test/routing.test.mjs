@@ -5,6 +5,7 @@ import { DecisionError } from '../src/errors.mjs';
 import { createBridge } from '../src/bridge.mjs';
 import { routingRequest as request, worker, registry, delay } from './routing-fixtures.mjs';
 import { jsonResponse } from './fixtures.mjs';
+import { pdfDataUrl } from './cloudflare-fixtures.mjs';
 
 test('explicit route/default selection, immutable policy and direct calls bypass auto prerequisites', async () => {
     assert.throws(() => createDecisionRouter(registry({ candidates: ['auto'] })), { code: 'CONFIGURATION_ERROR' });
@@ -149,4 +150,28 @@ test('canonical aliases, duplicate native targets, extraction operation and obse
     assert.equal(result.extraction.answers.total.value, 12); assert.equal(result.meta.routing.observerFailed, true);
     assert.equal(result.meta.routing.selectedRoute, 'text');
     assert((await extractRoutedBatch(extraction, [input]))[0].ok);
+});
+
+test('Cloudflare PDF attachment limits exclude only the Cloudflare route', async () => {
+    const fields = { total: { type: 'number' } };
+    const documents = Array(5).fill(pdfDataUrl);
+    const result = { extraction: { model: 'local', answers: { total: { type: 'number', value: 12 } },
+        truncated: false, usage: { input_tokens: 3, output_tokens: 0 } }, meta: {} };
+    const provider = {
+        name: 'local-extraction', kind: 'extraction', defaultModel: 'local',
+        validate(input) { return { ...input, model: 'local' }; },
+        async extract(input) { assert.deepEqual(input.documents, documents); return result; },
+        validateResult(saved) { return saved; },
+    };
+    const router = createExtractionRouter({ routes: {
+        auto: { policy: 'deterministic', candidates: ['cloudflare', 'local'] },
+        cloudflare: { config: { type: 'cloudflare-extraction', transport: 'binding', model: 'clairic-flash',
+            ai: { async run() { assert.fail('Cloudflare must reject five attachments before dispatch'); } } } },
+        local: { operation: 'extraction', provider },
+    }, defaultRoute: 'auto' });
+    const input = { fields, documents };
+    const report = router.inspect(input);
+    assert.equal(report.routes[0].status, 'unsupported');
+    assert.deepEqual(report.eligible, ['local']);
+    assert.equal((await router.extract(input)).meta.routing.selectedRoute, 'local');
 });

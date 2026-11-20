@@ -1,11 +1,11 @@
 import { requireCondition as check } from '../errors.mjs';
-import { validateImage } from '../input.mjs';
+import { base64ByteLength } from '../embedded.mjs';
 import { isRecord } from '../validation.mjs';
 import { imageDimensions } from './image-header.mjs';
 
 const FORMATS = ['image/png', 'image/jpeg', 'image/webp'];
-/** Inspect bounded embedded bytes; this is header validation, not full image decoding. */
-export function validateCloudflareImages(images) {
+/** Validate embedded encoding and, when requested, inspect the image header. */
+export function validateCloudflareImages(images, { checkBytes, checkHeader = true } = {}) {
     check(Array.isArray(images), 'Cloudflare images must be an array.');
     for (const image of images) {
         let format, payload;
@@ -22,7 +22,9 @@ export function validateCloudflareImages(images) {
             format = image.content_type;
             payload = image.base64;
         }
-        validateImage('data:' + format + ';base64,' + payload);
+        const size = base64ByteLength(payload);
+        checkBytes?.(size);
+        if (!checkHeader) continue;
         const decoded = atob(payload);
         const bytes = new Uint8Array(decoded.length);
         for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);

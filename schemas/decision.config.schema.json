@@ -1202,7 +1202,9 @@
                         "model": {
                             "enum": [
                                 "clairic",
-                                "@cf/cloudflare/clairic"
+                                "@cf/cloudflare/clairic",
+                                "clairic-flash",
+                                "@cf/cloudflare/clairic-flash"
                             ]
                         },
                         "apiKeyEnv": {

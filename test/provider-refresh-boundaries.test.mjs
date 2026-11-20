@@ -58,6 +58,16 @@ test('OpenRouter CLI profiles initialize, validate, dispatch and batch both nati
     assert(calls.every(({ url, body }) => url === 'https://openrouter.ai/api/alpha/' + (body.fields ? 'extractions' : 'decisions')));
 });
 
+test('OpenRouter System One CLI rejects model listing before credential lookup or dispatch', async t => {
+    const cwd = await temporaryWorkspace(t);
+    await writeFile(join(cwd, 'systemone.json'), JSON.stringify({ ...config('openrouter-decisions'), api: 'systemone' }));
+    const fetch = t.mock.method(globalThis, 'fetch', () => assert.fail('Unexpected model listing dispatch'));
+    const result = await invoke(['models', '--config', 'systemone.json'], undefined, { cwd });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /UNSUPPORTED_OPERATION/);
+    assert.equal(fetch.mock.callCount(), 0);
+});
+
 test('native OpenRouter routes preflight offline, enforce one fallback owner and preserve extraction metadata', async () => {
     let calls = 0;
     const configured = { type: 'openrouter-decisions', apiKey: 'fixture', model: 'vendor/model', fetchImpl: async () => {
@@ -74,7 +84,9 @@ test('native OpenRouter routes preflight offline, enforce one fallback owner and
         ...configured, type: 'openrouter-extraction', fetchImpl: async () => Response.json({ model: 'served',
             answers: { name: { type: 'text', value: 'Ada' } }, usage, state_text: null }),
     } } } });
-    const result = await extraction.extract({ state: 'Ada', fields });
+    const input = { state: 'Ada', fields: { name: { type: 'text', null_threshold: 0 } } };
+    assert.equal(extraction.inspect(input).selectedRoute, 'extract');
+    const result = await extraction.extract(input);
     assert.equal(result.meta.provider, 'openrouter-extraction');
     assert.equal(result.extraction.state_text, null); assert.equal(result.extraction.truncated, undefined);
 });

@@ -1,10 +1,9 @@
 # Custom decision providers
 
 Use `@fayegram-ai/decision-bridge/custom/decision` to connect a service with its own
-decision-model API. Jev, OpenAI Decisions, Cloudflare and OpenRouter Decisions are
-built into the root SDK. If
-you are prompting a general-purpose model to produce decisions, use
-[custom generative providers](CUSTOM_GENERATIVE.md) instead.
+decision-model API. See the [built-in native providers](../reference/PROVIDERS.md#native-decision-providers)
+for protocols covered by the root SDK. To prompt a general-purpose model for
+decisions, use a [custom generative provider](CUSTOM_GENERATIVE.md).
 
 ## SDK definition
 

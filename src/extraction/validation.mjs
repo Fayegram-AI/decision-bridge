@@ -4,17 +4,22 @@ import { serializeRequestBody } from '../transport.mjs';
 import { optionsObject } from '../options.mjs';
 import { cloudflareBindingBody } from '../providers/cloudflare-preflight.mjs';
 import { cloudflareGateway, validateCloudflareLimits } from '../providers/cloudflare-profile.mjs';
-import { validateCloudflareImages } from '../providers/cloudflare-images.mjs';
+import { extractionRequestLimit, validateExtractionMedia } from './cloudflare-media.mjs';
 
 const own = (value, key) => Object.hasOwn(value, key);
 const TYPES = ['text', 'number', 'date', 'time', 'datetime', 'duration', 'list', 'estimate', 'forecast'];
 const FIELD_KEYS = ['type', 'instructions', 'unit', 'integer', 'decimals', 'items', 'min', 'max',
     'step', 'scale', 'null_threshold', 'horizon', 'interval'];
 const isDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const CLAIRIC_UNIT_TYPES = ['number', 'duration', 'list', 'estimate', 'forecast'];
+const CLAIRIC_THRESHOLD_TYPES = ['date', 'time', 'datetime', 'duration'];
+
+export const CLOUDFLARE_EXTRACTION_MODELS = Object.freeze(['clairic', 'clairic-flash']);
 
 export function extractionModel(value = 'clairic') {
-    check(value === 'clairic' || value === '@cf/cloudflare/clairic', 'Unsupported extraction model.', 'UNSUPPORTED_CAPABILITY');
-    return 'clairic';
+    const model = CLOUDFLARE_EXTRACTION_MODELS.find(name => value === name || value === '@cf/cloudflare/' + name);
+    check(model !== undefined, 'Unsupported extraction model.', 'UNSUPPORTED_CAPABILITY');
+    return model;
 }
 
 export function validateExtractionField(spec, { allowZeroThreshold = false, numericListInteger = false } = {}) {
@@ -44,9 +49,12 @@ export function validateExtractionField(spec, { allowZeroThreshold = false, nume
 }
 
 /** Structural validation is independent of route model and transport policy. */
-export function validateExtractionStructure(input, fieldOptions) {
+export function validateExtractionStructure(input, { deferMedia = false, allowDocuments = true, ...fieldOptions } = {}) {
     const request = cloneJson(input, 'extraction request');
-    check(isRecord(request) && Object.keys(request).every(key => ['model', 'state', 'fields', 'images', 'reference_date', 'options'].includes(key)), 'Invalid extraction request fields.');
+    check(isRecord(request) && Object.keys(request).every(key =>
+        ['model', 'state', 'fields', 'images', 'documents', 'reference_date', 'options'].includes(key)), 'Invalid extraction request fields.');
+    check(allowDocuments || !own(request, 'documents'),
+        'OpenRouter common extraction does not accept documents; use native extraction assets for supported PDFs.', 'UNSUPPORTED_CAPABILITY');
     check(request.model === undefined || (typeof request.model === 'string' && request.model.trim()), 'model must be nonempty text.');
     check(isRecord(request.fields) && Object.keys(request.fields).length > 0, 'Extraction requires named fields.');
     for (const [name, spec] of Object.entries(request.fields)) {
@@ -54,20 +62,33 @@ export function validateExtractionStructure(input, fieldOptions) {
         validateExtractionField(spec, fieldOptions);
     }
     check(request.state === undefined || typeof request.state === 'string', 'Extraction state must be text.');
-    check((request.state?.length ?? 0) > 0 || (Array.isArray(request.images) && request.images.length > 0), 'Provide text or embedded images.');
+    check(request.images === undefined || Array.isArray(request.images), 'Cloudflare images must be an array.');
+    check(request.documents === undefined || Array.isArray(request.documents), 'Cloudflare documents must be an array.');
+    check((request.state?.length ?? 0) > 0 || request.images?.length > 0 || request.documents?.length > 0,
+        'Provide text, embedded images, or embedded PDF documents.');
     check(request.reference_date === undefined || isDate(request.reference_date), 'reference_date must be an ISO date.');
     const inference = own(request, 'options') ? request.options : {};
     check(isRecord(inference) && Object.keys(inference).every(key => ['include_quantiles', 'return_state_text', 'rejectIfBusy'].includes(key)) &&
         Object.values(inference).every(value => typeof value === 'boolean'), 'Invalid extraction options.');
-    if (own(request, 'images')) validateCloudflareImages(request.images);
+    if (!deferMedia) validateExtractionMedia(request);
     return request;
 }
 
 /** Credential-free preflight shares the exact wire budget with actual dispatch. */
 export function validateExtractionRequest(input, options = {}) {
     const settings = optionsObject(options, ['model', 'transport', 'gateway', 'maxRequestBytes', 'maxRetries', 'rejectIfBusy'], 'Extraction validation options');
-    const request = validateExtractionStructure(input);
-    const model = extractionModel(own(request, 'model') ? request.model : settings.model);
+    const request = validateExtractionStructure(input, { deferMedia: true, numericListInteger: true });
+    const defaultModel = extractionModel(settings.model);
+    const model = own(request, 'model') ? extractionModel(request.model) : defaultModel;
+    // The hosted Clairic schemas impose stricter constraints than the shared field grammar.
+    for (const [name, spec] of Object.entries(request.fields)) {
+        check(name.length <= 64, 'Cloudflare extraction field names must be at most 64 characters.');
+        check(spec.decimals === undefined || spec.decimals <= 6, 'Cloudflare extraction decimals must be at most 6.');
+        check(spec.horizon === undefined || spec.horizon <= 64, 'Cloudflare extraction forecast horizon must be at most 64.');
+        check(spec.unit === undefined || CLAIRIC_UNIT_TYPES.includes(spec.type), 'unit is unavailable for this Cloudflare extraction field type.');
+        check(spec.null_threshold === undefined || CLAIRIC_THRESHOLD_TYPES.includes(spec.type),
+            'null_threshold applies to Cloudflare date, time, datetime and duration fields.');
+    }
     const inference = request.options ?? {};
     const transport = settings.transport === undefined ? 'rest' : settings.transport;
     check(['rest', 'binding'].includes(transport), 'Unknown Cloudflare transport.', 'CONFIGURATION_ERROR');
@@ -75,8 +96,9 @@ export function validateExtractionRequest(input, options = {}) {
     const rejectIfBusy = inference.rejectIfBusy ?? settings.rejectIfBusy ?? false;
     validateCloudflareLimits({ ...settings, gateway, rejectIfBusy });
     const result = { ...request, model, ...(rejectIfBusy ? { options: { ...inference, rejectIfBusy } } : {}) };
-    serializeRequestBody(transport === 'binding' ? cloudflareBindingBody(result, gateway) : result, settings.maxRequestBytes);
-    if (own(request, 'images')) validateCloudflareImages(request.images);
+    serializeRequestBody(transport === 'binding' ? cloudflareBindingBody(result, gateway) : result,
+        extractionRequestLimit(result, settings.maxRequestBytes));
+    validateExtractionMedia(result, { enforcePdfLimits: true });
     return freezeJson(result);
 }
 
@@ -108,8 +130,8 @@ export function validateExtractionResponse(input, request, { openRouter = false 
             invalid(typeof answer[key] === 'number' && answer[key] >= 0 && answer[key] <= 1, 'Invalid extraction probability.');
         }
         const span = item => Array.isArray(item) && item.length === 2 && item.every(n => Number.isSafeInteger(n) && n >= 0) && item[1] >= item[0];
-        if (own(answer, 'span')) invalid(span(answer.span), 'Invalid extraction span.');
-        if (own(answer, 'spans')) invalid(Array.isArray(answer.spans) && answer.spans.every(item => openRouter && item === null || span(item)), 'Invalid extraction spans.');
+        if (own(answer, 'span')) invalid((!openRouter && answer.span === null) || span(answer.span), 'Invalid extraction span.');
+        if (own(answer, 'spans')) invalid(Array.isArray(answer.spans) && answer.spans.every(item => item === null || span(item)), 'Invalid extraction spans.');
         for (const key of ['quantiles', 'steps']) if (own(answer, key)) invalid(Array.isArray(answer[key]), 'Invalid predictive array.');
     }
     return freezeJson(data);
