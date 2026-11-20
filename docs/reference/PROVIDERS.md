@@ -52,7 +52,7 @@ contract. The following additional forms are checked before dispatch:
 | OpenAI Decisions | Supported; preserving order | Supported | Supported | Supported | Unsupported |
 | Cloudflare Clef / Clef-flash | Supported; images before text | Supported | Supported; ordered levels | Unsupported | Unsupported |
 | Cloudflare Clef-omni | Supported; images before audio/video/text | Supported | Supported; ordered levels | Unsupported | Unsupported |
-| OpenRouter native | Ordered text; media per verified model profile | Per profile | Per profile | Unsupported | Decisions catalog |
+| OpenRouter native | Ordered text; media per verified model profile | Per profile | Per profile | Unsupported | Decisions catalog with `api: 'decisions'` |
 | Gemini Decisions | Ordered text, images, audio, video and PDFs; supported remote references | Supported | Supported | Unsupported | Supported model metadata |
 | OpenAI-compatible / OpenRouter generative / Anthropic | Unsupported | Unsupported | Unsupported | Unsupported | Supported; service-specific catalog |
 
@@ -182,7 +182,7 @@ not discover models or establish account access. Generative targets require
 
 ## Dedicated operations
 
-Cloudflare Clairic and OpenRouter Extractions use the dedicated
+Cloudflare Clairic, Clairic Flash and OpenRouter Extractions use the dedicated
 [extraction API](../guides/EXTRACTION.md#provider-neutral-extraction).
 Extraction providers are not DecisionProviders and are not accepted by `createBridge`.
 [Live Decisions](../guides/LIVE_DECISIONS.md) owns a connection-oriented command

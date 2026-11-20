@@ -213,7 +213,7 @@ export async function runCli(argv, { stdin = process.stdin, stdout = process.std
     check(command !== 'inspect' && values.route === undefined && !values.interactive && !values['no-interactive'] && !values['no-routing-prompt'],
       'Routing options and inspect require a schemaVersion: 2 configuration; use init --route auto to create one.', 'USAGE_ERROR');
     check(extracting === (loaded.config.provider.endsWith('-extraction')), 'Selected provider does not match the command operation.', 'CONFIGURATION_ERROR');
-    const profile = extracting ? extractionProfile(loaded.config.provider) : decisionProfile(loaded.config.provider);
+    const profile = extracting ? extractionProfile(loaded.config.provider) : decisionProfile(loaded.config.provider, loaded.config.api);
     check(!values.native || !!profile?.native, 'This provider does not expose a separate native request format.', 'USAGE_ERROR');
     check(!values.native || (profile && ['init', 'evaluate', 'validate', 'batch'].includes(command)),
       '--native requires a decision provider and init/evaluate/validate/batch.', 'USAGE_ERROR');

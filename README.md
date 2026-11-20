@@ -31,9 +31,8 @@ additionally supports embedded WAV/MP3 audio and MP4/WebM video, ordered images 
 → videos → text. The shared API checks that the selected provider and model support your
 request before sending it. A provider refusal returns an error.
 
-**Version 0.1.8 · Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
+**Node.js 22.16+ or modern browsers (SDK) · ESM · zero runtime dependencies**
 
-These docs cover 0.1.8.
 For feature requirements and version history, see
 [version availability](docs/README.md#version-availability) and the
 [changelog](CHANGELOG.md). Start with the
@@ -75,7 +74,8 @@ the [OpenAI model selection guide](docs/guides/OPENAI_DECISIONS.md#model-selecti
 for details. Results retain the selected value in `meta.requestedModel`,
 the outgoing ID in `meta.resolvedModel`, and the service-reported model in `model`.
 The Cloudflare decision provider accepts the three decision models above, in short or full form.
-Model discovery is unsupported for OpenAI Decisions and Cloudflare.
+Model discovery is unsupported for OpenAI Decisions, Cloudflare Clef, and
+OpenRouter with `api: 'systemone'`.
 
 Additional decision protocols use [custom decision providers](docs/guides/CUSTOM_DECISION.md).
 General-purpose models use the separate [custom generative](docs/guides/CUSTOM_GENERATIVE.md)
@@ -83,8 +83,9 @@ entry point, with `openai-compatible`, `openrouter`, or `anthropic` presets, or
 an explicit provider module. Those presets require a model ID supported by your
 configured service and have no default model or fixed model catalog.
 
-Clairic uses the dedicated [extraction API](docs/guides/EXTRACTION.md), with
-selectors `clairic` and `@cf/cloudflare/clairic` (default `clairic`). It returns
+Cloudflare Clairic and Clairic Flash use the dedicated [extraction API](docs/guides/EXTRACTION.md).
+Select `clairic` (default) or `clairic-flash` by short name or full Workers AI ID.
+The API accepts text, embedded images and PDFs, and returns
 typed values, estimates and forecasts through REST or Workers bindings.
 [OpenRouter native Extractions](docs/guides/OPENROUTER_NATIVE.md#extractions) uses
 explicit model IDs with common images or native image/PDF assets.
@@ -293,10 +294,10 @@ test suite and development scripts.
 | Area | Implementation |
 | --- | --- |
 | Decision requests | Define [questions](docs/reference/SDK.md#question-builders) in code; send state, ordered input or conversation to a provider that supports it; receive typed answers and immutable results |
-| Native providers | Jev, OpenAI Decisions, Cloudflare Clef/Clef-flash/Clef-omni, and OpenRouter Decisions |
+| Native providers | [Jev, OpenAI Decisions, Cloudflare Clef, OpenRouter Decisions, and Gemini Decisions](docs/reference/PROVIDERS.md#native-decision-providers) |
 | Custom providers | Separate decision and generative contracts; opt-in Chat Completions, OpenRouter, and Anthropic presets |
 | SDK | Provider factory, [capability preflight](docs/reference/SDK.md#bridgegetcapabilitiesmodel-and-bridgevalidaterequest), [cancellation](docs/reference/SDK.md#cancellation-and-deadlines), and [ordered batch evaluation](docs/reference/SDK.md#sdk-batch-evaluation) |
-| Dedicated operations | [Cloudflare Clairic extraction](docs/guides/EXTRACTION.md), [OpenRouter Extractions](docs/guides/OPENROUTER_NATIVE.md#extractions), and [Live Decisions](docs/guides/LIVE_DECISIONS.md), with separate exports and native results |
+| Dedicated operations | [Cloudflare extraction](docs/guides/EXTRACTION.md), [OpenRouter Extractions](docs/guides/OPENROUTER_NATIVE.md#extractions), and [Live Decisions](docs/guides/LIVE_DECISIONS.md), with separate exports and native results |
 | Routing | Choose configured targets directly or use [experimental auto mode](docs/guides/ROUTING.md) with rules, a decision model, or clarification |
 | Application extensions | [State/input/conversation preparation and result observation](docs/guides/CUSTOMIZATION.md), plus [choice thresholds and abstention policies](docs/guides/CUSTOMIZATION.md#application-policy-is-a-separate-stage) |
 | Node command | [Decision/extraction commands and offline Live validation/replay](docs/reference/CLI.md#commands), with [explicit JSON profiles](docs/reference/CONFIGURATION.md) |

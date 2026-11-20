@@ -86,12 +86,14 @@ export function openRouterMeta(data, meta, model) {
         ...(data.provider === undefined ? {} : { upstreamProvider: data.provider }) };
 }
 
-export async function openRouterModels(transport, options, api = 'decisions') {
+export async function openRouterModels(transport, options) {
     const { data, meta } = await transport.request('GET', '/api/v1/models', undefined, options,
-        { endpoints: api === 'systemone' ? '/api/v1/systemone' : '/api/alpha/decisions' });
+        { endpoints: '/api/alpha/decisions' });
     return withResponseMeta(meta, () => {
-        check(isRecord(data) && Array.isArray(data.data) && data.data.every(m => isRecord(m) && typeof m.id === 'string' && m.id.trim()),
+        const catalogue = cloneJson(data, 'OpenRouter model catalogue', 'INVALID_RESPONSE');
+        check(isRecord(catalogue) && Array.isArray(catalogue.data) && catalogue.data.every(m => isRecord(m) && typeof m.id === 'string' && m.id.trim()),
             'Invalid OpenRouter model catalogue.', 'INVALID_RESPONSE');
-        return freezeJson({ models: data.data.map(m => ({ ...m, name: m.id })) });
+        const { data: cards, ...metadata } = catalogue;
+        return freezeJson({ ...metadata, models: cards.map(m => ({ ...m, name: m.id })) });
     });
 }

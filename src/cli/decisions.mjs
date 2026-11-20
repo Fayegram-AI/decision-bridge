@@ -11,7 +11,7 @@ import { prepareGeminiDecision } from '../providers/gemini-input.mjs';
 import { prepareCommonGeminiDecision } from '../providers/gemini-codec.mjs';
 
 /** Provider-specific native dispatch is shared by validation, initialization and calls. */
-export function decisionProfile(provider) {
+export function decisionProfile(provider, api) {
     if (provider === 'gemini-decisions') return {
         common: (input, settings) => prepareCommonGeminiDecision(input, settings).request,
         native: prepareGeminiDecision, encode: input => prepareCommonGeminiDecision(input).native,
@@ -21,7 +21,7 @@ export function decisionProfile(provider) {
     if (provider === 'openrouter-decisions') return {
         common: (input, settings) => prepareCommonOpenRouterDecision(input, settings).request,
         native: prepareOpenRouterDecision, encode: input => prepareCommonOpenRouterDecision(input).native,
-        models: true, inputLimit: 8 * 1024 * 1024,
+        models: api !== 'systemone', inputLimit: 8 * 1024 * 1024,
         options: config => ({ model: config.model, maxRequestBytes: config.maxRequestBytes, providerPreferences: config.providerPreferences }),
     };
     if (provider === 'jev') return {

@@ -4,8 +4,8 @@ The optional command runner evaluates decision files, runs Cloudflare or OpenRou
 and validates or replays Live protocol records offline. For application
 integration, start with the [SDK guide](../guides/GETTING_STARTED.md).
 
-This reference describes 0.1.8. See
-[version availability](../README.md#version-availability) for earlier command support.
+See [version availability](../README.md#version-availability) for documentation
+matched to your installed version.
 
 After [installing the package](../guides/GETTING_STARTED.md#install-into-your-application)
 in your project, run:
@@ -270,7 +270,9 @@ Config:
 first-party Anthropic's 128,000,000-byte request ceilings. Cloudflare reads single JSON inputs
 and individual JSONL records within 64 MiB, then applies model-specific serialized
 request validation: Clef/Clef-flash default 13 MiB, configurable through 64 MiB; Omni default 36 MiB,
-configurable through 64 MiB; Clairic defaults to 8 MiB, configurable through 64 MiB.
+configurable through 64 MiB. Clairic and Clairic Flash default to 8 MiB and accept
+configured budgets through 64 MiB. Requests containing PDFs also have a 16 MiB
+body ceiling and [attachment limits](../guides/EXTRACTION.md#pdf-documents).
 Explicit smaller ceilings remain in force. Request
 model overrides and mixed-model JSONL batches use each effective model's budget.
 The JSONL total is the larger of 64 MiB and the per-record input budget plus

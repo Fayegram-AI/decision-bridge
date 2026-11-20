@@ -8,6 +8,7 @@ import { runCli } from '../src/cli/main.mjs';
 import { loadConfig } from '../src/cli/config.mjs';
 import { streams, temporaryWorkspace } from './support.mjs';
 import { decisionResponse } from './decisions-fixtures.mjs';
+import { pdf } from './cloudflare-fixtures.mjs';
 
 const request = { state: '4 USD', fields: { amount: { type: 'number' } }, options: { include_quantiles: true } };
 async function invoke(args, input, context = {}) {
@@ -33,7 +34,32 @@ test('extraction namespace defaults to Clairic and validates/initializes without
     const ajvModule = await import('ajv/dist/2020.js'); const ajv = new ajvModule.default({ strict: false });
     const schema = JSON.parse(await readFile(join(cwd, 'decision.config.schema.json'), 'utf8'));
     delete config.$schema;
-    assert.equal(ajv.compile(schema)(config), true);
+    const validate = ajv.compile(schema);
+    assert.equal(validate(config), true);
+    for (const model of ['clairic-flash', '@cf/cloudflare/clairic-flash']) assert.equal(validate({ ...config, model }), true);
+    await writeFile(join(cwd, 'flash.json'), JSON.stringify({ ...config, model: '@cf/cloudflare/clairic-flash' }));
+    const switchedSample = await invoke(['extraction', 'validate', 'request.json', '--config', 'flash.json'], undefined, { cwd });
+    assert.equal(switchedSample.code, 0, switchedSample.stderr);
+    assert.equal(JSON.parse(switchedSample.stdout).model, '@cf/cloudflare/clairic-flash');
+    const flash = await invoke(['extraction', 'validate', '-', '--config', 'flash.json'],
+        { fields: request.fields, documents: [pdf] }, { cwd });
+    assert.equal(flash.code, 0, flash.stderr);
+    assert.equal(JSON.parse(flash.stdout).model, '@cf/cloudflare/clairic-flash');
+});
+
+test('extraction preflight rejects an invalid profile model even when the request selects Flash', async t => {
+    const cwd = await temporaryWorkspace(t);
+    await writeFile(join(cwd, 'profile.json'), JSON.stringify({ provider: 'cloudflare-extraction', model: 'clairic-27b' }));
+    const input = { fields: request.fields, documents: [pdf], model: 'clairic-flash' };
+    const flags = ['-', '--config', 'profile.json'];
+    for (const command of ['validate', 'run']) {
+        const result = await invoke(['extraction', command, ...flags], input, { cwd });
+        assert.notEqual(result.code, 0);
+        assert.match(result.stderr, /UNSUPPORTED_CAPABILITY/);
+        assert.match(result.stderr, /Unsupported extraction model/);
+    }
+    const overridden = await invoke(['extraction', 'validate', ...flags, '--model', 'clairic-flash'], input, { cwd });
+    assert.equal(overridden.code, 0, overridden.stderr);
 });
 
 test('extraction runs REST and streams mixed JSONL results through its own operation', async t => {
@@ -41,10 +67,10 @@ test('extraction runs REST and streams mixed JSONL results through its own opera
     const server = createServer(async (req, res) => {
         let body = ''; for await (const chunk of req) body += chunk;
         const input = JSON.parse(body); bodies.push(input);
-        assert(req.url.endsWith('/ai/run/@cf/cloudflare/clairic'));
+        assert(req.url.endsWith('/ai/run/@cf/cloudflare/' + input.model));
         if (input.state === 'fail') { res.writeHead(429); res.end(JSON.stringify({ errors: [{ code: 3036 }] })); return; }
         res.setHeader('content-type', 'application/json');
-        res.end(JSON.stringify({ success: true, result: { model: 'clairic', answers: { amount: { type: 'number', value: 4 } },
+        res.end(JSON.stringify({ success: true, result: { model: input.model, answers: { amount: { type: 'number', value: 4 } },
             truncated: false, usage: { input_tokens: 10, output_tokens: 0 } }, errors: [], messages: [] }));
     });
     server.listen(0, '127.0.0.1'); await once(server, 'listening');
@@ -63,13 +89,19 @@ test('extraction runs REST and streams mixed JSONL results through its own opera
         assert.equal(bodies.at(-1).options.rejectIfBusy, enabled);
         assert.equal(bodies.at(-1).options.include_quantiles, true);
     }
-    const rows = [request, { ...request, fields: {} }, { ...request, state: 'fail' }, request].map(JSON.stringify).join('\n');
+    const pdfRequest = { fields: request.fields, options: request.options, model: '@cf/cloudflare/clairic-flash', documents: [pdf] };
+    const single = await invoke(['extraction', 'run', '-', ...flags], pdfRequest, { env });
+    assert.equal(single.code, 0, single.stderr);
+    assert.equal(JSON.parse(single.stdout).meta.resolvedModel, 'clairic-flash');
+    const rows = [request, { ...request, fields: {} }, { ...request, state: 'fail' }, pdfRequest].map(JSON.stringify).join('\n');
     const batch = await invoke(['extraction', 'batch', '-', ...flags], rows, { env });
     assert.equal(batch.code, 1, batch.stderr);
     const records = batch.stdout.trim().split('\n').map(JSON.parse);
     assert.deepEqual(records.map(row => row.ok), [true, false, false, true]);
     assert.equal(records[2].error.code, 'ALLOCATION_EXCEEDED');
-    assert.equal(bodies.length, 6);
+    assert.equal(records[3].result.meta.requestedModel, pdfRequest.model);
+    assert.deepEqual(bodies.filter(body => body.model === 'clairic-flash').map(body => body.documents), [[pdf], [pdf]]);
+    assert.equal(bodies.length, 7);
     assert(bodies.every(body => body.options.include_quantiles));
 });
 

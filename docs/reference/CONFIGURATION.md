@@ -249,7 +249,8 @@ variables for credentials.
 
 The `extraction` namespace supplies provider `cloudflare-extraction` only when
 flags, environment and an explicit file have selected no provider. Its default
-model is `clairic`; `@cf/cloudflare/clairic` is also accepted. An explicit
+model is `clairic`. To use Clairic Flash, set `model` to `clairic-flash`.
+Both accept full Workers AI IDs with the `@cf/cloudflare/` prefix. An explicit
 `openrouter-extraction` profile requires a model ID and supports common input or
 `--native` assets. An incompatible provider is rejected. Provider switching follows the same isolation
 rules above, including transitions between Clef and Clairic. Single-provider

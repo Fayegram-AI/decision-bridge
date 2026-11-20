@@ -1,9 +1,20 @@
 # Jev images, boxes, and long context
 
 Jev uses TypeSafe's native `POST /v1/systemone` endpoint. The SDK defaults to
-`jev-latest`, the stable Jev 1.14 alias; `jev-preview` and explicit version IDs are also accepted. Model listing
-depends on your account and may show aliases without versioned IDs. The returned `model`
-records the service-reported version independently of `meta.requestedModel`.
+`jev-latest`, the stable Jev 1.14 alias; `jev-preview` and explicit version IDs
+such as `jev-1.14.0` are also accepted.
+
+## Model selection
+
+Use `jev-latest` to follow TypeSafe's stable alias, or set `model: 'jev-1.14.0'`
+to pin that version. An individual request's `model` overrides the provider's
+configured default. The returned `model` records the service-reported identity
+independently of `meta.requestedModel`.
+
+`listModels()` returns the account's catalog, which may contain aliases, pinned
+versions or both. It may omit versioned IDs. The SDK does not maintain a static
+Jev version list or combine aliases with pinned IDs. See
+[model listing](../reference/SDK.md#bridgelistmodelsoptions).
 
 ## Experimental opt-ins
 

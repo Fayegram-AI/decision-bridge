@@ -62,7 +62,7 @@ export async function initialize(directory, config, native = false, moduleBase =
         : native ? profile.native(profile.encode(validateRequest(request, template.model)), profile.options(template)) : request;
     // Generated request files inherit model selection from configuration.
     const generated = { ...sample };
-    if (['openai-decisions', 'gemini-decisions'].includes(config.provider)) delete generated.model;
+    if (['openai-decisions', 'gemini-decisions', 'cloudflare-extraction'].includes(config.provider)) delete generated.model;
     // Generated native defaults must not override the user's configured routing policy.
     if (['openrouter-decisions', 'openrouter-extraction'].includes(config.provider)) delete generated.provider;
     const schema = await readFile(new URL('../../schemas/decision.config.schema.json', import.meta.url), 'utf8');

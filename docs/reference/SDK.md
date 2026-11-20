@@ -6,8 +6,8 @@ JavaScript call, TypeScript setup, and CommonJS dynamic import. In a source chec
 the entry point is `src/index.mjs`. The package uses ESM and includes TypeScript
 declarations in `src/index.d.mts`.
 
-This reference covers **0.1.8**.
-See [version availability](../README.md#version-availability).
+See [version availability](../README.md#version-availability) for documentation
+matched to your installed version.
 
 ## Create a bridge
 
@@ -49,7 +49,7 @@ guides. These are SDK options, not per-evaluation bridge options.
 | Option | Default and behavior |
 | --- | --- |
 | `timeoutMs` | 30,000 ms; positive integer through 2,147,483,647; one transport budget for dispatch, retries, backoff, and response reading |
-| `maxRetries` | Additional eligible attempts, 0–10; Jev and ordinary generative calls default to 2; native OpenAI, Cloudflare and OpenRouter default to 0; Anthropic thread transport retries are disabled |
+| `maxRetries` | Additional eligible attempts, 0–10; Jev and ordinary generative calls default to 2; native OpenAI, Cloudflare, OpenRouter and Gemini default to 0; Anthropic thread transport retries are disabled |
 | `maxRequestBytes` | Complete serialized request ceiling; normally 8 MiB, configurable from 1 byte through 64 MiB. Gemini accepts explicit budgets through 160 MiB; first-party Anthropic Messages through 128,000,000 bytes. Jev defaults to 32 MiB, with explicit client budgets through 64 MiB; Cloudflare applies its [model-specific budgets](../guides/CLOUDFLARE_DECISIONS.md#embedded-images-and-limits) |
 | `maxResponseBytes` | 8 MiB; configurable from 1 byte through 64 MiB; applies while reading the response body |
 | `fetchImpl` | Optional `(url: string, init?: RequestInit) => Promise<Response>`; defaults to the runtime's `fetch` |
@@ -137,9 +137,13 @@ bytes against `maxRequestBytes`. The bridge repeats validation after preparation
 ### `bridge.listModels(options?)`
 
 Calls the provider's listing operation. Returns `{ models: [{ name, ... }], ... }`.
-Pagination markers are preserved; this is not a promise of an exhaustive catalog.
-OpenAI Decisions, Cloudflare Clef, and custom providers without listing support
-throw `UNSUPPORTED_OPERATION`.
+Pagination markers are preserved when the provider supplies them. Availability
+and pagination depend on the provider.
+The bridge preserves listed entries without resolving aliases or combining IDs
+that refer to the same model version. A catalog can include both an alias and a
+pinned version; the application chooses which selectors to expose.
+OpenAI Decisions, Cloudflare Clef, OpenRouter System One, and custom providers
+without listing support reject with `UNSUPPORTED_OPERATION`.
 
 ## Request data
 
@@ -555,18 +559,19 @@ by the root `createProvider` factory or implements the bridge's `evaluate` contr
 | `extraction` | `createExtractionProvider`, `CloudflareExtractionProvider`, `OpenRouterExtractionProvider`, `validateExtractionRequest`, `extractBatch` | Immutable `{ extraction, meta }`, with native values and model/transport diagnostics; [extraction guide](../guides/EXTRACTION.md) |
 | `live` | `createLiveDecisions`, `validateLiveConfiguration`, `validateLiveCommand`, `validateLiveEvent` | Commands, acknowledgements and event subscriptions over a caller-owned connection; [Live guide](../guides/LIVE_DECISIONS.md) |
 
-Both export their request, result, configuration and transport types. Extraction
-also exports `ExtractionProvider`, `CommonExtractionRequest`, `AnyExtractionResult`,
-and provider-specific types. Cloudflare
-extraction supports REST or a Workers AI binding; OpenRouter extraction uses REST.
-`validateExtractionRequest()` validates Clairic requests; use the configured
-provider's `validate()` for provider-specific validation.
+Both export request, result, configuration and transport types. The extraction
+export includes `ExtractionProvider`, `CommonExtractionRequest`,
+`AnyExtractionResult`, `CloudflareExtractionModelSelector` and
+`ExtractionDocument`. Cloudflare supports Clairic and Clairic Flash over REST
+or a Workers AI binding. OpenRouter extraction uses REST.
+`validateExtractionRequest()` validates Cloudflare extraction requests. For
+preflight with provider settings, call the configured provider's `validate()`.
 
 | Extraction method | Contract |
 | --- | --- |
-| `provider.validate(request)` | Validates a common request offline; returns an immutable common request with a resolved model, retaining common images for subsequent calls |
+| `provider.validate(request)` | Validates a common request offline and returns an immutable request with a resolved model and its embedded attachments |
 | `provider.extract(request, { signal }?)` | Evaluates a common extraction request and returns `{ extraction, meta }` |
-| `provider.validateResult(result, request)` | Validates a saved envelope offline against provider/model provenance and the common request's field contract |
+| `provider.validateResult(result, request)` | Validates a saved envelope offline against the provider, the model selector in the original request and the requested fields |
 | `OpenRouterExtractionProvider.createExtraction(request, { signal }?)` | Native OpenRouter request with image/PDF assets and request metadata; returns `{ extraction, meta }` |
 
 Validated common requests can be reused with extraction, `extractBatch` and

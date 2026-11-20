@@ -39,7 +39,7 @@ export function prepareOpenRouterExtraction(input, settings = {}) {
 
 /** Keep the reusable common snapshot separate from its provider-specific wire form. */
 function prepareCommonExtraction(input, settings) {
-    const request = validateExtractionStructure(input, { allowZeroThreshold: true, numericListInteger: true });
+    const request = validateExtractionStructure(input, { allowZeroThreshold: true, numericListInteger: true, allowDocuments: false });
     check(request.options === undefined || Object.keys(request.options).length === 0,
         'Cloudflare extraction options are not portable; configure OpenRouter providerPreferences.options explicitly.', 'UNSUPPORTED_CAPABILITY');
     const assets = {};

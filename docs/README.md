@@ -20,8 +20,8 @@ Cloudflare, OpenRouter and Gemini guides cover both.
 
 ## Version availability
 
-These guides describe **0.1.8**. Use the documentation bundled with your installed
-package. For earlier versions, consult the
+These guides cover Decision Bridge **0.1.9**. For earlier versions, see the
+[0.1.8 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.8/docs),
 [0.1.7 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.7/docs),
 [0.1.6 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.6/docs),
 [0.1.5 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/decision-bridge-v0.1.5/docs),
@@ -31,6 +31,7 @@ and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/de
 
 | Feature | First supported version |
 | --- | --- |
+| Clairic Flash, inline PDFs for Cloudflare extraction, and nullable Cloudflare extraction spans | 0.1.9 |
 | Prefixed and unprefixed provider credentials with shared SDK/CLI/routing precedence | 0.1.8 |
 | Additive response properties in native decisions, generated answers and Live acknowledgements; stable common result projection | 0.1.8 |
 | Model-aware Anthropic output defaults; expanded OpenRouter media/document profiles, extraction fields/assets and endpoint-filtered discovery | 0.1.8 |
@@ -46,8 +47,7 @@ and [0.1.2 documentation](https://github.com/Fayegram-AI/decision-bridge/tree/de
 | OpenAI `default`/`luna` model selectors | 0.1.1 |
 
 See [installation](guides/GETTING_STARTED.md#install-into-your-application) for setup
-and the [changelog](../CHANGELOG.md) for version history. Earlier APIs remain
-supported in 0.1.8.
+and the [changelog](../CHANGELOG.md) for version history.
 
 ## Use the bridge
 
@@ -64,7 +64,7 @@ supported in 0.1.8.
 | [Jev](guides/JEV.md) | Common/native images, boxes, experimental long context, model selection, and CLI opt-ins |
 | [OpenAI Decisions](guides/OPENAI_DECISIONS.md) | Model selectors, common/native access, JSON/question content, conversation/tool history, cache controls, and typed values |
 | [Cloudflare Clef / Clef-flash / Clef-omni](guides/CLOUDFLARE_DECISIONS.md) | Common/native decisions, embedded images and Omni audio/video, REST and Workers AI binding, busy-mode compatibility, and optional Gateway |
-| [Clairic extraction](guides/EXTRACTION.md) | Nine extraction/prediction types, REST/binding, native results, extraction CLI and shared validation/batch contracts |
+| [Cloudflare extraction](guides/EXTRACTION.md) | Clairic and Clairic Flash, embedded images and PDFs, nine field types, REST, Workers AI binding and CLI |
 | [Live Decisions](guides/LIVE_DECISIONS.md) | Existing-connection controller, JSON/hosted-image content, acknowledgements, correlation, and offline replay |
 | [Customization](guides/CUSTOMIZATION.md) | Questions, templates, extensions, and policies |
 | [Custom providers](guides/CUSTOM_PROVIDERS.md) | Common classified contract and explicit CLI module loading |

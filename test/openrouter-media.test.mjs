@@ -152,16 +152,27 @@ test('routing document eligibility, batches and context preserve MIME while reda
     assert(!context.includes('secret') && !context.includes('media.example') && !context.includes('YQ=='));
 });
 
-test('endpoint-specific discovery retains upstream model metadata', async () => {
-    for (const api of ['decisions', 'systemone']) {
-        const metadata = { id: 'vendor/model', endpoints: ['/api/alpha/decisions'], architecture: { input_modalities: ['text'] }, pricing: { prompt: '1' } };
-        const provider = make('vendor/model', async url => {
-            assert.equal(new URL(url).searchParams.get('endpoints'), api === 'systemone' ? '/api/v1/systemone' : '/api/alpha/decisions');
-            assert.equal(new URL(url).searchParams.has('output_modalities'), false);
-            return Response.json({ data: [metadata] });
-        }, { api });
-        assert.deepEqual((await provider.listModels()).models, [{ ...metadata, name: metadata.id }]);
-    }
+test('Decisions discovery retains catalogue and model metadata through the SDK and CLI', async t => {
+    const card = { id: 'vendor/model', endpoints: ['/api/alpha/decisions'], architecture: { input_modalities: ['text'] }, pricing: { prompt: '1' } };
+    const metadata = { has_more: true, last_id: card.id, catalog_details: { region: 'fixture' } };
+    const fetchCatalogue = async url => {
+        const params = new URL(url).searchParams;
+        assert.equal(params.get('endpoints'), '/api/alpha/decisions');
+        assert.equal(params.has('output_modalities'), false);
+        return Response.json({ data: [card], ...metadata });
+    };
+    const provider = make(card.id, fetchCatalogue, { api: 'decisions' });
+    const expected = { ...metadata, models: [{ ...card, name: card.id }] };
+    const list = await provider.listModels();
+    assert.deepEqual(list, expected);
+    assert(Object.isFrozen(list.catalog_details));
+    assert.deepEqual(await createBridge({ provider }).listModels(), expected);
+
+    t.mock.method(globalThis, 'fetch', fetchCatalogue);
+    const io = streams();
+    const code = await runCli(['models', '--provider', 'openrouter-decisions'], { ...io, env: { OPENROUTER_API_KEY: 'fixture' } });
+    assert.equal(code, 0, io.error());
+    assert.deepEqual(JSON.parse(io.output()), expected);
 });
 
 test('OpenRouter profile lookup follows native model normalization without coercing invalid selectors', async () => {

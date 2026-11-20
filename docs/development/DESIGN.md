@@ -36,8 +36,9 @@ output schemas do not imply interchangeable calibration or correctness.
 
 Decision calls reject invalid JSON, unsupported request fields, wrong labels,
 distributions outside the provider precision allowance, malformed results and refusals;
-generative paths also reject explicit output truncation. Require explicit output modes
-and models. Services may truncate input without reporting it; local byte limits do not
+generative paths also reject explicit output truncation. Model and output-mode
+defaults follow each provider's configuration contract. Services may truncate input
+without reporting it; local byte limits do not
 guarantee token fit. Invalid results fail explicitly so applications can apply their
 own error-handling policy.
 

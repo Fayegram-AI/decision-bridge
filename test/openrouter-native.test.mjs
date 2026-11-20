@@ -9,7 +9,7 @@ const decision = { model: 'served', answers: { q: { type: 'choice', choice: 'a',
     usage: { input_tokens: 2, output_tokens: 0, cost: 0.001 }, id: 'gen-1', provider: 'upstream' };
 const native = (extra = {}) => createProvider({ type: 'openrouter-decisions', apiKey: 'fixture', model: 'vendor/new-model', ...extra });
 
-test('native OpenRouter IDs, explicit endpoints, discovery and common metadata', async () => {
+test('native OpenRouter IDs, default endpoint, discovery and common metadata', async () => {
     const calls = [];
     const provider = native({ fetchImpl: async (url, init) => {
         calls.push({ url, init });
@@ -26,9 +26,23 @@ test('native OpenRouter IDs, explicit endpoints, discovery and common metadata',
     assert.equal(result.answers.q.confidence, undefined);
     assert.equal((await provider.listModels()).models[0].name, 'vendor/new-model');
     assert.equal(calls[1].url, 'https://openrouter.ai/api/v1/models?endpoints=%2Fapi%2Falpha%2Fdecisions');
-    await native({ api: 'systemone', fetchImpl: async url => {
-        assert.equal(url, 'https://openrouter.ai/api/v1/systemone'); return Response.json(decision);
-    } }).createDecision({ state: 'Text', questions });
+});
+
+test('OpenRouter System One rejects discovery locally and still dispatches inference', async () => {
+    const calls = [];
+    const provider = native({ api: 'systemone', fetchImpl: async (url, init) => {
+        calls.push({ url, method: init.method });
+        if (init.method === 'GET') return Response.json({ error: { message: 'Invalid endpoints value' } }, { status: 400 });
+        return Response.json(decision);
+    } });
+    const error = { code: 'UNSUPPORTED_OPERATION', message: /api: 'decisions'/ };
+    await assert.rejects(provider.listModels(), error);
+    await assert.rejects(createBridge({ provider }).listModels(), error);
+    assert.deepEqual(calls, []);
+
+    const result = await provider.createDecision({ state: 'Text', questions });
+    assert.equal(result.decision.model, decision.model);
+    assert.deepEqual(calls, [{ url: 'https://openrouter.ai/api/v1/systemone', method: 'POST' }]);
 });
 
 test('valid native answers without probabilities remain distinct from common results', async () => {

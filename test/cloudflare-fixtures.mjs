@@ -3,6 +3,9 @@ import { CloudflareDecisionsProvider, createBridge } from '../src/index.mjs';
 
 // Complete 1x1 RGBA PNG with valid chunk checksums, suitable for hosted decoding.
 export const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgaPj/HwAEggJ/59habAAAAABJRU5ErkJggg==';
+// Header-only PDF fixture for client preflight and mock transports.
+export const pdf = { content_type: 'application/pdf', base64: 'JVBERi0xLjcK' };
+export const pdfDataUrl = 'data:application/pdf;base64,' + pdf.base64;
 export const native = { state: 'Synthetic evidence', questions: { q: { type: 'noul', instructions: 'True?' } } };
 export const common = native;
 export function cloudflareResponse(request) {

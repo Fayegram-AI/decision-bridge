@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.9
+
+- Add Clairic Flash as `clairic-flash` or `@cf/cloudflare/clairic-flash`. Both
+  Clairic models accept inline PDF input over REST and Workers AI bindings,
+  including SDK, CLI, batch, and routed extraction.
+- Check Cloudflare attachment limits and field constraints before dispatch.
+  Field names are limited to 64 characters, decimal settings to six places,
+  and forecast horizons to 64 steps. Preserve nullable spans in native results.
+- Generate Cloudflare extraction requests that inherit the profile model.
+  Offline validation checks the profile selector even when a request selects
+  a different model.
+- Preserve OpenRouter Decisions catalogue and model-card metadata in the SDK
+  and CLI. System One model listing returns `UNSUPPORTED_OPERATION`. Supply
+  an explicit model ID for System One inference.
+
 ## 0.1.8
 
 - Accept additive response fields in native decisions, generated answers and Live

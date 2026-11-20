@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDecisionRouter } from '../src/routing/index.mjs';
+import { createDecisionRouter, createExtractionRouter, extractRoutedBatch } from '../src/routing/index.mjs';
 import { DecisionError } from '../src/errors.mjs';
 import { registry, worker, selector, routingRequest as request } from './routing-fixtures.mjs';
 import { image } from './decisions-fixtures.mjs';
 import { noulWithParts } from '../src/index.mjs';
+import { pdf, pdfDataUrl } from './cloudflare-fixtures.mjs';
 
 function assisted(policy = {}, routes = {}) {
     return registry({ policy: 'decision-assisted', selector: { route: 'judge', minProbability: 0.6, minMargin: 0.1 }, ...policy },
@@ -30,6 +31,53 @@ test('question images are sanitized for selectors while JSON data remains opaque
     assert.equal(context.task.media.length, 2);
     assert.equal(context.task.media[1].remote, true);
     assert.deepEqual(received.questions.yes.instructionParts, instructionParts);
+});
+
+test('routed PDFs reach eligible Cloudflare models and selectors see only document metadata', async () => {
+    let context;
+    const requests = [];
+    const judge = selector(input => {
+        context = JSON.parse(input.state);
+        return selector().evaluate(input);
+    });
+    const ai = { async run(model, input) {
+        requests.push({ model, input });
+        return Response.json({ model: input.model, answers: { total: { type: 'number', value: 4 },
+            items: { type: 'list', value: [4] } },
+            truncated: false, usage: { input_tokens: 2, output_tokens: 1 } });
+    } };
+    const cloudflare = { type: 'cloudflare-extraction', transport: 'binding', ai };
+    const router = createExtractionRouter(assisted({ candidates: ['a', 'b', 'openrouter', 'extra'],
+        rules: [
+            { effect: 'require', when: { modalities: ['document'] }, routes: ['a', 'b', 'openrouter'] },
+            { effect: 'require', when: { modalities: ['text'] }, routes: ['extra'] },
+        ] }, {
+        a: { model: 'clairic-flash', config: { ...cloudflare, model: '@cf/cloudflare/clairic-flash' } },
+        b: { config: cloudflare },
+        extra: { config: { ...cloudflare, ai: { run() { assert.fail('Unexpected extra route'); } } } },
+        openrouter: { config: { type: 'openrouter-extraction', model: 'cloudflare/clairic', apiKey: 'fixture',
+            fetchImpl() { assert.fail('Unexpected OpenRouter dispatch'); } } },
+        judge: { provider: judge },
+    }));
+    const input = { state: '', documents: [pdfDataUrl, pdf],
+        fields: { total: { type: 'number' }, items: { type: 'list', items: 'number', integer: true } } };
+    const report = router.inspect(input);
+    assert.deepEqual(report.eligible, ['a', 'b']);
+    assert.equal(report.routes.find(route => route.id === 'openrouter').code, 'UNSUPPORTED_CAPABILITY');
+    assert.equal(report.routes.find(route => route.id === 'extra').status, 'constrained');
+    const result = await router.extract(input);
+    assert.equal(result.meta.routing.method, 'selector');
+    assert.deepEqual(context.candidates.map(candidate => candidate.route), ['a', 'b']);
+    assert.deepEqual(context.task.media, Array(2).fill({ type: 'document', mimeType: 'application/pdf',
+        bytes: Buffer.from(pdf.base64, 'base64').length }));
+    assert(!JSON.stringify(context).includes(pdf.base64));
+    assert.deepEqual(requests, [{ model: '@cf/cloudflare/clairic-flash', input: { ...input, model: 'clairic-flash' } }]);
+
+    const explicit = { ...input, model: '@cf/cloudflare/clairic-flash' };
+    assert.equal(router.inspect(explicit).selectedRoute, 'a');
+    assert.equal(router.inspect(explicit, { route: 'b' }).routes[0].code, 'UNSUPPORTED_CAPABILITY');
+    const [row] = await extractRoutedBatch(router, [explicit]);
+    assert.equal(row.result.meta.requestedModel, explicit.model);
 });
 
 test('JSON-only input uses text routing rules and unsupported content routes are excluded', async () => {
